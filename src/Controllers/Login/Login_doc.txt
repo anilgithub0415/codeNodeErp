@@ -1,0 +1,22 @@
+As you can see Login.ts controller is replaced by Login_1.ts.
+Along with that a repository named 'RefreshTokenRepositoryTypeorm' replaced by 'RefreshTokenRepositoryTypeorm_1'
+and 
+service named LoginServiceTypeOrmNotInUse replaced by LoginServiceTypeOrmNotInUse_1
+
+Reason behing is to avoid race conditions while system startup, Especially while creating repository instances.
+We added dependencies.ts service. What happens is once service is included it is creating repositories. And repositories are referred by 
+other code parts for guarantee of repositories instances initiated. 
+
+In dependencies.ts all getters are exposed to return repositories.
+In LoginServiceTypeOrm_1 that is new Loginservice we have imported all getters and initializeDependencies method like below
+import { getUserRepository, getRefreshTokenRepository, getSettingsService, initializeDependencies} from '../dependencies'
+
+All these efforts are taken to avoid multiple refreshTokens of a one User with same device.
+It works now in following manner.
+
+A user say User1 logs in with a device, a refreshToken is created which is normal. But when he logs in again without logout,
+a refreshToken which is already existing is deleted and new refreshToken is created. And there is no refreshToken which 
+are additonal may be decaying and dangeor of mis use. 
+
+This approach is reverted and stored all code in SingleRefershTokenForAUserADevice
+

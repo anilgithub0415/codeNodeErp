@@ -1,0 +1,17 @@
+SettingsService.loadSettings method is called from initializeLoginService method of LoginServiceTypeOrm,
+before that initializeLoginService is called from server.ts.
+This implies server.ts is calling SettingsService.LoadSettings method  
+Methods exposed:
+    loadSettings - method read settings from DB 
+    getSettings - return settings 
+    refreshSettings - call loadSettings 
+    saveSettings - saves (updates) settings to DB 
+
+DependencyCheck:    Always there must be single record in Settings table.
+                    If not then allWellCheck should show 'Malfunction'
+
+Additional Info: Settings controller post and put methods that is 
+at the (post) time of Refresh Settings and (put) Save settings 
+an desired event (globalEvents.accessTokenExpiryChanged this name may be changed later) 
+is emitted to notify that loadSettings must be called from SettingsService.
+ 

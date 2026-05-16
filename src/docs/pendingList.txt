@@ -1,0 +1,15 @@
+. AllWellCheck routine must be designed
+. Always there must be only record in Settings table. Put this in AllWellChecks
+. currently refreshTokenExpiry is type Int and stores 3699 means 1 hour
+  and need to store 604800 seconds means 7d
+  Make it nvarchar and store 7d instead of 604800
+. Make use of barrel file i.e. index.js and export enums n other files
+. Need to find refreshtokens those are of selected user  
+. Logout from all devices need to design 
+
+. actually adding permissions in payload wouuld sometimes creates problem.
+  Alternative is create endpoint like '/api/user/permissions' and store response in cache.
+  For a while its handled by adding in payload currently
+
+. how do cascade delete to manage in fk, as we can delete tenant directly
+

@@ -1,0 +1,4 @@
+For Production 
+
+In AppDataSource set 
+    synchronize: false and use migrations 

@@ -1,0 +1,28 @@
+commands for running backend
+    tsc --watch
+    npm run dev 
+    
+
+sql.exe is author   
+    "C:\Program Files (x86)\Microsoft SQL Server\100\Tools\Binn\VSShell\Common7\IDE\Ssms.exe"
+
+typeORM
+    rethink over it
+
+DB update statements tool/service needed
+
+jwt payload
+    will it have browser/client/ip involved
+
+
+Recommendation for Educational Software:
+Given the nature of educational software, which often involves:
+
+Real-time collaboration: Group chats, collaborative whiteboards, shared document editing.
+Live interactive lessons/quizzes: Instant feedback, polling.
+Notifications: Updates on assignments, announcements.
+Varying user network conditions: Students might be connecting from home, schools with restrictive networks.
+Need for reliability: You can't afford to lose a student's quiz answer or a teacher's message.
+Developer productivity: As a solo developer or a small team, you want to build features quickly, not re-implement low-level networking concerns.
+Socket.IO is the clear winner.
+

@@ -1,0 +1,643 @@
+// src/dependencies.ts
+import { AppDataSource } from '../data-source';
+import UserRepository from './Repositories/UserRepositoryTypeorm';
+import RefreshTokenRepository from './Repositories/RefreshTokenRepositoryTypeorm_1';
+import SettingsService from './services/SettingsService_1'; // <--- Import the CLASS
+
+// Declare instances, initially null
+let userRepositoryInstance: UserRepository | null = null;
+let refreshTokenRepositoryInstance: RefreshTokenRepository | null = null;
+let settingsServiceInstance: SettingsService | null = null; // Declare as type of the class
+
+export async function initializeDependencies(): Promise<void> {
+    if (!AppDataSource.isInitialized) {
+        await AppDataSource.initialize();
+        console.log("Data Source has been initialized!");
+    }
+
+    userRepositoryInstance = new UserRepository();
+    refreshTokenRepositoryInstance = new RefreshTokenRepository();
+    
+    // --- NEW: Instantiate SettingsService here ---
+    settingsServiceInstance = new SettingsService(); // Create the instance
+    await settingsServiceInstance.loadSettings(); // Initialize its settings from DB
+    // --- END NEW ---
+
+    console.log("All core dependencies initialized.");
+}
+
+export function getUserRepository(): UserRepository {
+    if (!userRepositoryInstance) {
+        throw new Error("UserRepository not initialized. Call initializeDependencies() first.");
+    }
+    return userRepositoryInstance;
+}
+
+export function getRefreshTokenRepository(): RefreshTokenRepository {
+    if (!refreshTokenRepositoryInstance) {
+        throw new Error("RefreshTokenRepository not initialized. Call initializeDependencies() first.");
+    }
+    return refreshTokenRepositoryInstance;
+}
+
+export function getSettingsService(): SettingsService {
+    if (!settingsServiceInstance) {
+        throw new Error("SettingsService not initialized. Call initializeDependencies() first.");
+    }
+    return settingsServiceInstance;
+}
+//-----------------------------------------------------------------------------------------------------------------------------------
+//Login_1
+import express, { Router, Request, Response } from 'express';
+const LoginService = require('../../services/LoginServiceTypeOrm_1');
+
+const router = Router();
+
+router.post('/', async (req: Request, res: Response) => {
+    try {
+        const credentials = req.body;
+         // --- NEW: Get user agent from request headers ---
+         const userAgent = req.headers['user-agent'] || 'Unknown Device'; // Fallback for safety
+         // --- END NEW ---
+ 
+        const result = await LoginService.Login(credentials, userAgent);
+        res.status(200).json(result); // Send the result from the service
+    } catch (error: any) {
+        if (error.message === 'Invalid credentials') {
+            res.status(401).json({ message: 'Invalid credentials' }); // 401 for bad credentials
+        } else {
+            res.status(500).json({ message: 'Login failed: ' + error.message }); // 500 for other errors
+        }
+    }
+});
+
+router.put('/', async (req: Request, res: Response) => {
+    try {
+        const refreshToken = req.body; // Corrected to get refresh token from body
+        await LoginService.Logout(refreshToken);
+        res.status(204).send(); // 204 No Content for successful logout
+    } catch (error: any) {
+        res.status(500).json({ message: 'Logout failed: ' + error.message });
+    }
+});
+
+module.exports = router;
+//-------------------------------------------------------------------------------------------------------------------------------
+//settings_1
+import  SettingsService from '../../services/SettingsService_1'
+import express, { Router, Request, Response } from 'express';
+import { globalEvents} from '../../Special/ConstantsNEnums'
+
+const LoginService = require('../../services/LoginServiceTypeOrm');
+
+const eventemitter = require('../../Special/notifier');
+
+let settingsServiceInstance: SettingsService | null = null; // Declare as type of the class
+settingsServiceInstance = new SettingsService(); 
+const router = Router();
+
+//refreshSettings
+router.post('/', async (req, res) => {
+    // Implement authentication/authorization here to ensure only authorized admins can call this!
+    try {
+        await settingsServiceInstance!.refreshSettings();
+        //notify as settings changed
+        eventemitter.emit(globalEvents.accessTokenExpiryChanged);
+
+        res.status(200).json({ message: 'Application settings refreshed successfully.' });
+    } catch (error: any) {
+        console.error('Failed to refresh settings:', error.message || error);
+        res.status(500).json({ message: 'Failed to refresh settings.' });
+    }
+});
+
+//savesettings
+router.put('/', async (req, res) => {
+    // Implement authentication/authorization here to ensure only authorized admins can call this!
+    try {
+
+	    var newAccessTokenLifetime=req.body.newAccessTokenLifetime;
+	    var newRefreshTokenLifetime=req.body.newRefreshTokenLifetime;
+
+        await settingsServiceInstance!.saveSettings(newAccessTokenLifetime,newRefreshTokenLifetime);
+        //notify as settings changed
+        eventemitter.emit(globalEvents.accessTokenExpiryChanged);
+
+        res.status(200).json({ message: 'Application settings refreshed successfully.' });
+    } catch (error: any) {
+        console.error('Failed to save settings:', error.message || error);
+        res.status(500).json({ message: 'Failed to save settings.' });
+    }
+});
+
+module.exports = router;
+
+
+
+//-------------------------------------------------------------------------------------------------------------------------------------------
+
+//refreshTokenRepositoryTypeorm_1
+// src/repositories/RefreshTokenRepositoryTypeorm.ts
+import { Repository } from 'typeorm';
+import { AppDataSource } from '../../data-source'; // Correct relative path
+import { RefreshToken } from '../entity/RefreshToken'; // Import the new entity
+
+export class RefreshTokenRepositoryTypeorm {
+    private refreshTokenRepository: Repository<RefreshToken>;
+
+    constructor() {
+        if (!AppDataSource.isInitialized) {
+            console.warn('AppDataSource not initialized in RefreshTokenRepository. Attempting to initialize...');
+            AppDataSource.initialize().catch(error => {
+                console.error("Failed to initialize AppDataSource in RefreshTokenRepository constructor:", error);
+                process.exit(1);
+            });
+        }
+        this.refreshTokenRepository = AppDataSource.getRepository(RefreshToken);
+    }
+
+    /**
+     * Saves a new refresh token or updates an existing one.
+     * TypeORM handles insert/update based on primary key presence.
+     */
+    async save(refreshToken: RefreshToken): Promise<RefreshToken> {
+        try {
+            return await this.refreshTokenRepository.save(refreshToken);
+        } catch (error: any) {
+            console.error('Error saving refresh token:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Finds a refresh token by its unique token string.
+     */
+    async findByToken(token: string): Promise<RefreshToken | undefined> {
+        try {
+            var refreshTokenOBJ= await this.refreshTokenRepository.findOne({ where: { token: token } });
+            if (refreshTokenOBJ){
+                return refreshTokenOBJ
+            }
+            else return undefined;
+        } catch (error: any) {
+            console.error('Error finding refresh token by token string:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Deletes a refresh token by its unique token string.
+     */
+    async deleteByToken(token: string): Promise<void> {
+        try {
+            await this.refreshTokenRepository.delete({ token: token });
+        } catch (error: any) {
+            console.error('Error deleting refresh token by token string:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Deletes all expired refresh tokens for a given user.
+     * Useful for cleanup.
+     */
+    async deleteExpiredTokensForUser(userId: number): Promise<void> {
+        try {
+            await this.refreshTokenRepository.createQueryBuilder()
+                .delete()
+                .where("userId = :userId", { userId })
+                .andWhere("expiresAt <= :now", { now: new Date() })
+                .execute();
+        } catch (error: any) {
+            console.error('Error deleting expired tokens for user:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Cleans up all expired refresh tokens from the database.
+     * Call this periodically (e.g., via a cron job).
+     */
+    async deleteAllExpiredTokens(): Promise<void> {
+        try {
+            await this.refreshTokenRepository.createQueryBuilder()
+                .delete()
+                .where("expiresAt <= :now", { now: new Date() })
+                .execute();
+            console.log('Expired refresh tokens cleaned up from DB.');
+        } catch (error: any) {
+            console.error('Error deleting all expired tokens:', error);
+            // Don't re-throw for a cleanup job, just log
+        }
+    }
+
+
+    // --- NEW METHOD: Delete an existing token for a specific user and device ---
+    async deleteExistingTokenForDevice(userId: number, deviceInfo: string): Promise<void> {
+        try {
+            await this.refreshTokenRepository.delete({
+                userId: userId,
+                deviceInfo: deviceInfo,
+            });
+        } catch (error: any) {
+            console.error(`Error deleting existing token for user ${userId} on device ${deviceInfo}:`, error);
+            throw error;
+        }
+    }
+    // --- END NEW METHOD ---
+}
+
+export default RefreshTokenRepositoryTypeorm;
+
+//-----------------------------------------------------------------------------------------------------------------------------------
+//LoginServiceTypeorm_1
+// src/services/LoginService.ts
+import jwt from 'jsonwebtoken';
+import { v4 as uuidv4 } from 'uuid';
+//import { refreshTokens } from '../memory/memoryStore'; // Use a database for refresh tokens in production.
+
+import { RefreshToken } from '../entity/RefreshToken'; // <-- NEW: Import RefreshToken entity
+
+import UserRepository from '../Repositories/UserRepositoryTypeorm'; // Use import for the class
+import { AppDataSource } from '../../data-source'; // Need to ensure DataSource is initialized
+//import{ settingsService} from './SettingsService'
+import { getUserRepository, getRefreshTokenRepository, getSettingsService, initializeDependencies} from '../dependencies'
+//import RefreshTokenRepositoryTypeorm from '../Repositories/RefreshTokenRepositoryTypeorm_1';
+
+// Make sure dotenv is configured early in your application's entry point (e.g., app.ts/server.ts)
+// If LoginService is loaded via another file that already has dotenv.config(), you can remove this line.
+// Otherwise, it's safer to ensure it here if LoginService is a primary entry.
+// require('dotenv').config(); // Remove this CommonJS line
+
+
+const ACCESS_TOKEN_LIFETIME = process.env.ACCESS_TOKEN_LIFETIME || '3600s'; // 1 Hour
+const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET || 'your-secret-key';
+const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || 'your-refresh-secret';
+
+interface JwtPayload {
+    UserName: string;
+    Role: string;
+    exp?: number;
+    // Potentially add userId to payload if you want it in JWT
+    userId?: number;
+}
+
+// 1. Declare UserRepo as a private class member or pass it via constructor/factory
+// This way, its instantiation can be controlled after DB init.
+// For now, let's make it a late-initialized variable.
+//let userRepoInstance: UserRepository;
+//let refreshTokenRepoInstance: RefreshTokenRepositoryTypeorm;
+
+/**
+ * Initializes the database connection and the UserRepository.
+ * This function should be called once at your application's startup.
+ */
+export async function initializeLoginService(): Promise<void> {
+    // if (!AppDataSource.isInitialized) {
+    //     try {
+    //         await AppDataSource.initialize();
+    //         console.log("Data Source has been initialized!");
+    //     } catch (err) {
+    //         console.error("Error during Data Source initialization:", err);
+    //         process.exit(1); // Exit if DB connection fails, as this is critical
+    //     }
+    // }
+    //  // Load settings during application startup
+    //  try {
+    //     await settingsService.loadSettings();
+    // } catch (error) {
+    //     console.error("Failed to load initial settings:", error);
+    //     process.exit(1); // Critical: exit if settings cannot be loaded
+    // }
+    // // Instantiate UserRepository ONLY after AppDataSource is initialized
+    // userRepoInstance = new UserRepository();
+    // refreshTokenRepoInstance = new RefreshTokenRepositoryTypeorm(); // <-- NEW: Instantiate refresh token repository
+    // console.log("UserRepository and RefreshTokenRepository instances created.");
+
+    // console.log("UserRepository instance created.");
+    await initializeDependencies();
+    console.log("All repositories and services are ready.");
+}
+
+
+
+
+// --- MODIFIED Login function to accept deviceInfo ---
+const Login = async (credentials: any, deviceInfo: string): Promise<{ access_token: string; refresh_token: string; Role: string; userId: number }> => {
+    // if (!userRepoInstance || !refreshTokenRepoInstance) {
+    //     console.error("-->LoginService not initialized. Call initializeLoginService() first.");
+    //     if (!userRepoInstance ) {console.error('no usrrep instance');}
+    //     if ( !refreshTokenRepoInstance) {console.error('no refreshtokenInstance');}
+        
+    
+    //     throw new Error('Server not ready: Login service not initialized.');
+    // }
+
+    // if (!credentials || !credentials.UserName || !credentials.password) {
+    //     throw new Error('Missing UserName or password');
+    // }
+    // --- NEW: Get instances from the dependency getters ---
+    const userRepo = getUserRepository();
+    const refreshTokenRepo = getRefreshTokenRepository();
+    const settingsService = getSettingsService(); // Access SettingsService via getter
+    // --- END NEW ---
+
+    try {
+        console.log('credentials.UserName:', credentials.UserName);
+        const authenticatedUser = await userRepo.Authenticate(credentials.UserName, credentials.password);
+        if (!authenticatedUser) {
+            throw new Error('Invalid credentials');
+        }
+
+        if (typeof authenticatedUser.id === 'undefined') {
+            throw new Error('Authenticated user missing ID.');
+        }
+
+        // --- NEW LOGIC: Invalidate any existing token for THIS user and THIS device ---
+        console.log(`Checking for existing session for user ${authenticatedUser.UserName} on device: ${deviceInfo}`);
+        await refreshTokenRepo.deleteExistingTokenForDevice(authenticatedUser.id, deviceInfo);
+        console.log(`Any previous refresh token for user ${authenticatedUser.UserName} on device ${deviceInfo} has been invalidated.`);
+        // --- END NEW LOGIC ---
+
+        const payload: JwtPayload = {
+            UserName: authenticatedUser.UserName,
+            Role: authenticatedUser.Role,
+            userId: authenticatedUser.id
+        };
+
+        const currentAccessTokenLifetime = settingsService.getSettings().accessTokenLifetimeSeconds;
+        const currentRefreshTokenLifetime = settingsService.getSettings().refreshTokenLifetimeSeconds;
+
+        console.log('Current Access Token Lifetime:', currentAccessTokenLifetime, 'seconds');
+        console.log('Current Refresh Token Lifetime:', currentRefreshTokenLifetime, 'seconds');
+
+        const accessToken = jwt.sign(payload, ACCESS_TOKEN_SECRET, { expiresIn: currentAccessTokenLifetime });
+
+        const refreshTokenString = uuidv4();
+        const expiresAt = new Date(Date.now() + currentRefreshTokenLifetime * 1000);
+
+        const newRefreshToken = new RefreshToken();
+        newRefreshToken.token = refreshTokenString;
+        newRefreshToken.userId = authenticatedUser.id;
+        newRefreshToken.expiresAt = expiresAt;
+        newRefreshToken.deviceInfo = deviceInfo; // Store the identified device info
+
+        await refreshTokenRepo.save(newRefreshToken);
+        console.log(`New refresh token saved to DB for user ${authenticatedUser.UserName} (${deviceInfo}): ${refreshTokenString}`);
+
+        return {
+            access_token: accessToken,
+            refresh_token: refreshTokenString,
+            Role: authenticatedUser.Role,
+            userId: authenticatedUser.id
+        };
+    } catch (error: any) {
+        console.error('Error during Login:', error.message || error);
+        throw error;
+    }
+};
+
+
+// --- NEW: Function to verify refresh token and issue new access token ---
+ const RefreshAccessToken = async (refreshToken: string, userId: number): Promise<{ accessToken: string; newRefreshToken?: string; role: string; userId: number }> => {
+    // if (!refreshTokenRepoInstance || !userRepoInstance) {
+    //     throw new Error('Service not initialized.');
+    // }
+
+    // if (!refreshToken || !userId) {
+    //     throw new Error('Refresh token and User ID are required.');
+    // }
+// --- NEW: Get instances from the dependency getters ---
+const userRepo = getUserRepository();
+const refreshTokenRepo = getRefreshTokenRepository();
+const settingsService = getSettingsService(); // Access SettingsService via getter
+// --- END NEW ---
+    try {
+        // 1. Find the refresh token in the database
+        const storedToken = await refreshTokenRepo.findByToken(refreshToken);
+
+        if (!storedToken || storedToken.userId !== userId) {
+            throw new Error('Invalid or unauthorized refresh token.');
+        }
+
+        // 2. Check if the refresh token is expired
+        if (new Date() > storedToken.expiresAt) {
+            // Optional: Delete the expired token from DB
+            await refreshTokenRepo.deleteByToken(refreshToken);
+            throw new Error('Refresh token expired.');
+        }
+
+        // 3. (Optional but recommended): Invalidate the old refresh token
+        // This enhances security by preventing replay attacks
+        await refreshTokenRepo.deleteByToken(refreshToken);
+
+        // 4. Issue a new Access Token
+        const user = await userRepo.getById(userId);
+        if (!user) {
+            throw new Error('User associated with refresh token not found.');
+        }
+
+        const payload: JwtPayload = {
+            UserName: user.UserName,
+            Role: user.Role,
+            userId: user.id
+        };
+
+        const currentAccessTokenLifetime = settingsService.getSettings().accessTokenLifetimeSeconds;
+        const accessToken = jwt.sign(payload, ACCESS_TOKEN_SECRET, { expiresIn: currentAccessTokenLifetime });
+
+        // 5. (Optional): Issue a new Refresh Token (rotating refresh tokens for enhanced security)
+        const currentRefreshTokenLifetime = settingsService.getSettings().refreshTokenLifetimeSeconds;
+        const newRefreshTokenString = uuidv4();
+        const newExpiresAt = new Date(Date.now() + currentRefreshTokenLifetime * 1000);
+
+        const newRefreshToken = new RefreshToken();
+        newRefreshToken.token = newRefreshTokenString;
+        newRefreshToken.userId = user.id;
+        newRefreshToken.expiresAt = newExpiresAt;
+        newRefreshToken.deviceInfo = storedToken.deviceInfo; // Inherit device info
+        await refreshTokenRepo.save(newRefreshToken);
+
+        return {
+            accessToken: accessToken,
+            newRefreshToken: newRefreshTokenString,
+            role: user.Role,
+            userId: user.id
+        };
+
+    } catch (error: any) {
+        console.error('Error refreshing access token:', error.message || error);
+        throw error;
+    }
+};
+// --- END NEW ---
+const Logout = async (refreshTokenData: { refreshToken: string }): Promise<void> => {
+    // if (!refreshTokenRepoInstance) {
+    //     throw new Error('LoginService not initialized.');
+    // }
+    // if (!refreshTokenData || !refreshTokenData.refreshToken) {
+    //     throw new Error('Refresh token is required');
+    // }
+     // --- NEW: Get instance from the dependency getter ---
+     const refreshTokenRepo = getRefreshTokenRepository();
+     // --- END NEW ---
+    try {
+        // --- NEW: Delete refresh token from DB ---
+        await refreshTokenRepo.deleteByToken(refreshTokenData.refreshToken);
+        console.log('Refresh token deleted from DB:', refreshTokenData.refreshToken);
+        // --- END NEW ---
+    } catch (error: any) {
+        console.error('Error during logout:', error.message || error);
+        throw new Error('Error during logout: ' + error.message);
+    }
+};
+
+export { Login, Logout, RefreshAccessToken };
+//----------------------------------------------------------------------------------------------------------------------
+
+//SettingsService_1
+// src/services/SettingsService.ts
+import { AppDataSource } from '../../data-source'; // Correct relative path
+import SettingsRepositoryTypeorm from '../Repositories/SettingsRepositoryTypeorm'; // Use import
+import { globalEvents } from '../Special/ConstantsNEnums'; // Ensure this path is correct
+import { Settings } from '../entity/Settings'; // Import your Settings entity
+
+// Use ES module import for EventEmitter if 'notifier.js' is an ES module
+// Otherwise, adjust `notifier.js` to export EventEmitter instance with `export default new EventEmitter();`
+// For now, assuming it's a CommonJS module as you had `require`
+const eventemitter = require('../Special/notifier'); // Consider refactoring to ES Module import if possible
+
+// Define an interface for your cached application settings
+export interface AppSettings {
+    accessTokenLifetimeSeconds: number; // Stored in seconds
+    refreshTokenLifetimeSeconds: number; // Stored in seconds (NEW)
+    // Add other settings here if needed
+}
+
+// Declare the repository instance outside the class for controlled instantiation,
+// similar to how `userRepoInstance` is handled in `LoginService`.
+//let settingsRepositoryInstance: SettingsRepositoryTypeorm;
+//let settingsRepositoryInstance=new SettingsRepositoryTypeorm();
+
+
+class SettingsService {
+    // Private property to hold the cached settings
+    private settings: AppSettings = {
+        accessTokenLifetimeSeconds: 3600, // Default value (1 hour)
+        refreshTokenLifetimeSeconds: 86400 // Default value (24 hours)
+    };
+    private isInitialized = false;
+    private settingsRepository!: SettingsRepositoryTypeorm;
+
+    constructor() {
+        this.settingsRepository = new SettingsRepositoryTypeorm();
+
+        // Subscribe to events. Ensure `this.loadSettings` has the correct context.
+        eventemitter.on(globalEvents.accessTokenExpiryChanged, () => {
+            console.log('accessTokenExpiryChanged Event is occurred .........................');
+            // Call loadSettings and await it, or handle it as a background task
+            // Ensure `this` context is preserved, e.g., using arrow function or .bind(this)
+            this.loadSettings().catch(error => {
+                console.error('Error reloading settings on event:', error);
+            });
+        });
+    }
+
+   
+    //This loadSettings method is called from 
+    //1. LoginServiceTypeORm and 2. constructor of this service on emit of 'globalEvents.accessTokenExpiryChanged' event
+
+    // This reads settings from DB
+    public async loadSettings(): Promise<void> { console.log('Running loadSettings.....................................................');
+    
+        // // Ensure the repository instance is ready before use
+        // if (!settingsRepository) {
+        //     console.error('SettingsRepository not initialized. Cannot load settings.');
+        //     throw new Error('SettingsRepository not initialized.'); // Or handle more gracefully
+        // }
+
+        console.log('Loading application settings...');
+        try {
+            // --- FIX: Directly query the database using the repository instance ---
+            // Fetch the single settings record using its primary key 'global_settings'
+            let dbSettings = await this.settingsRepository.getById('global_settings');
+
+            if (!dbSettings) {
+                // If no record exists, create and save a default one
+                console.log('No global settings found in DB. Creating default settings record...');
+                dbSettings = {
+                    settingKey: 'global_settings',
+                    accessTokenLifetime: this.settings.accessTokenLifetimeSeconds, // Use current default
+                    refreshTokenLifetime: this.settings.refreshTokenLifetimeSeconds // Use current default
+                };
+                dbSettings = await this.settingsRepository.save(dbSettings); // Save the new record
+                console.log('Default settings record created in DB.');
+            }
+
+            // Update the cached settings with values from the database
+            this.settings.accessTokenLifetimeSeconds = dbSettings.accessTokenLifetime;
+            this.settings.refreshTokenLifetimeSeconds = dbSettings.refreshTokenLifetime; // NEW: Update refresh token expiry
+
+            this.isInitialized = true;
+            console.log(`Settings loaded: Access Token Lifetime = ${this.settings.accessTokenLifetimeSeconds} seconds`);
+            console.log(`Settings loaded: Refresh Token Lifetime = ${this.settings.refreshTokenLifetimeSeconds} seconds`);
+
+        } catch (error) {
+            console.error('Failed to load application settings:', error);
+            throw error; // Re-throw to prevent app startup if critical for initialization
+        }
+    }
+
+    /**
+     * Returns the current cached application settings.
+     * Ensure loadSettings() has been called prior to accessing for updated values.
+     */
+    public getSettings(): AppSettings {
+        if (!this.isInitialized) {
+            console.warn('SettingsService not fully initialized. Returning cached default settings.');
+        }
+        return this.settings;
+    }
+
+    /**
+     * Triggers a reload of settings from the database. Useful for admin endpoints.
+     */
+    public async refreshSettings(): Promise<void> {
+        await this.loadSettings();
+    }
+
+    /**
+     * Saves updated settings to the database.
+     * Use this method when an admin explicitly updates settings via an API.
+     */
+    public async saveSettings(newAccessTokenLifetime: number, newRefreshTokenLifetime: number): Promise<Settings> {
+        // if (!settingsRepositoryInstance) {
+        //     console.error('SettingsRepository not initialized. Cannot save settings.');
+        //     throw new Error('SettingsRepository not initialized.');
+        // }
+
+        // Fetch the existing record to update it, or create if it doesn't exist
+        let dbSettings = await this.settingsRepository.getById('global_settings');
+        if (!dbSettings) {
+            dbSettings = new Settings(); // Create a new instance of the entity
+            dbSettings.settingKey = 'global_settings';
+        }
+
+        dbSettings.accessTokenLifetime = newAccessTokenLifetime;
+        dbSettings.refreshTokenLifetime = newRefreshTokenLifetime;
+
+        const savedSettings = await this.settingsRepository.save(dbSettings);
+        
+        // After saving to DB, immediately update the in-memory cache
+        this.settings.accessTokenLifetimeSeconds = savedSettings.accessTokenLifetime;
+        this.settings.refreshTokenLifetimeSeconds = savedSettings.refreshTokenLifetime;
+        
+
+        return savedSettings;
+    }
+}
+
+// Export a single instance of the SettingsService
+//export const settingsService = new SettingsService();
+
+ export default SettingsService;
