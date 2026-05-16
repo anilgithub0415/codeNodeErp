@@ -14,7 +14,7 @@
 
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn, Unique } from 'typeorm';
 import { StudentProfile } from './StudentProfile'; // Import StudentProfile entity
-import { CourseOffering } from './CourseOffering'; // Import CourseOffering entity
+
 import { Tenant } from './Tenant'; // Import Tenant entity
 
 // A student can be assigned to a specific course offering only once within a tenant
@@ -42,13 +42,7 @@ export class StudentCourseOffering {
     @JoinColumn({ name: 'StudentProfileId' })
     studentProfile!: StudentProfile;
 
-    // Many-to-One relationship with CourseOffering
-    @Column({ type: 'int', nullable: false, name: 'CourseOfferingId' })
-    courseOfferingId!: number;
 
-    @ManyToOne(() => CourseOffering, courseOffering => courseOffering.studentCourseOfferings, { onDelete: 'CASCADE' })
-    @JoinColumn({ name: 'CourseOfferingId' })
-    courseOffering!: CourseOffering;
 
     @Column({ type: 'date', nullable: false })
     assignmentDate!: Date; // Date when the student was assigned to this offering

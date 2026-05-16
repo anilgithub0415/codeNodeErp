@@ -1,5 +1,4 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn, Unique } from 'typeorm';
-import { Question } from './Question'; // Import Question entity
 import { ExamType } from './ExamType'; // Import ExamType entity
 import { Tenant } from './Tenant'; // Import Tenant entity
 
@@ -21,13 +20,6 @@ export class QuestionExamTypes {
     tenant!: Tenant;
     // --- End Tenant ID ---
 
-    // Many-to-One relationship with Question
-    @Column({ type: 'int', nullable: false, name: 'QuestionId' })
-    questionId!: number;
-
-    @ManyToOne(() => Question, question => question.questionExamTypes, { onDelete: 'CASCADE' })
-    @JoinColumn({ name: 'QuestionId' })
-    question!: Question;
 
     // Many-to-One relationship with ExamType
     @Column({ type: 'int', nullable: false, name: 'ExamTypeId' })

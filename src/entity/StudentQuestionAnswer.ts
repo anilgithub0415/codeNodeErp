@@ -1,6 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn, Unique } from 'typeorm';
-import { AssignmentAttempt } from './AssignmentAttempt'; // Import AssignmentAttempt entity
-import { Question } from './Question'; // Import Question entity
+
 import { Tenant } from './Tenant'; // Import Tenant entity
 
 // A student can have only one answer for a specific question within a specific assignment attempt within a tenant
@@ -19,21 +18,7 @@ export class StudentQuestionAnswer {
     tenant!: Tenant;
     // --- End Tenant ID ---
 
-    // Many-to-One relationship with AssignmentAttempt
-    @Column({ type: 'int', nullable: false, name: 'AssignmentAttemptId' })
-    assignmentAttemptId!: number;
 
-    @ManyToOne(() => AssignmentAttempt, assignmentattempt => assignmentattempt.studentQuestionAnswers, { onDelete: 'CASCADE' })
-    @JoinColumn({ name: 'AssignmentAttemptId' })   
-    assignmentAttempt!: AssignmentAttempt;
-
-    // Many-to-One relationship with Question
-    @Column({ type: 'int', nullable: false, name: 'QuestionId' })
-    questionId!: number;
-
-    @ManyToOne(() => Question, question => question.studentQuestionAnswers, { onDelete: 'CASCADE' }) //earlier was RESTRICT// Prevent deleting a question if answers exist
-    @JoinColumn({ name: 'QuestionId' })
-    question!: Question;
 
     @Column({ type: 'nvarchar', length: 'MAX', nullable: true })
     studentAnswerContent?:  string | string[]; // The student's answer (e.g., selected option, typed text)
@@ -52,4 +37,4 @@ export class StudentQuestionAnswer {
 
     @UpdateDateColumn({ type: 'datetime2', name: 'UpdatedAt' })
     updatedAt!: Date;
-}
+} 

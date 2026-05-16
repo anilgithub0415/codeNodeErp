@@ -19,56 +19,48 @@ import { TenantTypeLookup } from './entity/TenantTypeLookup';
 import { SubscriptionPlanLookup } from './entity/SubscriptionPlanLookup';
 import { UserRoleLookup } from './entity/UserRoleLookup';
 import { UserTenantContext } from './entity/UserTenantContext';
-import ProgramService from './services/ProgramService';
-import { Program } from './entity/Program';
+
 import ExamTypeService from './services/ExamtypeService';
 import { ExamType } from './entity/ExamType';
-import { Question } from './entity/Question';
+
 import { Option} from './entity/Option'
-import QuestionService from './services/QuestionService';
+
 import { QuestionTypeLookup } from './entity/QuestionTypeLookup';
-import { QuestionCategoryLookup } from './entity/QuestionCategoryLookup';
-import{ QuestionPurposeLookup} from './entity/QuestionPurposeLookup'
-import CourseService from './services/CourseService';
-import { Course } from './entity/Course';
-import CourseOfferingService from './services/CourseOfferingService';
-import { CourseOffering } from './entity/CourseOffering';
+
+
 import EnrollService from './services/EnrollService';
 import { Enrollment } from './entity/Enrollment';
 import StudentProfileService from './services/StudentProfileService';
 import { StudentProfile } from './entity/StudentProfile';
 //import { OrchestratorService } from './services/orchestrator.service';
-import { Subject } from './entity/Subject';
-import SubjectService from './services/SubjectService';
+
+
 import { FacultyProfile } from './entity/FacultyProfile';
 import FacultyProfileService from './services/FacultyProfileService';
-import { ProgramCourses } from './entity/ProgramCourses';
-import ProgramCourseService from './services/ProgramCourseService';
+
+
 import TopicService from './services/TopicService';
 import { Topic } from './entity/Topic';
-import { QuestionOrchestrationService } from './services/QuestionOrchestrationService';
+
 import OptionService from './services/OptionService';
-import { Assignment } from './entity/Assignment';
-import AssignmentService from './services/AssignmentService';
-import { AssignmentAttempt } from './entity/AssignmentAttempt';
-import AssignmentAttemptService from './services/AssignmentAttemptService';
+
 import { StudentQuestionAnswer } from './entity/StudentQuestionAnswer';
 //import TenantService from './services/TenantService';
 
 // Declare instances that will be populated AFTER initialization
 
 let personRepositoryInstance: PersonService;let StudentProfileRepositoryInstance:StudentProfileService;
-let userRepositoryInstance: UserService;let programRepositoryInstance:ProgramService;
+let userRepositoryInstance: UserService;
  let refreshTokenRepositoryInstance: RefreshTokenService;
 let settingsServiceInstance: SettingsService;
-let programServiceInstance:ProgramService;let SubjectServiceInstance:SubjectService;
-let programCourseServiceInstance:ProgramCourseService;
+
+
 let examtypeServiceInstance:ExamTypeService;
-let questionServiceInstance:QuestionService; let questionOrchestrationServiceInstance:QuestionOrchestrationService; let questionOptionServiceInstance:OptionService;
-let courseServiceInstance:CourseService; 
-let assignmentServiceInstance:AssignmentService; let assignmentAttemptServiceInstance:AssignmentAttemptService;
+  let questionOptionServiceInstance:OptionService;
+
+
 let topicServiceInstance:TopicService;
-let courseOfferingServiceInstance:CourseOfferingService;let facultyProfileServiceInstance:FacultyProfileService
+let facultyProfileServiceInstance:FacultyProfileService
 let enrollServiceInstance:EnrollService;
 //let enrollTransactionalServiceInstance:OrchestratorService;
 
@@ -131,69 +123,21 @@ export async function initializeDependencies(): Promise<void> {
     console.log("tenantServiceInstance initialized");
 
     
-    programServiceInstance = new ProgramService();
-    // Pass the actual TypeORM repository instance to the service's init method
-    await programServiceInstance.init(AppDataSource.getRepository(Program));
-    console.log("programServiceInstance initialized");
-
-    //
-    programCourseServiceInstance = new ProgramCourseService();
-    // Pass the actual TypeORM repository instance to the service's init method
-    await programCourseServiceInstance.init(AppDataSource.getRepository(ProgramCourses));
-    console.log("programCourseServiceInstance initialized");
-
-    //
-    SubjectServiceInstance = new SubjectService();
-    // Pass the actual TypeORM repository instance to the service's init method
-    await SubjectServiceInstance.init(AppDataSource.getRepository(Subject));
-    console.log("SubjectServiceInstance initialized");
-
-
-    examtypeServiceInstance = new ExamTypeService();
+     examtypeServiceInstance = new ExamTypeService();
     // Pass the actual TypeORM repository instance to the service's init method
     await examtypeServiceInstance.init(AppDataSource.getRepository(ExamType));
     console.log("examtypeServiceInstance initialized");
 
     
-    questionServiceInstance = new QuestionService();
-    // Pass the actual TypeORM repository instance to the service's init method
-    await questionServiceInstance.init(AppDataSource.getRepository(Question),AppDataSource.getRepository(QuestionTypeLookup),AppDataSource.getRepository(QuestionCategoryLookup),AppDataSource.getRepository(QuestionPurposeLookup),AppDataSource.getRepository(Subject),AppDataSource.getRepository(Topic));
-    console.log("questionServiceInstance initialized");
-
+    
     //
     questionOptionServiceInstance = new OptionService();
     // Pass the actual TypeORM repository instance to the service's init method
     await questionOptionServiceInstance.init(AppDataSource.getRepository(Option));
     console.log("questionOptionServiceInstance initialized");
 
-    //
-    questionOrchestrationServiceInstance = new QuestionOrchestrationService();
-    // Pass the actual TypeORM repository instance to the service's init method
-   // await questionOrchestrationServiceInstance.init(AppDataSource.getRepository(Question),AppDataSource.getRepository(QuestionTypeLookup),AppDataSource.getRepository(QuestionCategoryLookup),AppDataSource.getRepository(QuestionPurposeLookup));
-    console.log("questionOrchestrationServiceInstance initialized");
 
 
-    courseServiceInstance = new CourseService();
-// Pass the actual TypeORM repository instance to the service's init method
-await courseServiceInstance.init(AppDataSource.getRepository(Course),AppDataSource.getRepository(ProgramCourses));
-console.log("courseServiceInstance initialized");
-//
-assignmentServiceInstance = new AssignmentService();
-// Pass the actual TypeORM repository instance to the service's init method
-await assignmentServiceInstance.init(AppDataSource.getRepository(Assignment));
-console.log("assignmentServiceInstance initialized");
-
-//assignmentAttemptServiceInstance
-assignmentAttemptServiceInstance = new AssignmentAttemptService();
-// Pass the actual TypeORM repository instance to the service's init method
-await assignmentAttemptServiceInstance.init(AppDataSource.getRepository(AssignmentAttempt),AppDataSource.getRepository(StudentQuestionAnswer));
-console.log("assignmentAttemptServiceInstance initialized");
-
-
-courseOfferingServiceInstance = new CourseOfferingService();
-// Pass the actual TypeORM repository instance to the service's init method
-await courseOfferingServiceInstance.init(AppDataSource.getRepository(CourseOffering));
-console.log("courseOfferingServiceInstance initialized");
 
 //
 topicServiceInstance = new TopicService();
@@ -223,7 +167,7 @@ console.log("enrollServiceInstance initialized");
 
     console.log("All core application dependencies initialized successfully.");
 }
-
+ 
 // // Public getters for the initialized instances
 
 export function getPersonRepository(): PersonService {
@@ -249,28 +193,6 @@ export function getUserRepository(): UserService {
 }
 
 
-export function getProgramRepository(): ProgramService {
-    if (!programServiceInstance) {
-        throw new Error("ProgramRepository not initialized. Call initializeDependencies() first.");
-    }
-    return programServiceInstance;
-}
-
-
-export function getProgramCourseRepository(): ProgramCourseService {
-    if (!programCourseServiceInstance) {
-        throw new Error("ProgramCourseRepository not initialized. Call initializeDependencies() first.");
-    }
-    return programCourseServiceInstance;
-}
-
-//getSubjectRepository
-export function getSubjectRepository(): SubjectService {
-    if (!SubjectServiceInstance) {
-        throw new Error("SubjectRepository not initialized. Call initializeDependencies() first.");
-    }
-    return SubjectServiceInstance;
-}
 
 
 
@@ -281,13 +203,6 @@ export function getExamTypeRepository(): ExamTypeService {
     return examtypeServiceInstance;
 }
 
-
-export function getQuestionRepository(): QuestionService {
-    if (!questionServiceInstance) {
-        throw new Error("QuestionRepository not initialized. Call initializeDependencies() first.");
-    }
-    return questionServiceInstance;
-}
 //
 export function getQuestionOptionRepository(): OptionService {
     if (!questionOptionServiceInstance) {
@@ -296,35 +211,9 @@ export function getQuestionOptionRepository(): OptionService {
     return questionOptionServiceInstance;
 }
 
-export function getQuestionOrchestrationRepository(): QuestionOrchestrationService {
-    if (!questionOrchestrationServiceInstance) {
-        throw new Error("QuestionOrchestrationRepository not initialized. Call initializeDependencies() first.");
-    }
-    return questionOrchestrationServiceInstance;
-}
-
-
-export function getCourseRepository(): CourseService {
-    if (!courseServiceInstance) {
-        throw new Error("CourseRepository not initialized. Call initializeDependencies() first.");
-    }
-    return courseServiceInstance;
-}
-//
-export function getAssignmentRepository(): AssignmentService {
-    if (!assignmentServiceInstance) {
-        throw new Error("AssignmentRepository not initialized. Call initializeDependencies() first.");
-    }
-    return assignmentServiceInstance;
-}
 
 //
-export function getAssignmentAttemptRepository(): AssignmentAttemptService {
-    if (!assignmentAttemptServiceInstance) {
-        throw new Error("AssignmentAttemptRepository not initialized. Call initializeDependencies() first.");
-    }
-    return assignmentAttemptServiceInstance;
-}
+
 
 
 export function getTopicRepository(): TopicService {
@@ -334,12 +223,7 @@ export function getTopicRepository(): TopicService {
     return topicServiceInstance;
 }
 
-export function getCourseOfferingRepository(): CourseOfferingService {
-    if (!courseOfferingServiceInstance) {
-        throw new Error("CourseOfferingRepository not initialized. Call initializeDependencies() first.");
-    }
-    return courseOfferingServiceInstance;
-}
+  
 //
 
 export function getFacultyProfileRepository(): FacultyProfileService {

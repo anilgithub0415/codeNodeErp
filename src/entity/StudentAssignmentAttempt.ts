@@ -1,6 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, OneToMany, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { StudentProfile } from './StudentProfile'; // Import StudentProfile entity
-import { Assignment } from './Assignment'; // Import Assignment entity
+
 import { User } from './User'; // For gradedByUserId
 import { StudentAnswer } from './StudentAnswer'; // For inverse relationship (answers for this attempt)
 
@@ -13,17 +13,6 @@ export class StudentAssignmentAttempt {
     @Column({ type: 'int', nullable: false, name: 'StudentProfileId' })
     studentProfileId!: number;
 
-    @ManyToOne(() => StudentProfile, studentProfile => studentProfile.assignmentAttempts, { onDelete: 'CASCADE' }) // If student profile is deleted, their attempts are deleted
-    @JoinColumn({ name: 'StudentProfileId' })
-    studentProfile!: StudentProfile;
-
-    // Many-to-One relationship with Assignment (which assignment was attempted)
-    @Column({ type: 'int', nullable: false, name: 'AssignmentId' })
-    assignmentId!: number;
-
-    @ManyToOne(() => Assignment, assignment => assignment.assignmentAttempts, { onDelete: 'CASCADE' }) // If assignment is deleted, its attempts are deleted
-    @JoinColumn({ name: 'AssignmentId' })
-    assignment!: Assignment;
 
     @Column({ type: 'datetime2', nullable: false })
     startTime!: Date; // When the student started the attempt

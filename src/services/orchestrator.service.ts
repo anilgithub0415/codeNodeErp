@@ -6,7 +6,7 @@ import { Enrollment } from '../entity/Enrollment';
 import { PersonService} from './PersonService'
 import { StudentProfileService } from './StudentProfileService';
 import { EnrollService } from './EnrollService';
-import { Repository } from 'typeorm';
+import { Repository } from 'typeorm'; 
 import { getStudentProfileRepository,getPersonRepository, getEnrollRepository } from '../dependencies';
 import { CreateStudentEnrollmentDto } from '../Models/Enrollment.interfaces';
 import { StudentCourseOffering } from '../entity/StudentCourseOffering';
@@ -148,7 +148,7 @@ export class OrchestratorService {
                 const studentOfferingEntity = new StudentCourseOffering();
                 studentOfferingEntity.tenantId = enrollmentData.tenantId; // Inherit tenantId
                 studentOfferingEntity.studentProfileId = studentProfile.id; // Link to the created profile
-                studentOfferingEntity.courseOfferingId = scoDto.courseOfferingId;
+                
                 studentOfferingEntity.assignmentDate = scoDto.assignmentDate || new Date();
                 studentOfferingEntity.status = scoDto.status || 'Active'; // Default status
                 return studentOfferingEntity;

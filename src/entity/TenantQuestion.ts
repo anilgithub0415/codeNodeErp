@@ -1,8 +1,8 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, OneToMany, CreateDateColumn, UpdateDateColumn, Unique } from 'typeorm';
 import { Tenant } from './Tenant';
-import { Question } from './Question';
+
 import { User } from './User';
-import { AssignmentQuestion } from './AssignmentQuestion'; // Import AssignmentQuestion entity
+
 
 @Unique("UQ_TenantQuestion_MasterQuestion", ["tenantId", "masterQuestionId"])
 @Entity({ name: 'TenantQuestion' })
@@ -22,7 +22,6 @@ export class TenantQuestion {
 
     // @ManyToOne(() => Question, question => question.tenantQuestions, { onDelete: 'SET NULL' })
     // @JoinColumn({ name: 'MasterQuestionId' })
-    masterQuestion?: Question | null;
 
     @Column({ type: 'nvarchar', length: 'MAX', nullable: true })
     questionText?: string | null;

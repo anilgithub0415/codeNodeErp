@@ -39,7 +39,7 @@ const checkCache = require('./src/Middlewares/checkCache');
 // Import Controllers (using dynamic import for consistency)
 // The '/api' prefix needs to be handled consistently for all routes.
 // Given your previous discussion, '/api' should be the primary prefix for all API endpoints.
-
+ 
 // Login Controller - now accessible at /api/login and /api/login/auth/google/callback
 import loginC from './src/Controllers/Login/Login'; // Use default import
 app.use('/api/login', loginC); // Mounts login routes under /api/login
@@ -61,28 +61,11 @@ app.use('/api/user', userC);
 import tenantC from './src/Controllers/Tenant/Tenant';
 app.use('/api/tenant', tenantC);
 
-import programC from './src/Controllers/Program/Program';
-app.use('/api/program', programC);
-
-import programcourseC from './src/Controllers/ProgramCourse/ProgramCourse';
-app.use('/api/programcourse', programcourseC);
-
 
  
 import examtypeC from './src/Controllers/Examtype/Examtype';
 app.use('/api/examtype', examtypeC);
  
-import questionC from './src/Controllers/Question/Question';
-app.use('/api/question', questionC);
-
-import courseC from './src/Controllers/Course/Course';
-app.use('/api/course', courseC);
- 
-import subjectC  from './src/Controllers/Subject/Subject';
-app.use('/api/subject', subjectC);
-
-import courseOfferingC from './src/Controllers/CourseOffering/CourseOffering';
-app.use('/api/courseoffering', courseOfferingC);
 
 
 
@@ -100,14 +83,7 @@ app.use('/api/lookups', lookupsC);
 import facultyprofileC from './src/Controllers/FacultyProfile/FacultyProfile';
 app.use('/api/facultyprofile', facultyprofileC);
 
-//
-import assignmentC from './src/Controllers/Assignment/Assignment';
-app.use('/api/assignment', assignmentC); // Consistent mounting example
-
-//
-import assignmentattemptC from './src/Controllers/AssignmentAttempt/AssignmentAttempt';
-app.use('/api/assignmentattempt', assignmentattemptC); // Consistent mounting example
-
+// 
 
 // Centralized error handling middleware (best practice)
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {

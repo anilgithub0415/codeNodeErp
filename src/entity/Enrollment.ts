@@ -1,6 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn, Unique } from 'typeorm';
 import { StudentProfile } from './StudentProfile'; // Import StudentProfile
-import { Program } from './Program'; // Import Program
 import { Tenant } from './Tenant'; // Import Tenant
 
 @Unique("UQ_StudentProgramEnrollment_Tenant", ["studentProfileId", "programId", "tenantId"]) // Ensure unique enrollment per student per program per tenant
@@ -26,13 +25,6 @@ export class Enrollment {
     @JoinColumn({ name: 'StudentProfileId' })
     studentProfile!: StudentProfile;
 
-    // Many-to-One relationship with Program
-    @Column({ type: 'int', nullable: false, name: 'ProgramId' })
-    programId!: number;
-
-    @ManyToOne(() => Program, program => program.enrollments, { onDelete: 'CASCADE' })
-    @JoinColumn({ name: 'ProgramId' })
-    program!: Program;
 
     @Column({ type: 'date', nullable: false })
     enrollmentDate!: Date;

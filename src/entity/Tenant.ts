@@ -5,17 +5,16 @@ import { UserTenantContext } from './UserTenantContext';
 import { TenantTypeLookup } from './TenantTypeLookup'; // NEW: Import TenantTypeLookup
 import { SubscriptionPlanLookup } from './SubscriptionPlanLookup'; // NEW: Import SubscriptionPlanLookup
 import { TenantQuestion } from './TenantQuestion';
-import { Program } from './Program';
-import { Course } from './Course';
+
+
 import { Enrollment } from './Enrollment';
 import { StudentProfile } from './StudentProfile';
 import { FacultyProfile } from './FacultyProfile';
-import { CourseOffering } from './CourseOffering';
-import { Subject } from './Subject';
-import { AssignmentAttempt } from './AssignmentAttempt';
-import { Assignment } from './Assignment';
-import { AssignmentQuestion } from './AssignmentQuestion';
-import { Question } from './Question';
+
+
+
+
+
 import { Topic } from './Topic';
 import { QuestionExamTypes } from './QuestionExamTypes';
 import { ExamType } from './ExamType';
@@ -73,11 +72,6 @@ export class Tenant {
     @UpdateDateColumn({ type: 'datetime2', name: 'updatedAt' })
     updatedAt!: Date;
 
-    @OneToMany(() => Program, program => program.tenant)
-    programs?: Program[];
-
-    @OneToMany(() => Course, course => course.tenant)
-    courses?: Course[];
 
     
     @OneToMany(() => Enrollment, enrollment => enrollment.tenant)
@@ -90,29 +84,13 @@ export class Tenant {
     @OneToMany(() => FacultyProfile, facultyprofile => facultyprofile.tenant)
     facultyProfiles?: FacultyProfile[];
     
-    @OneToMany(() => CourseOffering, courseoffering => courseoffering.tenant)
-    courseOfferings?: CourseOffering[];
+   
+    
+    //
 
     //
-    @OneToMany(() => Assignment, assignment => assignment.tenant)
-    assignments?: Assignment[];
 
     //
-    @OneToMany(() => AssignmentQuestion, assignmentquestion => assignmentquestion.tenant)
-    assignmentQuestions?: AssignmentQuestion[];
-
-    //
-    @OneToMany(() => AssignmentAttempt, assignmentattempt => assignmentattempt.tenant)
-    assignmentAttempts?: AssignmentAttempt[];
-
-    //
-    @OneToMany(() => Subject, subject => subject.tenant)
-    subjects?: CourseOffering[];
-
-    //
-    @OneToMany(() => Question, question => question.tenant)
-    questions?: Question[];
-
     //
     @OneToMany(() => ExamType, examtype => examtype.tenant)
     questionExamTypes?: ExamType[];

@@ -2,7 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, OneToOne, JoinColumn, ManyToOne
 import { Person } from './Person';
 import { Tenant } from './Tenant'; // Import Tenant
 import { Enrollment } from './Enrollment'; // Import Enrollment
-import { AssignmentAttempt } from './AssignmentAttempt';
+
 import { StudentCourseOffering } from './StudentCourseOffering';
 
 
@@ -41,9 +41,6 @@ export class StudentProfile {
     // One-to-Many relationship with Enrollment (a student profile can have many enrollments in different programs)
     @OneToMany(() => Enrollment, enrollment => enrollment.studentProfile)
     enrollments?: Enrollment[];
-
-    @OneToMany(() => AssignmentAttempt, attempt => attempt.studentProfile)
-    assignmentAttempts?: AssignmentAttempt[];
 
     @OneToMany(() => StudentCourseOffering, sco => sco.studentProfile)
     studentCourseOfferings?: StudentCourseOffering[];

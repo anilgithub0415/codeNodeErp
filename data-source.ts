@@ -13,32 +13,32 @@ import { UserRoleLookup } from './src/entity/UserRoleLookup';
 //import { RolePermission } from './src/entity/RolePermission';
 import { Permission } from './src/entity/Permission';
 import { TenantQuestion } from './src/entity/TenantQuestion';
-import { Question } from './src/entity/Question';
+
 import { QuestionTypeLookup } from './src/entity/QuestionTypeLookup';
-import { Subject } from './src/entity/Subject';
-import { Course } from './src/entity/Course';
-import { Program } from './src/entity/Program';
+
+
+
 import { StudentProfile } from './src/entity/StudentProfile';
 import { Person } from './src/entity/Person';
 import { StudentAssignmentAttempt } from './src/entity/StudentAssignmentAttempt';
-import { Assignment } from './src/entity/Assignment';
-import { CourseOffering } from './src/entity/CourseOffering';
+
+
 import { Enrollment } from './src/entity/Enrollment';
-import { AssignmentQuestion } from './src/entity/AssignmentQuestion';
+
 import { StudentAnswer } from './src/entity/StudentAnswer';
 import { Topic } from './src/entity/Topic';
 import { ExamType } from './src/entity/ExamType';
-import { QuestionCategoryLookup } from './src/entity/QuestionCategoryLookup';
+
 import { Option } from './src/entity/Option';
 import { UserTenantContext } from './src/entity/UserTenantContext';
 import { FacultyProfile } from './src/entity/FacultyProfile';
-import { AssignmentAttempt } from './src/entity/AssignmentAttempt';
+
 import { StudentQuestionAnswer } from './src/entity/StudentQuestionAnswer';
 import { QuestionExamTypes } from './src/entity/QuestionExamTypes';
-import { ProgramCourses } from './src/entity/ProgramCourses';
+
 import { StudentCourseOffering } from './src/entity/StudentCourseOffering';
 import { AutocodeCounter } from './src/entity/AutocodeCounter';
-import { QuestionPurposeLookup } from './src/entity/QuestionPurposeLookup';
+
 
 
 
@@ -54,18 +54,18 @@ export const AppDataSource = new DataSource({
     username: process.env.DB_USER || 'sa',
     password: process.env.DB_PASSWORD || 'saadmin',
     database: process.env.DB_DATABASE || 'test',
-    
+      
     // Set to true to automatically create database schema on sync (development only)
     // For production, use migrations (TypeORM generates these)
     //synchronize: false, // Set to true for initial development to auto-create tables, then set to false and use migrations
     synchronize: true,
     logging: false, // Set to true to see SQL queries in console  RolePermission,
     entities: [Tenant,TenantTypeLookup,SubscriptionPlanLookup,User,UserRoleLookup,Permission,RefreshToken,Settings
-    ,TenantQuestion,Question,QuestionTypeLookup,Subject,Course,Program,StudentProfile,Person,StudentAssignmentAttempt,Assignment
-    ,CourseOffering,Enrollment,AssignmentQuestion,StudentAnswer,Topic,ExamType,QuestionCategoryLookup,Option
-,UserTenantContext,Program,ExamType,Question,CourseOffering
-,FacultyProfile,AssignmentAttempt,StudentQuestionAnswer,QuestionExamTypes,ProgramCourses,QuestionCategoryLookup
- ,Enrollment,StudentCourseOffering ,AutocodeCounter,ProgramCourses, QuestionPurposeLookup], // Register your entities here
+    ,TenantQuestion,StudentProfile,Person,StudentAssignmentAttempt,
+    Enrollment,StudentAnswer,Topic,ExamType,Option
+,UserTenantContext,ExamType
+,FacultyProfile
+ ,Enrollment,AutocodeCounter ], // Register your entities here
     //Tenant,TenantTypeLookup,SubscriptionPlanLookup,User,UserRoleLookup,RolePermission,Permission,RefreshToken,Settings
     migrations: [], // You'll add migration files here later
     subscribers: [],    
@@ -92,4 +92,4 @@ AppDataSource.initialize()
     .catch((err) => {
         console.error("Error during Data Source initialization:", err);
     });
-*/
+*/ 

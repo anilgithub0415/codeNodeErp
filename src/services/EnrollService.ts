@@ -57,12 +57,12 @@ export class EnrollService {
        
         const newEnroll = new Enrollment();
         newEnroll.tenantId = enrollData.tenantId!;
-        newEnroll.programId=enrollData.programId!;
+        
         newEnroll.studentProfileId = enrollData.studentProfile.id;
         newEnroll.enrollmentDate = enrollData.enrollmentDate || null;
         newEnroll.status=enrollData.status!;
         newEnroll.completionDate = enrollData.completionDate;
-        newEnroll.programId=enrollData.programId!;
+        
         newEnroll.status=enrollData.status!;
 
       

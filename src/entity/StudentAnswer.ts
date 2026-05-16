@@ -1,6 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn, Unique } from 'typeorm';
 import { StudentAssignmentAttempt } from './StudentAssignmentAttempt'; // Import StudentAssignmentAttempt entity
-import { Question } from './Question'; // Import master Question entity
 import { Option } from './Option'; // For selected options in MCQs
 
 // Composite unique index to ensure a student answers a question only once per attempt
@@ -18,13 +17,6 @@ export class StudentAnswer {
     @JoinColumn({ name: 'StudentAssignmentAttemptId' })
     studentAssignmentAttempt!: StudentAssignmentAttempt;
 
-    // Many-to-One relationship with Question (the question being answered)
-    @Column({ type: 'int', nullable: false, name: 'QuestionId' })
-    questionId!: number;
-
-    @ManyToOne(() => Question, question => question.studentQuestionAnswers, { onDelete: 'NO ACTION' }) // Don't delete question if answer is deleted
-    @JoinColumn({ name: 'QuestionId' })
-    question!: Question;
 
     @Column({ type: 'nvarchar', length: 'MAX', nullable: true })
     studentAnswerText?: string | null; // For descriptive or numerical answers

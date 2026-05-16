@@ -75,15 +75,7 @@ class OptionService {
      * Retrieves all Option records from the database.
      * @returns An array of Option entities.
      */
-    getOptionsOfQuestion = async (pquesId:number,
-        manager?: EntityManager): Promise<Option[]> => {
-                       
-        if (!this.optionRepository) {
-            throw new Error("OptionService repository not initialized. Call init() first.");
-        }
-        const optionRepository = manager ? manager.getRepository(Option) : this.optionRepository;
-        return await optionRepository.find({where:{questionId:pquesId}}); 
-    }
+    
 
     
     async getById(id: number

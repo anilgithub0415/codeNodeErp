@@ -1,7 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, OneToOne, JoinColumn, ManyToOne, OneToMany, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { Person } from './Person';
 import { Tenant } from './Tenant'; // Import Tenant
-import { CourseOffering } from './CourseOffering'; // Import CourseOffering
+
 
 @Entity({ name: 'FacultyProfile' })
 export class FacultyProfile {
@@ -37,9 +37,6 @@ export class FacultyProfile {
     @Column({ type: 'bit', default: true })
     isActive!: boolean;
 
-    // One-to-Many relationship with CourseOffering (a faculty can teach many course offerings)
-    @OneToMany(() => CourseOffering, courseOffering => courseOffering.faculty)
-    courseOfferings?: CourseOffering[];
 
     @Column({ type: 'int', nullable: true, name: 'CreatedByUserId' })
     createdByUserId?: number | null;

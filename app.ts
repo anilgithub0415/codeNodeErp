@@ -61,8 +61,6 @@ app.use('/api/user', userC);
 import tenantC from './src/Controllers/Tenant/Tenant';
 app.use('/api/tenant', tenantC);
 
-import programC from './src/Controllers/Program/Program';
-app.use('/api/program', programC);
 
 
 import examtypeC from './src/Controllers/Examtype/Examtype';
@@ -71,14 +69,8 @@ app.use('/api/examtype', examtypeC);
 // import questionC from './src/Controllers/Question/Question';
 // app.use('/api/question', questionC);
  
-import courseC from './src/Controllers/Course/Course';
-app.use('/api/course', courseC);
  
-import subjectC  from './src/Controllers/Question/Question';
-app.use('/api/subc', subjectC);
 
-import courseOfferingC from './src/Controllers/CourseOffering/CourseOffering';
-app.use('/api/courseoffering', courseOfferingC);
 
 
 
