@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid'; 
 import {db} from '../Connections/sqlConfig'
-import { Employee } from '../Models/Employee';
+
 export function generateAutocode(data: any[], fieldName: string): string {
     if (!data || data.length === 0) {
       return '1'; // Or your initial autocode value
@@ -9,7 +9,7 @@ export function generateAutocode(data: any[], fieldName: string): string {
     // Sort the array in descending order based on the specified field
     const sortedData = [...data].sort((a, b) => {
       const valueA = a[fieldName];
-      const valueB = b[fieldName];
+      const valueB = b[fieldName]; 
   
       // Handle cases where the field might not exist or is not comparable
       if (valueA === undefined || valueA === null) return 1;

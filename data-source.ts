@@ -6,38 +6,27 @@ import { User } from './src/entity/User'; // Import your User entity
 import {Settings} from './src/entity/Settings'
 import {RefreshToken} from './src/entity/RefreshToken'
 import { refreshTokens } from './src/memory/memoryStore';
-import { Tenant } from './src/entity/Tenant';
-import { TenantTypeLookup} from './src/entity/TenantTypeLookup';
 import { SubscriptionPlanLookup} from './src/entity/SubscriptionPlanLookup';
 import { UserRoleLookup } from './src/entity/UserRoleLookup';
 //import { RolePermission } from './src/entity/RolePermission';
 import { Permission } from './src/entity/Permission';
-import { TenantQuestion } from './src/entity/TenantQuestion';
-
-import { QuestionTypeLookup } from './src/entity/QuestionTypeLookup';
 
 
 
-import { StudentProfile } from './src/entity/StudentProfile';
-import { Person } from './src/entity/Person';
-import { StudentAssignmentAttempt } from './src/entity/StudentAssignmentAttempt';
 
 
-import { Enrollment } from './src/entity/Enrollment';
 
-import { StudentAnswer } from './src/entity/StudentAnswer';
-import { Topic } from './src/entity/Topic';
-import { ExamType } from './src/entity/ExamType';
+
 
 import { Option } from './src/entity/Option';
-import { UserTenantContext } from './src/entity/UserTenantContext';
-import { FacultyProfile } from './src/entity/FacultyProfile';
 
-import { StudentQuestionAnswer } from './src/entity/StudentQuestionAnswer';
-import { QuestionExamTypes } from './src/entity/QuestionExamTypes';
 
-import { StudentCourseOffering } from './src/entity/StudentCourseOffering';
+
+
 import { AutocodeCounter } from './src/entity/AutocodeCounter';
+import { UserTenantContext } from './src/entity/UserTenantContext';
+import { Tenant } from './src/entity/Tenant';
+import { TenantTypeLookup } from './src/entity/TenantTypeLookup';
 
 
 
@@ -60,15 +49,13 @@ export const AppDataSource = new DataSource({
     //synchronize: false, // Set to true for initial development to auto-create tables, then set to false and use migrations
     synchronize: true,
     logging: false, // Set to true to see SQL queries in console  RolePermission,
-    entities: [Tenant,TenantTypeLookup,SubscriptionPlanLookup,User,UserRoleLookup,Permission,RefreshToken,Settings
-    ,TenantQuestion,StudentProfile,Person,StudentAssignmentAttempt,
-    Enrollment,StudentAnswer,Topic,ExamType,Option
-,UserTenantContext,ExamType
-,FacultyProfile
- ,Enrollment,AutocodeCounter ], // Register your entities here
+    entities: [User,UserRoleLookup,Permission,RefreshToken,Settings,Tenant,TenantTypeLookup,SubscriptionPlanLookup
+    ,Option,UserTenantContext  
+
+,AutocodeCounter ], // Register your entities here
     //Tenant,TenantTypeLookup,SubscriptionPlanLookup,User,UserRoleLookup,RolePermission,Permission,RefreshToken,Settings
     migrations: [], // You'll add migration files here later
-    subscribers: [],    
+    subscribers: [],     
 
     // Options specific to mssql driver
     extra: {

@@ -3,19 +3,16 @@ import { Router, Request, Response } from 'express';
 // Use default import for the service
 import * as LoginService from '../../services/LoginServiceTypeorm_1'; // Changed to import * as
 import {  CreateUserDto, RegisterAndSubscribeDto } from '../../dto/CreateUser.dto';
-import { BackendCreateTenantDto } from '../../dto/tenant.dto';
-import { getTenantServiceRepository,getUserRepository } from '../../dependencies';
+import { getUserRepository } from '../../dependencies';
 import { getRefreshTokenRepository } from '../../dependencies';
 import { getSettingsServiceRepository } from '../../dependencies';
 import { User } from '../../entity/User';
 import { AppDataSource } from '../../../data-source';
-import { Tenant } from '../../entity/Tenant';
-import { TenantTypeLookup } from '../../entity/TenantTypeLookup';
 import { SubscriptionPlanLookup } from '../../entity/SubscriptionPlanLookup';
 import { UserRoleLookup } from '../../entity/UserRoleLookup';
 import bcrypt from 'bcrypt';
 
-import { v4 as uuidv4 } from 'uuid'; 
+import { v4 as uuidv4 } from 'uuid';
 import { UserTenantContext } from '../../entity/UserTenantContext';
 import { RefreshToken } from '../../entity/RefreshToken';
 import  jwt from 'jsonwebtoken';
@@ -101,10 +98,10 @@ router.post('/register-and-subscribeAtomic', async (req: Request<{}, {}, Registe
     try {
         const result: RegisterResponse = await AppDataSource.manager.transaction(async transactionalEntityManager => {
             // Get service instances (these are the global ones from dependencies.ts)
-            const tenantService = getTenantServiceRepository();
+           
             const userService = getUserRepository();
             // Repositories for lookups within the transaction
-            const tenantTypeLookupRepo = transactionalEntityManager.getRepository(TenantTypeLookup);
+          
             const subscriptionPlanLookupRepo = transactionalEntityManager.getRepository(SubscriptionPlanLookup);
             const userRoleLookupRepo = transactionalEntityManager.getRepository(UserRoleLookup);
 
@@ -112,11 +109,7 @@ router.post('/register-and-subscribeAtomic', async (req: Request<{}, {}, Registe
                 throw new Error('Missing required registration fields (userName, password, displayName, tenantType, tenantName, subscriptionPlan, contactEmail, firstName).');
             }
             
-            // Fetch TenantTypeLookup
-            const tenantType = await tenantTypeLookupRepo.findOneBy({ typeName: req.body.tenantType });
-            if (!tenantType) {
-                throw new Error(`Invalid tenant type: ${req.body.tenantType}`);
-            }
+           
             // Fetch SubscriptionPlanLookup
             const subscriptionPlan = await subscriptionPlanLookupRepo.findOneBy({ planName: req.body.subscriptionPlan });
             if (!subscriptionPlan) {
@@ -126,13 +119,8 @@ router.post('/register-and-subscribeAtomic', async (req: Request<{}, {}, Registe
            // console.log('............trying to create tenant');
             
             // Step 1: Create the Tenant using the service's transactional method
-            const newTenantDto: BackendCreateTenantDto = {
-                tenantName: req.body.tenantName,
-                tenantType: req.body.tenantType,
-                subscriptionPlan: req.body.subscriptionPlan,
-                isActive: true
-            };
-            const savedTenant = await tenantService.CreateTenant(newTenantDto, transactionalEntityManager); // <--- PASS MANAGER HERE
+          
+           
             
             let aRoleName: string = '';
             aRoleName=req.body.roleType;
@@ -163,7 +151,7 @@ router.post('/register-and-subscribeAtomic', async (req: Request<{}, {}, Registe
                 // contactEmail: req.body.contactEmail,
                 // contactPhone: req.body.contactPhone,
                 password: req.body.password,
-                initialTenantId: savedTenant.tenantId, // Use ID from newly saved tenant
+              
                 initialRoleName: aRoleName, // Use the determined role name string
                 userName: req.body.userName, // Pass userName for the global User
                 displayName: req.body.displayName, // Pass displayName for the global User

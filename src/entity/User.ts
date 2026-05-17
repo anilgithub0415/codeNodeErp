@@ -1,6 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, OneToMany, ManyToOne, JoinColumn, Unique, CreateDateColumn, UpdateDateColumn, OneToOne } from 'typeorm';
 import { RefreshToken } from './RefreshToken';
-import { Person } from './Person';
+
 import { UserTenantContext } from './UserTenantContext'; // New import for context
 
 @Unique("UQ_userName", ["userName"]) // userName is now globally unique across all tenants
@@ -58,8 +58,7 @@ export class User {
     // @JoinColumn({ name: 'PersonId' })
     // person!: Person;
     // --- END One-to-One ---
-
-    // --- NEW: One-to-Many relationship with UserTenantContext ---
+// --- NEW: One-to-Many relationship with UserTenantContext ---
     // A global user can have many contexts (tenant + role combinations)
     @OneToMany(() => UserTenantContext, userTenantContext => userTenantContext.user)
     userTenantContexts?: UserTenantContext[];

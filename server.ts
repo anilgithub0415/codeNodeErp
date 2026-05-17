@@ -48,25 +48,15 @@ app.use('/api/login', loginC); // Mounts login routes under /api/login
 // import tokenC from './src/Controllers/Token/Token';
 // app.use('/api/token', tokenC); // Mounts token routes under /api/token
 
-import personC from './src/Controllers/Person/Person';
-app.use('/api/person', personC);
-
-import studprofileC from './src/Controllers/Studentprofile/Studentprofile';
-app.use('/api/studprofile', studprofileC);
 
 
 import userC from './src/Controllers/User/User';
 app.use('/api/user', userC);
 
+
+
 import tenantC from './src/Controllers/Tenant/Tenant';
 app.use('/api/tenant', tenantC);
-
-
- 
-import examtypeC from './src/Controllers/Examtype/Examtype';
-app.use('/api/examtype', examtypeC);
- 
-
 
 
 
@@ -79,9 +69,6 @@ app.use('/api/form-schemas', formschemasC);
 
 import lookupsC from './src/Controllers/lookups/lookups';
 app.use('/api/lookups', lookupsC);
-
-import facultyprofileC from './src/Controllers/FacultyProfile/FacultyProfile';
-app.use('/api/facultyprofile', facultyprofileC);
 
 // 
 

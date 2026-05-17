@@ -56,6 +56,8 @@ router.route('/:id/ptenantId/:ptenantId')
     router.route('/types')
     .get(async (req: Request, res: Response) => {
         try {
+            console.log('getTenantTypes');
+            
             // Assuming TenantService has a method to get types from TenantTypeLookupRepository
             const tenantService = getTenantServiceRepository();
             const types = await tenantService.getTenantTypes(); // This method needs to be implemented in TenantService

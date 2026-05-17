@@ -4,18 +4,17 @@
 // src/services/UserService.ts
 import { EntityManager, Not, Repository } from 'typeorm';
 import { User } from '../entity/User';
-import { Tenant } from '../entity/Tenant';
 
 import { UserRoleLookup } from '../entity/UserRoleLookup';
 import { UpdateUserDTO } from '../dto/CreateUser.dto';
 //import { getTenantServiceRepository, getUserRepository } from '../dependencies'; // <-- User Service gets its dependencies from here!
-import { UserTenantContext } from '../entity/UserTenantContext'; 
+
 import { AppDataSource } from '../../data-source'; // Assuming you have a data-source for repositories
 import * as bcrypt from 'bcrypt'; // For password hashing
-import { Person } from '../entity/Person';
-import { FacultyProfile } from '../entity/FacultyProfile';
-import { StudentProfile } from '../entity/StudentProfile';
+
+//import { StudentProfile } from '../entity/StudentProfile';
 import { AutocodeService } from './autocode.service';
+import { UserTenantContext } from '../entity/UserTenantContext';
 
 // Define DTOs for input and output (adjust based on your actual needs)
 export interface CreateUserAndContextDto {
@@ -31,7 +30,7 @@ export interface CreateUserAndContextDto {
     // lastName?: string;  
     // contactEmail: string;  
     // contactPhone?:string;
-    initialTenantId: string;  
+   // initialTenantId: string;  
     initialRoleName: string;//earlier UserRoleLookup;  
     deviceInfo : string;
     userName: string;
@@ -51,6 +50,7 @@ export interface CreateUserAndContextDto {
 export interface CreatedUserResponse {
     user: User;
     initialContext: UserTenantContext;
+    
     password?: string;
   
 }
@@ -87,8 +87,8 @@ export class UserService {
    
     // You might also need the TenantRepository here if UserService directly links tenants on user creation
     private userRoleLookupRepository!: Repository<UserRoleLookup>;
-    private tenantRepository!: Repository<Tenant>;
-private userTenantContextRepository!:Repository<UserTenantContext>;
+    private userTenantContextRepository!:Repository<UserTenantContext>;
+  
 
     constructor() {
         // Constructor is lean, repositories will be set via init
@@ -102,12 +102,11 @@ private userTenantContextRepository!:Repository<UserTenantContext>;
      * @param userRepo The TypeORM Repository instance for User.
      * @param tenantRepo The TypeORM Repository instance for Tenant (if UserService needs it).
      */
-    async init(userRepo: Repository<User>, tenantRepo: Repository<Tenant>, userRoleLookupRepo:Repository<UserRoleLookup>, userTenantContextRepo:Repository<UserTenantContext>): Promise<void> {
+    async init(userRepo: Repository<User>,  userRoleLookupRepo:Repository<UserRoleLookup>): Promise<void> {
         this.userRepository = userRepo;
-        this.userTenantContextRepository=userTenantContextRepo
-        this.tenantRepository = tenantRepo; // Assign tenant repo if needed
+      
         this.userRoleLookupRepository = userRoleLookupRepo;
-        this.userTenantContextRepository=userTenantContextRepo;
+      
         
     }
 
@@ -144,7 +143,7 @@ private userTenantContextRepository!:Repository<UserTenantContext>;
 
         const user = await userRepo.findOne({
             where: { userName: userName },
-            relations: ['person'] // Load person data if needed for display/initial setup
+          //  relations: ['person'] // Load person data if needed for display/initial setup
         });
 
         if (!user || !user.password) {
@@ -209,23 +208,13 @@ private userTenantContextRepository!:Repository<UserTenantContext>;
                 shouldReleaseQueryRunner = true;
             }
 
-            const personRepo = queryRunner!.manager.getRepository(Person);
+          
             const userRepo = queryRunner!.manager.getRepository(User);
             const userRoleLookupRepo = queryRunner!.manager.getRepository(UserRoleLookup);
             const userTenantContextRepo = queryRunner!.manager.getRepository(UserTenantContext);
-            const tenantRepo = queryRunner!.manager.getRepository(Tenant);
-            const facultyProfileRepo = queryRunner!.manager.getRepository(FacultyProfile); // Get FacultyProfile repo
-            const studentProfileRepo = queryRunner!.manager.getRepository(StudentProfile); // Get StudentProfile repo
+            
 
-            // 1. Validate Tenant and Role (existing logic)
-            const tenant = await tenantRepo.findOne({ where: { tenantId: createDto.initialTenantId } });
-            if (!tenant) {
-                throw new Error(`Tenant with ID '${createDto.initialTenantId}' not found.`);
-            }
-            const roleLookup = await userRoleLookupRepo.findOne({ where: { rolename: createDto.initialRoleName } });
-            if (!roleLookup) {
-                throw new Error(`Role '${createDto.initialRoleName}' not found in lookup table.`);
-            }
+           
 
             
 
@@ -255,7 +244,7 @@ private userTenantContextRepository!:Repository<UserTenantContext>;
             // 4. Create Initial UserTenantContext (existing logic)
             const newUserContext = userTenantContextRepo.create({
                 userId: newORexistinguser.id,
-                tenantId: createDto.initialTenantId,
+               // tenantId: createDto.initialTenantId,
                 roleName: createDto.initialRoleName,
                 isActiveInContext: true,
             });
@@ -268,7 +257,8 @@ private userTenantContextRepository!:Repository<UserTenantContext>;
                 await queryRunner!.commitTransaction();
             }
 
-            return { user: newORexistinguser, initialContext: newUserContext };
+          return { user: newORexistinguser, initialContext: newUserContext };
+            
 
         } catch (error) {
             if (shouldReleaseQueryRunner) {

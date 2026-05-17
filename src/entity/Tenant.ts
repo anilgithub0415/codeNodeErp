@@ -4,22 +4,7 @@ import { User } from './User'; // Import User entity
 import { UserTenantContext } from './UserTenantContext'; 
 import { TenantTypeLookup } from './TenantTypeLookup'; // NEW: Import TenantTypeLookup
 import { SubscriptionPlanLookup } from './SubscriptionPlanLookup'; // NEW: Import SubscriptionPlanLookup
-import { TenantQuestion } from './TenantQuestion';
 
-
-import { Enrollment } from './Enrollment';
-import { StudentProfile } from './StudentProfile';
-import { FacultyProfile } from './FacultyProfile';
-
-
-
-
-
-import { Topic } from './Topic';
-import { QuestionExamTypes } from './QuestionExamTypes';
-import { ExamType } from './ExamType';
-import { StudentQuestionAnswer } from './StudentQuestionAnswer';
-import { StudentCourseOffering } from './StudentCourseOffering';
 
 // REMOVE these enums from here, they are now represented by lookup tables
 // export enum TenantType { /* ... */ }
@@ -39,7 +24,7 @@ export class Tenant {
         faculty?: string; // e.g., 'FAC-{YYYY}-{NNNN}'
         student?: string; // e.g., 'STU-{YYYY}-{NNNN}'
         // Add other roles or entities here as needed
-    };
+    }; 
     // --- END NEW ---
     
     // --- MODIFIED: ManyToOne relationship to TenantTypeLookup ---
@@ -72,54 +57,16 @@ export class Tenant {
     @UpdateDateColumn({ type: 'datetime2', name: 'updatedAt' })
     updatedAt!: Date;
 
+    
 
     
-    @OneToMany(() => Enrollment, enrollment => enrollment.tenant)
-    enrollments?: Enrollment[];
-
-    //
-    @OneToMany(() => StudentProfile, studentprofile => studentprofile.tenant)
-    studentProfiles?: StudentProfile[];
-
-    @OneToMany(() => FacultyProfile, facultyprofile => facultyprofile.tenant)
-    facultyProfiles?: FacultyProfile[];
-    
-   
-    
-    //
-
-    //
-
-    //
-    //
-    @OneToMany(() => ExamType, examtype => examtype.tenant)
-    questionExamTypes?: ExamType[];
-
-    //
-    @OneToMany(() => QuestionExamTypes, questionexamtype => questionexamtype.tenant)
-    examTypes?: QuestionExamTypes[];
-
-    //
-    // @OneToMany(() => StudentQuestionAnswer, studentquestionanswer => studentquestionanswer.tenant)
-    // studentQuestionAnswers?: StudentQuestionAnswer[];
-    @OneToMany(() => StudentQuestionAnswer, sqa => sqa.tenant)
-    studentQuestionAnswers?: StudentQuestionAnswer[];
-   
-
-    @OneToMany(() => Topic, topic => topic.tenant)
-    topics?: Topic[];
 
     // --- NEW: One-to-Many relationship with UserTenantContext ---
     // A tenant can have many user-tenant contexts
     @OneToMany(() => UserTenantContext, userTenantContext => userTenantContext.tenant)
     userTenantContexts?: UserTenantContext[];
     // --- END NEW ---
-    // --- NEW: One-to-Many relationship with TenantQuestion ---
-    // A tenant can have many custom/extended questions
-    @OneToMany(() => TenantQuestion, tenantQuestion => tenantQuestion.tenant)
-    tenantQuestions?: TenantQuestion[];
-    // --- END NEW ---
-    @OneToMany(() => StudentCourseOffering, sco => sco.tenant)
-    studentCourseOfferings?: StudentCourseOffering[];
+   
+   
    
 }

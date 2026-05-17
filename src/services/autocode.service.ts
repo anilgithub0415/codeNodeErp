@@ -2,14 +2,16 @@
 import { EntityManager, Repository } from 'typeorm';
 import { AppDataSource } from '../../data-source';
 import { Tenant } from '../entity/Tenant';
+
 import { AutocodeCounter } from '../entity/AutocodeCounter'; // We will create this entity below
 
 export class AutocodeService {
-    private tenantRepository: Repository<Tenant>;
+    private tenantRepository!: Repository<Tenant>;
+    
     private autocodeCounterRepository: Repository<AutocodeCounter>;
 
     constructor() {
-        this.tenantRepository = AppDataSource.getRepository(Tenant);
+      
         this.autocodeCounterRepository = AppDataSource.getRepository(AutocodeCounter);
     }
 
