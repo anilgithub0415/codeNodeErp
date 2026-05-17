@@ -1,35 +1,68 @@
-// //ConfigService
-// import {Request,Response} from 'express'
+//ConfigService
+import { Repository } from 'typeorm'; // Import Repository directly
+import { Config } from '../entity/Config'; // Import your Config entity
+import { getConfigAppNameServiceRepository} from '../dependencies'
+import { BackendGlobalConfigDto } from '../dto/config.dto';
+//import UserRepository from '../Repositories/UserRepositoryTypeorm'; // Import your TypeORM User Repository
 
-// import UserRepository from '../Repositories/UserRepositoryTypeorm'; // Import your TypeORM User Repository
-
-// import { User } from '../Models/User';
-// import { UserRepositoryInterface } from '../Models/UserRepositoryInterface';
-// import bcrypt from 'bcrypt'; // For password hashing
-// // Remove this if utility is not directly used in methods that need it, or define its type
-// // const utility=require('../Utilities/Utility'); // Ensure this is correctly imported if needed
-
-// const saltRounds = 10; // Assuming this is defined globally or passed somehow
-
-// const utility=require('../Utilities/Utility');
-// type UserUpdateDTO = Partial<Omit<User, 'id' | 'password'>> & {
-//   password?: string; // Allow password to be explicitly provided for update
-// };
+import { User } from '../Models/User';
 
 
-// const userRepository = new UserRepository(); // Instantiate your repository
 
-//  class ConfigService{
+//const userRepository = new UserRepository(); // Instantiate your repository
+// Define an interface for your cached application settings
+export interface ConfigSettings {
+  appname: string|undefined; 
+  config_useraddthru: string|undefined; 
+}
+ class ConfigService{
 
-// getConfig=async():Promise<User[]>=>{
+  private configRepository!: Repository<Config>;
+   /**
+     * Initializes the ConfigService with its TypeORM repository.
+     * This MUST be called AFTER AppDataSource.initialize() has completed.
+     * @param repo The TypeORM Repository instance for Config.
+     */
+      async init(repo: Repository<Config>): Promise<void> {
+        this.configRepository = repo;
+        console.log("ConfigService repository initialized.");
+      }
+      private currentConfig: ConfigSettings = {
+        appname: '',
+        config_useraddthru:''
+    };
+
+    getAppName=async():Promise<any>=>{
+      const configAppNameService = getConfigAppNameServiceRepository(); // Get the singleton instance
+      const currentConfigAppName =await configAppNameService.getAppName(); // Get the cached config
+      return await currentConfigAppName;
+    }
+getConfig=async():Promise<any>=>{
+
+  const CONFIG_KEY = await this.getAppName();
+  try {
+    // 1. Try to find the existing config record by its primary key
+     let dbConfig = await this.configRepository.findOne({ where: { appname: CONFIG_KEY } });
+   
+    
+    // // 3. Update the in-memory cache with values from the database
+     this.currentConfig.appname = dbConfig?.appname;
+     this.currentConfig.config_useraddthru = dbConfig?.config_useraddthru;
+
+ return await this.currentConfig;
+} catch (error) {
+    console.error('Error ensuring/loading default config:', error);
+    throw error; // Re-throw to indicate a critical initialization failure
+}
+   
   
   
-//    return await userRepository.getAll()
-  
-//  }
-
-// }
+ }
 
 
+ 
 
-// module.exports=ConfigService
+}
+
+
+ export default ConfigService

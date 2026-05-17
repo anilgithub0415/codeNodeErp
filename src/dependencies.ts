@@ -7,10 +7,13 @@ import { Repository, EntityManager } from 'typeorm';
 import UserService from './services/UserService'; // Class import
  import RefreshTokenService from './services/RefreshTokenService';
 import SettingsService from './services/SettingsService'; // Class import
+import c from './services/ConfigService';
 
 
 
 import { Settings } from './entity/Settings'; 
+import {Config} from './entity/Config';
+import {Config_AppName} from './entity/Config_Appname';
 
 import { User } from './entity/User';
 import { RefreshToken } from './entity/RefreshToken';
@@ -23,6 +26,8 @@ import { Option} from './entity/Option'
 import TenantService from './services/TenantService';
 import { Tenant } from './entity/Tenant';
 import { TenantTypeLookup } from './entity/TenantTypeLookup';
+import ConfigService from './services/ConfigService';
+import ConfigAppNameService from './services/ConfigAppNameService';
 
 
 
@@ -39,7 +44,7 @@ import { TenantTypeLookup } from './entity/TenantTypeLookup';
 
 let userRepositoryInstance: UserService;
  let refreshTokenRepositoryInstance: RefreshTokenService;
-let settingsServiceInstance: SettingsService;
+let settingsServiceInstance: SettingsService; let configServiceInstance:ConfigService; let configAppNameServiceInstance:ConfigAppNameService
 
 
 
@@ -89,14 +94,28 @@ export async function initializeDependencies(): Promise<void> {
     await settingsServiceInstance.ensureDefaultSettings(); // Ensure default settings exist and are loaded
     console.log("SettingsService initialized and default settings ensured.");
 
+  // 4. Instantiate and Initialize ConfigService
+    // We pass AppDataSource.getRepository(Config) to its init method
+    // to ensure it gets the repository after DataSource is ready.
+    configServiceInstance = new ConfigService();
+    // Pass the actual TypeORM repository instance to the service's init method
+    await configServiceInstance.init(AppDataSource.getRepository(Config));
+    console.log("ConfigService initialized and default config ensured.");
 
+    // 5. Instantiate and Initialize ConfigAppNameService
+    // We pass AppDataSource.getRepository(ConfigAppName) to its init method
+    // to ensure it gets the repository after DataSource is ready.
+    configAppNameServiceInstance = new ConfigAppNameService();
+    // Pass the actual TypeORM repository instance to the service's init method
+    await configAppNameServiceInstance.init(AppDataSource.getRepository(Config_AppName));
+    console.log("ConfigAppNameService initialized and default configAppName ensured.");
 
     tenantServiceInstance = new TenantService();
     // Pass the actual TypeORM repository instance to the service's init method
     await tenantServiceInstance.init(AppDataSource.getRepository(Tenant),AppDataSource.getRepository(TenantTypeLookup),AppDataSource.getRepository(SubscriptionPlanLookup));
     console.log("tenantServiceInstance initialized");
     
-       
+        
 
 
     console.log("All core application dependencies initialized successfully.");
@@ -140,8 +159,19 @@ export function getSettingsServiceRepository(): SettingsService {
     }
     return settingsServiceInstance;
 }
+export function getConfigServiceRepository(): ConfigService {
+    if (!configServiceInstance) {
+        throw new Error("ConfigService not initialized. Call initializeDependencies() first.");
+    }
+    return configServiceInstance;
+}
 
-
+export function getConfigAppNameServiceRepository(): ConfigAppNameService {
+    if (!configAppNameServiceInstance) {
+        throw new Error("ConfigAppNameService not initialized. Call initializeDependencies() first.");
+    }
+    return configAppNameServiceInstance;
+}
 export function getTenantServiceRepository(): TenantService {
     if (!tenantServiceInstance) {
         throw new Error("TenantService not initialized. Call initializeDependencies() first.");

@@ -4,6 +4,9 @@ import { DataSource } from 'typeorm';
 import * as dotenv from 'dotenv';
 import { User } from './src/entity/User'; // Import your User entity
 import {Settings} from './src/entity/Settings'
+import {Config} from './src/entity/Config'
+import {  Config_AppName } from './src/entity/Config_Appname';
+
 import {RefreshToken} from './src/entity/RefreshToken'
 import { refreshTokens } from './src/memory/memoryStore';
 import { SubscriptionPlanLookup} from './src/entity/SubscriptionPlanLookup';
@@ -49,7 +52,7 @@ export const AppDataSource = new DataSource({
     //synchronize: false, // Set to true for initial development to auto-create tables, then set to false and use migrations
     synchronize: true,
     logging: false, // Set to true to see SQL queries in console  RolePermission,
-    entities: [User,UserRoleLookup,Permission,RefreshToken,Settings,Tenant,TenantTypeLookup,SubscriptionPlanLookup
+    entities: [User,UserRoleLookup,Permission,RefreshToken,Settings,Config,Config_AppName,Tenant,TenantTypeLookup,SubscriptionPlanLookup
     ,Option,UserTenantContext  
 
 ,AutocodeCounter ], // Register your entities here

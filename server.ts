@@ -40,6 +40,9 @@ const checkCache = require('./src/Middlewares/checkCache');
 // The '/api' prefix needs to be handled consistently for all routes.
 // Given your previous discussion, '/api' should be the primary prefix for all API endpoints.
  
+import configC from './src/Controllers/Config/Config';
+app.use('/api/config', configC);
+
 // Login Controller - now accessible at /api/login and /api/login/auth/google/callback
 import loginC from './src/Controllers/Login/Login'; // Use default import
 app.use('/api/login', loginC); // Mounts login routes under /api/login
