@@ -8,6 +8,7 @@ import { User } from '../entity/User';
 import { UserRoleLookup } from '../entity/UserRoleLookup';
 import { UpdateUserDTO } from '../dto/CreateUser.dto';
 //import { getTenantServiceRepository, getUserRepository } from '../dependencies'; // <-- User Service gets its dependencies from here!
+import {getUser_tableServiceRepository} from '../dependencies';
 
 import { AppDataSource } from '../../data-source'; // Assuming you have a data-source for repositories
 import * as bcrypt from 'bcrypt'; // For password hashing
@@ -15,6 +16,7 @@ import * as bcrypt from 'bcrypt'; // For password hashing
 //import { StudentProfile } from '../entity/StudentProfile';
 import { AutocodeService } from './autocode.service';
 import { UserTenantContext } from '../entity/UserTenantContext';
+import { User_table_fields } from '../entity/user_table_fields';
 
 // Define DTOs for input and output (adjust based on your actual needs)
 export interface CreateUserAndContextDto {
@@ -30,7 +32,7 @@ export interface CreateUserAndContextDto {
     // lastName?: string;  
     // contactEmail: string;  
     // contactPhone?:string;
-   // initialTenantId: string;  
+    initialTenantId: string;  
     initialRoleName: string;//earlier UserRoleLookup;  
     deviceInfo : string;
     userName: string;
@@ -85,10 +87,13 @@ export class UserService {
     private autocodeService!: AutocodeService;
     private userRepository!: Repository<User>;
    
+    private usertableRepository!:Repository<User_table_fields>;
+
     // You might also need the TenantRepository here if UserService directly links tenants on user creation
     private userRoleLookupRepository!: Repository<UserRoleLookup>;
     private userTenantContextRepository!:Repository<UserTenantContext>;
   
+   
 
     constructor() {
         // Constructor is lean, repositories will be set via init
@@ -102,11 +107,10 @@ export class UserService {
      * @param userRepo The TypeORM Repository instance for User.
      * @param tenantRepo The TypeORM Repository instance for Tenant (if UserService needs it).
      */
-    async init(userRepo: Repository<User>,  userRoleLookupRepo:Repository<UserRoleLookup>): Promise<void> {
-        this.userRepository = userRepo;
-      
+    async init(userRepo: Repository<User>,  userRoleLookupRepo:Repository<UserRoleLookup>, usertableRepo:Repository<User_table_fields>): Promise<void> {
+        this.userRepository = userRepo;      
         this.userRoleLookupRepository = userRoleLookupRepo;
-      
+        this.usertableRepository = usertableRepo;      
         
     }
 
@@ -244,10 +248,12 @@ export class UserService {
             // 4. Create Initial UserTenantContext (existing logic)
             const newUserContext = userTenantContextRepo.create({
                 userId: newORexistinguser.id,
-               // tenantId: createDto.initialTenantId,
+                tenantId: createDto.initialTenantId,
                 roleName: createDto.initialRoleName,
                 isActiveInContext: true,
             });
+            console.log('here m inserting newusercontext:',newUserContext);
+            
             await userTenantContextRepo.save(newUserContext);
 
 
@@ -560,6 +566,21 @@ async getUsers(
        return await this.userRoleLookupRepository.find({where:{rolename:Not ('SuperAdmin') }});
 
     }
+
+
+
+    //This is for building for by reading which field exists in user table
+    // get usert table fields
+    get_user_table_fields = async (config_usersCreatedby:string|undefined): Promise<any[]> => { // Or Observable<EnumOption[]> if backend sends label/value
+        const usertableService = getUser_tableServiceRepository(); // Get the singleton instance
+       // const usertable =await usertableService.getUser_table_fields(); 
+        //    let usertable_fields_array = await usertable.find();
+         let usertable_fields_array= await this.usertableRepository.find({where:{CreatedByMode:config_usersCreatedby}});
+   
+       return await usertable_fields_array
+
+    }
+
 }
 
 export default UserService; // Export the CLASS

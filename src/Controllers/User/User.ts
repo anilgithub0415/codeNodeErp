@@ -147,6 +147,22 @@ router.route('')
             res.status(500).json({ message: 'Failed to retrieve tenant types.' });
         }
     });
+
+    // get ussert table fields
+    router.route('/user_table_fields')
+    .get(async (req: Request, res: Response) => {
+        try {
+      
+          var config_usersCreatedby=req.query.config_usersCreatedby?.toString();
+
+            const userService = getUserRepository();
+            const user_table_fields = await userService.get_user_table_fields(config_usersCreatedby);
+            res.status(200).json(user_table_fields); 
+        } catch (error: any) {
+            console.error('Failed to retrieveuser_table_fields:', error.message || error);
+            res.status(500).json({ message: 'Failed to retrieve user_table_fields.' });
+        }
+    });
     router.route('/:id/ptenantId/:ptenantId')
     .get(async (req: Request, res: Response) => {
               console.log('........is this caled?.........');

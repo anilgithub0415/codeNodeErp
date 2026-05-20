@@ -1,3 +1,3 @@
 export interface BackendGlobalConfigDto{
-    config_useraddthru:string; //signup/superadmin
+    config_usersCreatedby:string; //signup/superadmin
   }

@@ -28,6 +28,8 @@ import { Tenant } from './entity/Tenant';
 import { TenantTypeLookup } from './entity/TenantTypeLookup';
 import ConfigService from './services/ConfigService';
 import ConfigAppNameService from './services/ConfigAppNameService';
+import User_tableService from './services/user_table.service';
+import { User_table_fields } from './entity/user_table_fields';
 
 
 
@@ -44,7 +46,10 @@ import ConfigAppNameService from './services/ConfigAppNameService';
 
 let userRepositoryInstance: UserService;
  let refreshTokenRepositoryInstance: RefreshTokenService;
-let settingsServiceInstance: SettingsService; let configServiceInstance:ConfigService; let configAppNameServiceInstance:ConfigAppNameService
+let settingsServiceInstance: SettingsService; 
+let configServiceInstance:ConfigService; 
+let user_tableServiceInstance:User_tableService;
+let configAppNameServiceInstance:ConfigAppNameService
 
 
 
@@ -76,7 +81,7 @@ export async function initializeDependencies(): Promise<void> {
 
     userRepositoryInstance = new UserService();
       // Pass the actual TypeORM repository instance to the service's init method
-      await userRepositoryInstance.init(AppDataSource.getRepository(User),AppDataSource.getRepository(UserRoleLookup));
+      await userRepositoryInstance.init(AppDataSource.getRepository(User),AppDataSource.getRepository(UserRoleLookup),AppDataSource.getRepository(User_table_fields));
     // refreshTokenRepositoryInstance = new RefreshTokenRepository();
     console.log("UserRepository and RefreshTokenRepository instances created.");
 
@@ -101,6 +106,15 @@ export async function initializeDependencies(): Promise<void> {
     // Pass the actual TypeORM repository instance to the service's init method
     await configServiceInstance.init(AppDataSource.getRepository(Config));
     console.log("ConfigService initialized and default config ensured.");
+
+    
+  // 5. Instantiate and Initialize User_tableService
+    // We pass AppDataSource.getRepository(User_table) to its init method
+    // to ensure it gets the repository after DataSource is ready.
+    user_tableServiceInstance = new User_tableService();
+    // Pass the actual TypeORM repository instance to the service's init method
+    await user_tableServiceInstance.init(AppDataSource.getRepository(User_table_fields));
+    console.log("User_tableService initialized and default user_table ensured.");
 
     // 5. Instantiate and Initialize ConfigAppNameService
     // We pass AppDataSource.getRepository(ConfigAppName) to its init method
@@ -164,6 +178,13 @@ export function getConfigServiceRepository(): ConfigService {
         throw new Error("ConfigService not initialized. Call initializeDependencies() first.");
     }
     return configServiceInstance;
+}
+
+export function getUser_tableServiceRepository(): User_tableService {
+    if (!user_tableServiceInstance) {
+        throw new Error("User_tableService not initialized. Call initializeDependencies() first.");
+    }
+    return user_tableServiceInstance;
 }
 
 export function getConfigAppNameServiceRepository(): ConfigAppNameService {

@@ -3,7 +3,7 @@ import { Router, Request, Response } from 'express';
 // Use default import for the service
 import * as LoginService from '../../services/LoginServiceTypeorm_1'; // Changed to import * as
 import {  CreateUserDto, RegisterAndSubscribeDto } from '../../dto/CreateUser.dto';
-import { getUserRepository } from '../../dependencies';
+import { getTenantServiceRepository, getUserRepository } from '../../dependencies';
 import { getRefreshTokenRepository } from '../../dependencies';
 import { getSettingsServiceRepository } from '../../dependencies';
 import { User } from '../../entity/User';
@@ -18,6 +18,7 @@ import { RefreshToken } from '../../entity/RefreshToken';
 import  jwt from 'jsonwebtoken';
 import { CreateUserAndContextDto } from '../../services/UserService';
 import { EntityManager } from 'typeorm';
+import { BackendCreateTenantDto } from '../../dto/tenant.dto';
 require('dotenv').config();
 
 const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET || 'aaa';
@@ -98,7 +99,7 @@ router.post('/register-and-subscribeAtomic', async (req: Request<{}, {}, Registe
     try {
         const result: RegisterResponse = await AppDataSource.manager.transaction(async transactionalEntityManager => {
             // Get service instances (these are the global ones from dependencies.ts)
-           
+            const tenantService = getTenantServiceRepository();
             const userService = getUserRepository();
             // Repositories for lookups within the transaction
           
@@ -119,7 +120,14 @@ router.post('/register-and-subscribeAtomic', async (req: Request<{}, {}, Registe
            // console.log('............trying to create tenant');
             
             // Step 1: Create the Tenant using the service's transactional method
-          
+            // Step 1: Create the Tenant using the service's transactional method
+            const newTenantDto: BackendCreateTenantDto = {
+                tenantName: req.body.tenantName,
+                tenantType: req.body.tenantType,
+                subscriptionPlan: req.body.subscriptionPlan,
+                isActive: true
+            };
+            const savedTenant = await tenantService.CreateTenant(newTenantDto, transactionalEntityManager); // <--- PASS MANAGER HERE
            
             
             let aRoleName: string = '';
@@ -151,7 +159,7 @@ router.post('/register-and-subscribeAtomic', async (req: Request<{}, {}, Registe
                 // contactEmail: req.body.contactEmail,
                 // contactPhone: req.body.contactPhone,
                 password: req.body.password,
-              
+                initialTenantId: savedTenant.tenantId,
                 initialRoleName: aRoleName, // Use the determined role name string
                 userName: req.body.userName, // Pass userName for the global User
                 displayName: req.body.displayName, // Pass displayName for the global User

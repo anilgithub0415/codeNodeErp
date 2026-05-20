@@ -13,7 +13,7 @@ import { User } from '../Models/User';
 // Define an interface for your cached application settings
 export interface ConfigSettings {
   appname: string|undefined; 
-  config_useraddthru: string|undefined; 
+  config_usersCreatedby: string|undefined; 
 }
  class ConfigService{
 
@@ -29,7 +29,7 @@ export interface ConfigSettings {
       }
       private currentConfig: ConfigSettings = {
         appname: '',
-        config_useraddthru:''
+        config_usersCreatedby:''
     };
 
     getAppName=async():Promise<any>=>{
@@ -47,7 +47,7 @@ getConfig=async():Promise<any>=>{
     
     // // 3. Update the in-memory cache with values from the database
      this.currentConfig.appname = dbConfig?.appname;
-     this.currentConfig.config_useraddthru = dbConfig?.config_useraddthru;
+     this.currentConfig.config_usersCreatedby = dbConfig?.config_usersCreatedby;
 
  return await this.currentConfig;
 } catch (error) {

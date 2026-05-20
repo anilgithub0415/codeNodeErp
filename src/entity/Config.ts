@@ -14,8 +14,8 @@ export class Config {
 
  
     // Decides whether user added thru superadmin or signup  
-    @Column({  name: 'config_useraddthru', type: 'nvarchar', length: 10 })
-   config_useraddthru!: string;
+    @Column({  name: 'config_usersCreatedby', type: 'nvarchar', length: 10 })
+   config_usersCreatedby!: string;
 
     
 }
