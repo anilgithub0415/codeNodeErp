@@ -212,7 +212,7 @@ interface RefreshAccessTokenResponse {
                                 //<!--newUser: User-->
 const generateAuthTokens = async (newUser: any, deviceInfo: string = '', manager?: EntityManager,  initialContext?: any): Promise<GenerateAuthTokensResponse> => 
 {
-    //console.log('......................... m in generateAuthTokens newUser:', newUser.id);
+    console.log('......................... m in generateAuthTokens newUser:', newUser.id);
     
     // Get service instances (these are the global ones from dependencies.ts)
     const userService = getUserRepository(); // This returns UserService instance
@@ -530,7 +530,7 @@ const Login = async (credentials: { userName: string; password: string; }, devic
     const userTenantContextRepo = AppDataSource.getRepository(UserTenantContext); // Get UserTenantContext repository
 
     try {
-        console.log('Attempting login for userName:', credentials.userName);
+        console.log('Attempting login for userName:', credentials.password);
         
         // 1. Authenticate the global User
         const authenticatedUser = await userService.Authenticate(credentials.userName, credentials.password);

@@ -415,6 +415,8 @@ router.post('/select-context', async (req: Request<{}, {}, SelectContextRequestB
     
     console.log('.... started  posting request to select-context at mm:ss:',new Date);
 
+    console.log('.......reqbody',req.body);
+    
     const { userId, refreshToken, tenantId, roleName } = req.body;
     let storedTokenDeviceInfo: string | null | undefined;
 
@@ -432,7 +434,11 @@ router.post('/select-context', async (req: Request<{}, {}, SelectContextRequestB
                 userRepo.findOneBy({ id: userId }),
                 refreshTokenRepo.findOneBy({ token: refreshToken })
             ]);
-
+console.log('storedToken:',storedToken);
+console.log('userId:',userId);
+console.log('storedToken.userId:',storedToken?.userId);
+console.log('for refreshToken:',refreshToken);
+          
             // --- 1. Validation Checks ---
             if (!storedToken || storedToken.userId !== userId) {
                 throw new Error('Invalid or unauthorized refresh token.');
@@ -486,8 +492,13 @@ router.post('/select-context', async (req: Request<{}, {}, SelectContextRequestB
                     permissions: userPermissions
                 }]
             };
+
+            console.log('running jwt.sign................');
+            
             const accessToken = jwt.sign(payload, ACCESS_TOKEN_SECRET, { expiresIn: currentAccessTokenLifetime });
 
+            console.log('yes, done.................');
+            
             // 6. Generate and save a NEW Refresh Token
             const currentRefreshTokenLifetime = settingsService.getSettings().refreshTokenLifetime;
             const newRefreshTokenString = uuidv4();

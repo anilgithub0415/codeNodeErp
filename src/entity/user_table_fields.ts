@@ -21,9 +21,11 @@ export class User_table_fields {
     @Column({  name: 'IsRequired',  type: 'bit', default: true })
     IsRequired!: boolean;
  
-    @Column({  name: 'CreatedByMode', type: 'nvarchar', length: 20 })
-    CreatedByMode!: string;
+    @Column({  name: 'SelectOptions', type: 'nvarchar', length: 500,nullable: true  }) 
+    SelectOptions!: string;
 
+    @Column({  name: 'CreatedByMode', type: 'nvarchar', length: 20 })
+    CreatedByMode!: string; 
 
     
 }

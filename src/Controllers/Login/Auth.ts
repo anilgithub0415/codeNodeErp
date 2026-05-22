@@ -15,7 +15,7 @@ export const auth = (req: Request, res: Response, next: NextFunction) => {
         //to bypass Auth security we can uncomment to allow direct access but we loose security
         (req.originalUrl.includes('/api')) || //to allow all, uncomment it for security
 
-        (req.originalUrl === '/api/login' && req.method === 'POST') ||
+        (req.originalUrl.includes('/api/login') && req.method === 'POST') ||
         (req.originalUrl === '/api/signup' && req.method === 'POST') ||
         (req.originalUrl.includes('/api/Device/') && req.method === 'GET')
     ) {

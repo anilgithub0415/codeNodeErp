@@ -1,7 +1,7 @@
 // src/Controllers/User/User_1.ts
 import { Router, Request, Response } from 'express';
 // Import the specific getter for UserService from dependencies.ts
-import { getUserRepository } from '../../dependencies'; // <--- Get the service via getter
+import { getUserRepository, getUser_tableServiceRepository } from '../../dependencies'; // <--- Get the service via getter
 
 // Import types for request bodies and enums for type safety
 //import { userRole } from '../../entity/User'; // Assuming UserRole is exported from User entity file
@@ -155,8 +155,8 @@ router.route('')
       
           var config_usersCreatedby=req.query.config_usersCreatedby?.toString();
 
-            const userService = getUserRepository();
-            const user_table_fields = await userService.get_user_table_fields(config_usersCreatedby);
+            const usertableService = getUser_tableServiceRepository();
+            const user_table_fields = await usertableService.get_user_table_fields(config_usersCreatedby);
             res.status(200).json(user_table_fields); 
         } catch (error: any) {
             console.error('Failed to retrieveuser_table_fields:', error.message || error);
@@ -179,23 +179,7 @@ router.route('')
             res.status(500).json({ "message": "Failed to retrieve users: " + error.message });
         }
     });
-    // //only students    
-    // router.route('/:id/ptenantId/:ptenantId/:paramcondition')
-    // .get(async (req: Request, res: Response) => {
-    //     try {
-    //         console.log('req.params.paramcondition:',req.params.paramcondition);
-    //         var pramcondition=req.params.paramcondition;
-
-    //         const userService = getUserRepository(); // <--- Get the singleton instance from dependencies.ts
-    //         const users = await userService.getUsers(pramcondition);//req.params.ptenantId,
-    //         // In a multi-tenant app, this should usually be filtered by the requesting user's tenantId.
-    //         // Example: const users = await userService.getUsersByTenant(req.tenantId);
-    //         res.status(200).json(users);
-    //     } catch (error: any) {
-    //         console.error('Failed to retrieve users:', error.message || error);
-    //         res.status(500).json({ "message": "Failed to retrieve users: " + error.message });
-    //     }
-    // });
+    
     
 router.route('/:id')
     .get(async (req: Request<{ id: string }>, res: Response) => {

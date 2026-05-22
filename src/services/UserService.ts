@@ -7,8 +7,7 @@ import { User } from '../entity/User';
 
 import { UserRoleLookup } from '../entity/UserRoleLookup';
 import { UpdateUserDTO } from '../dto/CreateUser.dto';
-//import { getTenantServiceRepository, getUserRepository } from '../dependencies'; // <-- User Service gets its dependencies from here!
-import {getUser_tableServiceRepository} from '../dependencies';
+
 
 import { AppDataSource } from '../../data-source'; // Assuming you have a data-source for repositories
 import * as bcrypt from 'bcrypt'; // For password hashing
@@ -16,7 +15,6 @@ import * as bcrypt from 'bcrypt'; // For password hashing
 //import { StudentProfile } from '../entity/StudentProfile';
 import { AutocodeService } from './autocode.service';
 import { UserTenantContext } from '../entity/UserTenantContext';
-import { User_table_fields } from '../entity/user_table_fields';
 
 // Define DTOs for input and output (adjust based on your actual needs)
 export interface CreateUserAndContextDto {
@@ -87,7 +85,6 @@ export class UserService {
     private autocodeService!: AutocodeService;
     private userRepository!: Repository<User>;
    
-    private usertableRepository!:Repository<User_table_fields>;
 
     // You might also need the TenantRepository here if UserService directly links tenants on user creation
     private userRoleLookupRepository!: Repository<UserRoleLookup>;
@@ -107,10 +104,10 @@ export class UserService {
      * @param userRepo The TypeORM Repository instance for User.
      * @param tenantRepo The TypeORM Repository instance for Tenant (if UserService needs it).
      */
-    async init(userRepo: Repository<User>,  userRoleLookupRepo:Repository<UserRoleLookup>, usertableRepo:Repository<User_table_fields>): Promise<void> {
+    async init(userRepo: Repository<User>,  userRoleLookupRepo:Repository<UserRoleLookup>): Promise<void> {
         this.userRepository = userRepo;      
         this.userRoleLookupRepository = userRoleLookupRepo;
-        this.usertableRepository = usertableRepo;      
+      //  this.usertableRepository = usertableRepo;      
         
     }
 
@@ -150,7 +147,7 @@ export class UserService {
           //  relations: ['person'] // Load person data if needed for display/initial setup
         });
 
-        if (!user || !user.password) {
+        if (!user || !user.password) {console.log('returning null for ',user?.password);
             return null; // User not found or no password set
         }
 
@@ -158,6 +155,9 @@ export class UserService {
         const isPasswordValid = await bcrypt.compare(passwordPlain, user.password);
 
         if (!!isPasswordValid) { // for a while we allowed invalid password
+
+            
+            
             return null; // Invalid password
         }
 
@@ -225,13 +225,15 @@ export class UserService {
             // 3. Create or Find User (existing logic)
             let newORexistinguser: User;
             let aUser = await userRepo.findOne({ where: { userName: createDto.userName } });
+           
             if (aUser) {
                // console.log(`found user with contactemail: ${createDto.contactEmail}`);
                 newORexistinguser = aUser;
+             //   await userRepo.save(newORexistinguser); 
             } else {
                 console.log(`creating user with data username: ${createDto}`);
                 const hashedPassword = await bcrypt.hash(createDto.password!, 10);
-                const newUser = userRepo.create({
+                let newUser = userRepo.create({
                     userName: createDto.userName,
                    // displayName: `${person.firstName} ${person.lastName || ''}`.trim(),
                    displayName:createDto.displayName,
@@ -239,10 +241,12 @@ export class UserService {
                     isActive: true,
                     isEmailVerified: false,
                    // personId: person.id,
+                 //  initialtenantId=createDto.initialTenantId,
                     createdByUserId: createDto.createdByUserId
                 });
+           
                 newORexistinguser = newUser;
-                await userRepo.save(newUser); 
+                   await userRepo.save(newUser);  
             }
 
             // 4. Create Initial UserTenantContext (existing logic)
@@ -264,6 +268,7 @@ export class UserService {
             }
 
           return { user: newORexistinguser, initialContext: newUserContext };
+       
             
 
         } catch (error) {
@@ -379,53 +384,6 @@ console.log('m assigning role:',updateData.roleNameInContext,'  for id:',id,' an
         return undefined;
     }
     
-    /**
-     * Retrieves all users (for the current tenant context - assuming this will be filtered later).
-     * @returns An array of User entities.
-     */
-    // //ptenantId:string,
-    // async getUsers(paramcondition?:string
-    //     ,manager?: EntityManager): Promise<User[]> {
-    //     if (!this.userRepository) {
-    //         throw new Error("UserService repository not initialized. Call init() first.");
-    //     }
-
-    //     const userRepository = manager ? manager.getRepository(User) : this.userRepository;
-
-    //     if (paramcondition === 'onlystudents') {
-        
-    //         // Step 1: Await the role lookup to get the actual UserRoleLookup entity
-    //         const studentRole = await this.userRoleLookupRepository.findOne({
-    //             where: {
-    //                 // Assuming 'rolefortenanttype' is a column in UserRoleLookup
-    //                 // that indicates which tenant type this role is primarily for.
-    //                 // If 'rolename' itself is unique and sufficient, you can simplify.
-    //                 // Based on your entities, UserRoleLookup only has 'rolename'.
-    //                 // So, you likely want to query by 'rolename' directly.
-    //                 rolename: 'Student' // Use the actual rolename string
-    //             }
-    //         });
-
-
-    //         if (!studentRole) {
-    //             // Handle case where 'Student' role is not found in lookup table
-    //             console.warn("Student role not found in UserRoleLookup table.");
-    //             return []; // Or throw an error, depending on desired behavior
-    //         }
-
-    //         // Step 2: Use the resolved 'studentRole' entity object in the 'where' clause
-    //         return await userRepository.find()
-    //         // {
-    //         //     where: {
-    //         //         //tenantId: ptenantId,
-    //         //         role: studentRole // Assign the actual UserRoleLookup entity object
-    //         //     }
-    //         // });
-    //     }
-
-    //     // Default case: retrieve all users for the given tenantId
-    //     return await userRepository.find();//{ where: { tenantId: ptenantId } }
-    // }
      /**
      * Retrieves User entities based on tenant ID and optionally filters by roles.
      * In this model, 'users' are global login accounts. Filtering by roles means
@@ -569,17 +527,7 @@ async getUsers(
 
 
 
-    //This is for building for by reading which field exists in user table
-    // get usert table fields
-    get_user_table_fields = async (config_usersCreatedby:string|undefined): Promise<any[]> => { // Or Observable<EnumOption[]> if backend sends label/value
-        const usertableService = getUser_tableServiceRepository(); // Get the singleton instance
-       // const usertable =await usertableService.getUser_table_fields(); 
-        //    let usertable_fields_array = await usertable.find();
-         let usertable_fields_array= await this.usertableRepository.find({where:{CreatedByMode:config_usersCreatedby}});
-   
-       return await usertable_fields_array
-
-    }
+  
 
 }
 

@@ -31,7 +31,7 @@ export const method2 = async (req: Request, res: Response) => {
     console.log(' token 2');
     res.status(200).json({ 'message': ' tokene 2' });
 };
-
+ 
 export const refreshtoken = async (req: Request, res: Response) => {
 
     console.log(('method:refreshtoken'));

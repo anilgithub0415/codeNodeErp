@@ -7,9 +7,10 @@ function auth(req,res,next){
 
     //for login post forgive
     if(
-        (req.originalUrl=='/api/login/' && req.method=="POST")
+      (req.originalUrl=='/api/config/' )
+      || (req.originalUrl=='/api/login/' && req.method=="POST")
       || (req.originalUrl=='/api/signup' && req.method=="POST")
-      || (req.originalUrl.includes('/api/Device/') && req.method=="GET")    
+      || (req.originalUrl.includes('/api/Device/') && req.method=="GET")     
        
     ){next();return;}
 

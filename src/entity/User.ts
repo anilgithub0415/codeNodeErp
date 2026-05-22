@@ -6,7 +6,7 @@ import { UserTenantContext } from './UserTenantContext'; // New import for conte
 @Unique("UQ_userName", ["userName"]) // userName is now globally unique across all tenants
 @Entity({ name: 'User' })
 export class User {
-    @PrimaryGeneratedColumn()
+    @PrimaryGeneratedColumn()    
     id!: number;
 
     // Removed tenantId from User entity. Tenant association is now via UserTenantContext.

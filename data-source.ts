@@ -31,6 +31,7 @@ import { UserTenantContext } from './src/entity/UserTenantContext';
 import { Tenant } from './src/entity/Tenant';
 import { TenantTypeLookup } from './src/entity/TenantTypeLookup';
 import { User_table_fields } from './src/entity/user_table_fields';
+import { Product } from './src/entity/Product';
 
 
 
@@ -51,12 +52,12 @@ export const AppDataSource = new DataSource({
     // Set to true to automatically create database schema on sync (development only)
     // For production, use migrations (TypeORM generates these)
     //synchronize: false, // Set to true for initial development to auto-create tables, then set to false and use migrations
-    synchronize: true,
+    synchronize: true, 
     logging: false, // Set to true to see SQL queries in console  RolePermission,
     entities: [User,UserRoleLookup,Permission,RefreshToken,Settings,Config,Config_AppName,Tenant,TenantTypeLookup,SubscriptionPlanLookup
     ,Option,UserTenantContext  
-
-,AutocodeCounter, User_table_fields ], // Register your entities here
+ 
+,AutocodeCounter, User_table_fields ,Product], // Register your entities here
     //Tenant,TenantTypeLookup,SubscriptionPlanLookup,User,UserRoleLookup,RolePermission,Permission,RefreshToken,Settings
     migrations: [], // You'll add migration files here later
     subscribers: [],     

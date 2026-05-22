@@ -48,7 +48,7 @@ getConfig=async():Promise<any>=>{
     // // 3. Update the in-memory cache with values from the database
      this.currentConfig.appname = dbConfig?.appname;
      this.currentConfig.config_usersCreatedby = dbConfig?.config_usersCreatedby;
-
+ 
  return await this.currentConfig;
 } catch (error) {
     console.error('Error ensuring/loading default config:', error);

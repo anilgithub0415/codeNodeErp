@@ -40,7 +40,7 @@ export class UserTenantContext {
 
     @Column({ type: 'bit', default: true })
     isActiveInContext!: boolean; // Is this specific role for this user in this tenant active?
-
+ 
     // Audit fields
     @CreateDateColumn({ type: 'datetime2', name: 'CreatedAt' })
     createdAt!: Date;

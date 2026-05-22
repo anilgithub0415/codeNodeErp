@@ -81,7 +81,7 @@ export async function initializeDependencies(): Promise<void> {
 
     userRepositoryInstance = new UserService();
       // Pass the actual TypeORM repository instance to the service's init method
-      await userRepositoryInstance.init(AppDataSource.getRepository(User),AppDataSource.getRepository(UserRoleLookup),AppDataSource.getRepository(User_table_fields));
+      await userRepositoryInstance.init(AppDataSource.getRepository(User),AppDataSource.getRepository(UserRoleLookup));
     // refreshTokenRepositoryInstance = new RefreshTokenRepository();
     console.log("UserRepository and RefreshTokenRepository instances created.");
 
