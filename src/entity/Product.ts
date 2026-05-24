@@ -8,8 +8,8 @@ export class Product {
     @PrimaryGeneratedColumn()
     id!: number;
  
-    @Column({  name: 'name', type: 'nvarchar', length: 20 })
-    name!: string;
+    @Column({  name: 'prod_name', type: 'nvarchar', length: 20 })
+    prod_name!: string;
 
     @Column({  name: 'description', type: 'nvarchar', length: 20, nullable:true })
     description!: string;

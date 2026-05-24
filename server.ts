@@ -56,6 +56,8 @@ app.use('/api/login', loginC); // Mounts login routes under /api/login
 import userC from './src/Controllers/User/User';
 app.use('/api/user', userC);
 
+import productC from './src/Controllers/Product/Product';
+app.use('/api/product', productC);
 
 
 import tenantC from './src/Controllers/Tenant/Tenant';

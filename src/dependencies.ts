@@ -30,7 +30,8 @@ import ConfigService from './services/ConfigService';
 import ConfigAppNameService from './services/ConfigAppNameService';
 import User_tableService from './services/user_table.service';
 import { User_table_fields } from './entity/user_table_fields';
-
+import product_tableService from './services/product_table.service';
+import { product_table_fields } from './entity/product_table_fields'
 
 
 //import { OrchestratorService } from './services/orchestrator.service';
@@ -48,7 +49,8 @@ let userRepositoryInstance: UserService;
  let refreshTokenRepositoryInstance: RefreshTokenService;
 let settingsServiceInstance: SettingsService; 
 let configServiceInstance:ConfigService; 
-let user_tableServiceInstance:User_tableService;
+let user_tableServiceInstance:User_tableService; 
+let product_tableServiceInstance:product_tableService;
 let configAppNameServiceInstance:ConfigAppNameService
 
 
@@ -115,6 +117,15 @@ export async function initializeDependencies(): Promise<void> {
     // Pass the actual TypeORM repository instance to the service's init method
     await user_tableServiceInstance.init(AppDataSource.getRepository(User_table_fields));
     console.log("User_tableService initialized and default user_table ensured.");
+
+  // 5. Instantiate and Initialize Product_tableService
+    // We pass AppDataSource.getRepository(Product_table) to its init method
+    // to ensure it gets the repository after DataSource is ready.
+    product_tableServiceInstance = new product_tableService();
+    // Pass the actual TypeORM repository instance to the service's init method
+    await product_tableServiceInstance.init(AppDataSource.getRepository(product_table_fields));
+    console.log("Product_tableService initialized and default product_table ensured.");
+
 
     // 5. Instantiate and Initialize ConfigAppNameService
     // We pass AppDataSource.getRepository(ConfigAppName) to its init method
@@ -186,7 +197,12 @@ export function getUser_tableServiceRepository(): User_tableService {
     }
     return user_tableServiceInstance;
 }
-
+export function getProduct_tableServiceRepository(): product_tableService {
+    if (!product_tableServiceInstance) {
+        throw new Error("Product_tableService not initialized. Call initializeDependencies() first.");
+    }
+    return product_tableServiceInstance;
+}
 export function getConfigAppNameServiceRepository(): ConfigAppNameService {
     if (!configAppNameServiceInstance) {
         throw new Error("ConfigAppNameService not initialized. Call initializeDependencies() first.");

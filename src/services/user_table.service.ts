@@ -3,10 +3,6 @@ import { Repository } from 'typeorm'; // Import Repository directly
 import { User_table_fields } from '../entity/user_table_fields'; // Import your User_table entity
 
 
-import { User } from '../Models/User';
-import { getUser_tableServiceRepository } from '../dependencies';
-
-
 
 //const userRepository = new UserRepository(); // Instantiate your repository
 // Define an interface for your cached application settings
