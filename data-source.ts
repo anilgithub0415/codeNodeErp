@@ -28,7 +28,7 @@ import { Option } from './src/entity/Option';
 
 import { AutocodeCounter } from './src/entity/AutocodeCounter';
 import { UserTenantContext } from './src/entity/UserTenantContext';
-import { Tenant } from './src/entity/Tenant';
+import { Tenant } from './src/entity/Tenant'; 
 import { TenantTypeLookup } from './src/entity/TenantTypeLookup';
 import { User_table_fields } from './src/entity/user_table_fields';
 import { Product } from './src/entity/Product';
@@ -58,7 +58,7 @@ export const AppDataSource = new DataSource({
 
 
     entities: [User,UserRoleLookup,Permission,RefreshToken,Settings,Config,Config_AppName,Tenant,TenantTypeLookup,SubscriptionPlanLookup
-    ,Option,UserTenantContext  
+    ,Option,UserTenantContext  ,Product
  
 ,AutocodeCounter, User_table_fields,product_table_fields ,Product], // Register your entities here
     //Tenant,TenantTypeLookup,SubscriptionPlanLookup,User,UserRoleLookup,RolePermission,Permission,RefreshToken,Settings
