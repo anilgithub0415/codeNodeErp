@@ -30,6 +30,9 @@ import { AutocodeCounter } from './src/entity/AutocodeCounter';
 import { UserTenantContext } from './src/entity/UserTenantContext';
 import { Tenant } from './src/entity/Tenant';
 import { TenantTypeLookup } from './src/entity/TenantTypeLookup';
+import { Product } from './src/entity/Product';
+import { product_table_fields } from './src/entity/product_table_fields';
+import { User_table_fields } from './src/entity/user_table_fields';
 
 
 
@@ -54,7 +57,7 @@ export const AppDataSource = new DataSource({
     logging: false, // Set to true to see SQL queries in console  RolePermission,
     entities: [User,UserRoleLookup,Permission,RefreshToken,Settings,Config,Config_AppName,Tenant,TenantTypeLookup,SubscriptionPlanLookup
     ,Option,UserTenantContext  
-
+    ,Product,product_table_fields,User_table_fields
 ,AutocodeCounter ], // Register your entities here
     //Tenant,TenantTypeLookup,SubscriptionPlanLookup,User,UserRoleLookup,RolePermission,Permission,RefreshToken,Settings
     migrations: [], // You'll add migration files here later

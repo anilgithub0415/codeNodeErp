@@ -62,6 +62,9 @@ import tenantC from './src/Controllers/Tenant/Tenant';
 app.use('/api/tenant', tenantC);
 
 
+import productC from './src/Controllers/Product/Product';
+app.use('/api/product', productC);
+ 
 
 import settingsC from './src/Controllers/Settings/Settings';
 app.use('/api/admin-settings', settingsC); // Consistent mounting example
