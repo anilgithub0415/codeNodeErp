@@ -102,9 +102,9 @@ export class UserService {
      * @param userRepo The TypeORM Repository instance for User.
      * @param tenantRepo The TypeORM Repository instance for Tenant (if UserService needs it).
      */
-    async init(userRepo: Repository<User>,  userRoleLookupRepo:Repository<UserRoleLookup>): Promise<void> {
+    async init(userRepo: Repository<User>,  userRoleLookupRepo:Repository<UserRoleLookup>, userTenantContRepo:Repository<UserTenantContext>): Promise<void> {
         this.userRepository = userRepo;
-      
+        this.userTenantContextRepository=userTenantContRepo;
         this.userRoleLookupRepository = userRoleLookupRepo;
       
         
@@ -439,13 +439,13 @@ async getUsers(
     manager?: EntityManager
 ): Promise<UserWithRole[]> {
     const userTenantContextRepo = manager ? manager.getRepository(UserTenantContext) : this.userTenantContextRepository;
-
+console.log('m here');
     const queryBuilder = userTenantContextRepo.createQueryBuilder('utc')
         .leftJoinAndSelect('utc.user', 'user')
         .leftJoinAndSelect('utc.role', 'role')
         // Correct join path: start from 'user' and go through 'person'
         //.leftJoinAndSelect('user.person', 'person') // First join to the Person entity
-        .leftJoinAndSelect('person.facultyProfile', 'facultyProfile'); // Then join to the FacultyProfile entity
+        
 
     queryBuilder
         .where('utc.isActiveInContext = :isActive', { isActive: true })

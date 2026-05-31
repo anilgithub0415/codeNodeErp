@@ -13,6 +13,7 @@ interface CreateProductDto{
     sku:string;
     basePrice:number;
     createdByUserId?:number;
+    [key:string]:any;
 }
 
 export interface CreatedProductResponse {
@@ -34,6 +35,24 @@ export class ProductService{
         }
 
 
+        async getProduct(
+            ptenantId:string,   pProdId:number,        
+            manager?: EntityManager
+        ): Promise<Product> {
+console.log('hitting url products');
+             if (!this.productRepository) {
+                        throw new Error("ProductService repository not initialized. Call init() first.");
+                    }
+
+                   
+                    
+                    const productRepository = manager ? manager.getRepository(Product) : this.productRepository;
+                    const ps= await productRepository.findOne({where:{tenantId:ptenantId , id:pProdId}}); // Use find() to get all 
+                 
+                    
+                    return ps!; 
+                }
+
 
         async getProducts(
             ptenantId:string,           
@@ -43,8 +62,11 @@ console.log('hitting url products');
              if (!this.productRepository) {
                         throw new Error("ProductService repository not initialized. Call init() first.");
                     }
+
+                    console.log('ptenantId:',ptenantId);
+                    
                     const productRepository = manager ? manager.getRepository(Product) : this.productRepository;
-                    const ps= await productRepository.find({where:{}, withDeleted:true}); // Use find() to get all //where:{tenantId:ptenantId}
+                    const ps= await productRepository.find({where:{tenantId:ptenantId}}); // Use find() to get all 
                     console.log('products count:',ps.length);
                     
                     return ps;
@@ -93,7 +115,7 @@ console.log('hitting url products');
 
                 await productRepo.save(aProduct); 
             } else {
-                console.log(`creating product with data productname: ${createDto}`);
+                console.log(`creating product with data customattributes: ${createDto.customAttributes.tier_prices.B2C_price}`);
                
                 let newProduct = productRepo.create(
                     createDto                   

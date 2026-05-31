@@ -33,7 +33,11 @@ import { TenantTypeLookup } from './src/entity/TenantTypeLookup';
 import { Product } from './src/entity/Product';
 import { product_table_fields } from './src/entity/product_table_fields';
 import { User_table_fields } from './src/entity/user_table_fields';
-
+import { TenantStrategy } from './src/entity/TenantStrategy';
+import { Customer } from './src/entity/Customer';
+import { Tenant_custom_scripts } from './src/entity/Tenant_custom_scripts';
+import { product_table_fields_tenantwise } from './src/entity/product_table_fields_tenantwise';
+import { TenantFormConfigs } from './src/entity/TenantFormConfigs'
 
 
 
@@ -55,11 +59,16 @@ export const AppDataSource = new DataSource({
     //synchronize: false, // Set to true for initial development to auto-create tables, then set to false and use migrations
     synchronize: true,
     logging: false, // Set to true to see SQL queries in console  RolePermission,
+  
     entities: [User,UserRoleLookup,Permission,RefreshToken,Settings,Config,Config_AppName,Tenant,TenantTypeLookup,SubscriptionPlanLookup
     ,Option,UserTenantContext  
-    ,Product,product_table_fields,User_table_fields
+    ,Product,product_table_fields, Product,product_table_fields_tenantwise,
+    User_table_fields, TenantStrategy, Customer
+    ,Tenant_custom_scripts, TenantFormConfigs
 ,AutocodeCounter ], // Register your entities here
     //Tenant,TenantTypeLookup,SubscriptionPlanLookup,User,UserRoleLookup,RolePermission,Permission,RefreshToken,Settings
+    
+    
     migrations: [], // You'll add migration files here later
     subscribers: [],     
 

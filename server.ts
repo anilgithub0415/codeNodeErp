@@ -66,6 +66,14 @@ import productC from './src/Controllers/Product/Product';
 app.use('/api/product', productC);
  
 
+import customerC from './src/Controllers/Customer/Customer';
+app.use('/api/customer', customerC);
+ 
+
+import formC from './src/Controllers/TenanttForm/TenantForm';
+app.use('/api/form', formC);
+
+
 import settingsC from './src/Controllers/Settings/Settings';
 app.use('/api/admin-settings', settingsC); // Consistent mounting example
 

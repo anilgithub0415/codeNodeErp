@@ -23,7 +23,7 @@ import { UserRoleLookup } from './entity/UserRoleLookup';
 
 
 import { Option} from './entity/Option'
-import TenantService from './services/TenantService';
+import TenantService from './services/TenantService'; import Tenant_custom_scriptsService from './services/Tenant_custom_scriptsService'
 import { Tenant } from './entity/Tenant';
 import { TenantTypeLookup } from './entity/TenantTypeLookup';
 import ConfigService from './services/ConfigService';
@@ -33,6 +33,14 @@ import User_tableService from './services/user_table.service';
 import product_tableService from './services/product_table.service';
 import { User_table_fields } from './entity/user_table_fields';
 import { product_table_fields } from './entity/product_table_fields';
+import { UserTenantContext } from './entity/UserTenantContext';
+import TenantStrategyService from './services/TenantStrategyService';
+import CustomerService from './services/Customerservice';
+import { TenantStrategy } from './entity/TenantStrategy';
+import { Customer } from './entity/Customer';
+import { Tenant_custom_scripts } from './entity/Tenant_custom_scripts';
+import TenantFormService from './services/TenantFormService';
+import { TenantFormConfigs } from './entity/TenantFormConfigs';
 
 
 
@@ -58,7 +66,10 @@ let configAppNameServiceInstance:ConfigAppNameService
 
 
 
-let tenantServiceInstance: TenantService;  
+let tenantServiceInstance: TenantService; let tenantCustomScriptsInstance:Tenant_custom_scriptsService;
+let tenantFormServiceInstance :TenantFormService;
+let tenantStrategyServiceInstance: TenantStrategyService; 
+let customerServiceInstance: CustomerService;
   
 
 
@@ -86,7 +97,7 @@ export async function initializeDependencies(): Promise<void> {
 
     userRepositoryInstance = new UserService();
       // Pass the actual TypeORM repository instance to the service's init method
-      await userRepositoryInstance.init(AppDataSource.getRepository(User),AppDataSource.getRepository(UserRoleLookup));
+      await userRepositoryInstance.init(AppDataSource.getRepository(User),AppDataSource.getRepository(UserRoleLookup),AppDataSource.getRepository(UserTenantContext));
     // refreshTokenRepositoryInstance = new RefreshTokenRepository();
     console.log("UserRepository and RefreshTokenRepository instances created.");
 
@@ -150,7 +161,29 @@ export async function initializeDependencies(): Promise<void> {
     await tenantServiceInstance.init(AppDataSource.getRepository(Tenant),AppDataSource.getRepository(TenantTypeLookup),AppDataSource.getRepository(SubscriptionPlanLookup));
     console.log("tenantServiceInstance initialized");
     
-        
+    tenantFormServiceInstance = new TenantFormService();
+    // Pass the actual TypeORM repository instance to the service's init method
+    await tenantFormServiceInstance.init(AppDataSource.getRepository(TenantFormConfigs));
+    console.log("tenantServiceInstance initialized");
+    
+
+    tenantCustomScriptsInstance = new Tenant_custom_scriptsService();
+    // Pass the actual TypeORM repository instance to the service's init method
+    await tenantCustomScriptsInstance.init(AppDataSource.getRepository(Tenant_custom_scripts));
+    console.log("tenantCustomScriptServiceInstance initialized");
+    
+
+     tenantStrategyServiceInstance = new TenantStrategyService();
+    // Pass the actual TypeORM repository instance to the service's init method
+    await tenantStrategyServiceInstance.init(AppDataSource.getRepository(TenantStrategy));
+    console.log("tenantStrategyServiceInstance initialized");
+    
+    customerServiceInstance = new CustomerService();
+    // Pass the actual TypeORM repository instance to the service's init method
+    await customerServiceInstance.init(AppDataSource.getRepository(Customer));
+    console.log("customerServiceInstance initialized");
+    
+                   
 
 
     console.log("All core application dependencies initialized successfully.");
@@ -230,4 +263,34 @@ export function getTenantServiceRepository(): TenantService {
         throw new Error("TenantService not initialized. Call initializeDependencies() first.");
     }
     return tenantServiceInstance;
+} 
+
+
+export function getTenantFormServiceRepository(): TenantFormService {
+    if (!tenantFormServiceInstance) {
+        throw new Error("TenantForm not initialized. Call initializeDependencies() first.");
+    }
+    return tenantFormServiceInstance;
+} 
+
+export function getTenantCustomScriptsServiceRepository(): Tenant_custom_scriptsService {
+    if (!tenantCustomScriptsInstance) {
+        throw new Error("tenantCustomScriptsService not initialized. Call initializeDependencies() first.");
+    }
+    return tenantCustomScriptsInstance;
+} 
+
+export function getTenantStrategyServiceRepository(): TenantStrategyService {
+    if (!tenantStrategyServiceInstance) {
+        throw new Error("TenantStrategyService not initialized. Call initializeDependencies() first.");
+    }
+    return tenantStrategyServiceInstance;
+} 
+
+
+export function getCustomerServiceRepository(): CustomerService {
+    if (!customerServiceInstance) {
+        throw new Error("CustomerServiceInstance not initialized. Call initializeDependencies() first.");
+    }
+    return customerServiceInstance;
 } 

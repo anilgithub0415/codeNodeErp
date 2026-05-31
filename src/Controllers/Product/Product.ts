@@ -1,5 +1,10 @@
 import { Router, Request, Response } from 'express';
 import { getProduct_tableServiceRepository,getProductRepository} from '../../dependencies'
+import PriceCalculationService from '../../services/PriceCalculationService';
+import { AppDataSource } from '../../../data-source';
+import { product_table_fields } from '../../entity/product_table_fields';
+import { product_table_fields_tenantwise } from '../../entity/product_table_fields_tenantwise';
+
 
 interface CreateProductRequestBody{
     tenantId:string,
@@ -25,19 +30,52 @@ router.use((req, res, next) => {
 
 
 // get ussert table fields
-router.route('/product_table_fields')
+router.route('/product_table_fields/:id')
 .get(async (req: Request, res: Response) => {
     try {   
     
+        //product_table_fields
+        const tenantId=req.params.id;
+        const prodtblflds  = await AppDataSource
+        .getRepository(product_table_fields)
+        .createQueryBuilder('product_table_fields')
+        .getMany();
 
-        const producttableService = getProduct_tableServiceRepository();
-        const product_table_fields = await producttableService.get_product_table_fields();
-        res.status(200).json(product_table_fields); 
+        //product_table_fields_tenantwise
+        const tenatprodtblflds = await AppDataSource
+        .getRepository(product_table_fields_tenantwise)
+        .createQueryBuilder('product_table_fields_tenantwise')
+        .where("product_table_fields_tenantwise.tenantId= :tenantId",{tenantId})
+        .getMany();
+
+        //both results made union and returned
+        const unionArray = [...prodtblflds, ...tenatprodtblflds]
+
+        res.status(200).json(unionArray); 
+        
     } catch (error: any) {
         console.error('Failed to retrieveproduct_table_fields:', error.message || error);
         res.status(500).json({ message: 'Failed to retrieve product_table_fields.' });
     }
 });
+
+
+    router.route('/:tenantId/:id')
+    .get(async (req: Request, res: Response) => {
+        try {
+            
+            var tenantId=req.params.tenantId;        
+            var prodId=parseInt(req.params.id);
+            const productService = getProductRepository(); 
+            
+        
+            const aProduct = await productService.getProduct(tenantId,prodId);
+            res.status(200).json(aProduct);
+        } catch (error: any) {
+            console.error('Failed to retrieve a product:', error.message || error);
+            res.status(500).json({ "message": "Failed to retrieve a product: " + error.message });
+        }
+    });
 
     router.route('/')
     .get(async (req: Request, res: Response) => {
@@ -49,8 +87,9 @@ router.route('/product_table_fields')
             const productService = getProductRepository(); // <--- Get the singleton instance from dependencies.ts
             var activeTenantId=req.query?.activeTenantId?.toString();
                      
+        console.log('m in getproducts activeTenantId:',activeTenantId);
         
-            const products = await productService.getProducts('1');
+            const products = await productService.getProducts(activeTenantId!);
             // In a multi-tenant app, this should usually be filtered by the requesting product's tenantId.
             // Example: const products = await productService.getProductsByTenant(req.tenantId);
             //var products2=products.filter(usr=>roles?.includes(usr.role.rolename))
@@ -62,6 +101,28 @@ router.route('/product_table_fields')
     });
 
 
+//Note: custId treated as number tenantId treated as string
+
+    router.route('/finalPrice/:id/:tenantId/:custId')
+    .post(async (req: Request, res: Response) => {
+        try {
+            var p=req.body;
+            console.log('i got p:',p);
+            
+        var prodId= parseInt(req.params.id);
+            var tenantId=req.params.tenantId;
+            var custId= parseInt(req.params.custId);
+
+            const priceCalcService = new PriceCalculationService(); // <--- Get the singleton instance from dependencies.ts
+            
+            var finalPrice=await priceCalcService.calculateFinalPrice(tenantId,prodId,custId,p)
+
+            res.status(200).json(finalPrice);
+        } catch (error: any) {
+            console.error('Failed to calculatefinalprice of product:', error.message || error);
+            res.status(500).json({ "message": "Failed to calculatefinalprice of product: " + error.message });
+        }
+    });
 router.route('')
     .post(async (req: Request<{}, {}, CreateProductRequestBody>, res: Response) => {
         try {
@@ -92,4 +153,6 @@ router.route('')
             res.status(400).json({ 'message': 'User creation failed: ' + error.message });
         }
     })
+
+ 
 export default router;

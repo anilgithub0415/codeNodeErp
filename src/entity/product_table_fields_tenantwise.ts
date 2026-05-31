@@ -1,16 +1,19 @@
 
 
-// src/entity/product_table_fields.ts
+// src/entity/product_table_fields_tenantwise.ts
 import { Entity, PrimaryColumn, Column, PrimaryGeneratedColumn } from 'typeorm';
 
-// This class defines the structure of your 'product_table_fields' table in the database.
-@Entity({ name: 'product_table_fields' }) 
-export class product_table_fields {
+// This class defines the structure of your 'product_table_fields_tenantwise' table in the database.
+@Entity({ name: 'product_table_fields_tenantwise' }) 
+export class product_table_fields_tenantwise {
 
    
     @PrimaryGeneratedColumn()
     id!: number;
- 
+    
+    @Column({name:"tenant_id",type:'nvarchar'})
+    tenantId!:string;
+
     // Decides whether user added thru superadmin or signup  
     @Column({  name: 'FieldName', type: 'nvarchar', length: 20 })
     FieldName!: string;

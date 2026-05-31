@@ -35,7 +35,10 @@ export class Product {
     @Column({  name: 'base_price', type: 'decimal', precision:10, scale:2, nullable:true })
     basePrice!: number;
  
-    @Column({type:"simple-json",nullable:true})
+    @Column({type:'bit',default:true})
+    isActive!:boolean;
+
+     @Column({type:"simple-json",nullable:true})
     customAttributes!:IProductCustomAttributes|null
  
 

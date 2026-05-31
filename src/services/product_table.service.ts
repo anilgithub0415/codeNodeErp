@@ -21,6 +21,12 @@ import { product_table_fields } from '../entity/product_table_fields'; // Import
 
     { FieldName: 'basePrice', FieldType: 'input', FieldLabel: 'base_price',    IsRequired: true    },
      
+    { FieldName: 'B2C_price', FieldType: 'select', FieldLabel: 'B2c_price',    IsRequired: true  ,SelectOptions:'[{"label":"label1",value:"label1"}, {"label":"label2",value:"label2"}]'  },
+     
+    { FieldName: 'B2B_price', FieldType: 'select', FieldLabel: 'B2B_price',    IsRequired: true  ,SelectOptions:'[{"label":"label1",value:"label1"}, {"label":"label2",value:"label2"}]'    },
+     
+    { FieldName: 'B2BC_price', FieldType: 'select', FieldLabel: 'B2BC_price',    IsRequired: true   ,SelectOptions:'[{"label":"label1",value:"label1"}, {"label":"label2",value:"label2"}]'   },
+     
   ];  
   private product_table_Repository!: Repository<product_table_fields>;
   
