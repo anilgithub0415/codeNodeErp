@@ -42,7 +42,7 @@ import { product_table_fields_tenantwise } from '../entity/product_table_fields_
 
    //This is for building for by reading which field exists in product table
     // get productt table fields_tenantwise
-    get_product_table_fields_tenantwise = async ( ptenantId:string,           
+    get_product_table_fields_tenantwise = async ( ptenantId:number,           
                 manager?: EntityManager): Promise<any> => { // Or Observable<EnumOption[]> if backend sends label/value
     
       if (!this.product_table_tenantwise_Repository) {

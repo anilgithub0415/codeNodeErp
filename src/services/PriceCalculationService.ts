@@ -5,7 +5,7 @@ import { HookBroker } from './execution/hook-broker';
 class PriceCalculationService{
 private hookBroker =new HookBroker();         
    
-      async  calculateFinalPrice(tenantId:string, productId:number, customerId:number,p:any){
+      async  calculateFinalPrice(tenantId:number, productId:number, customerId:number,p:any){
          const tenantStrategyService=getTenantStrategyServiceRepository();
          const customerService=getCustomerServiceRepository();
          const strategies =await tenantStrategyService.getTenantStrategies(tenantId);
@@ -26,7 +26,7 @@ private hookBroker =new HookBroker();
       }
 
 
-      async getProductFinalPrice(tenantId:string,  customerCategory:string,p:any){
+      async getProductFinalPrice(tenantId:number,  customerCategory:string,p:any){
          Object.assign(p,{customerCategory:customerCategory})          
          
          //hook for single product pricing

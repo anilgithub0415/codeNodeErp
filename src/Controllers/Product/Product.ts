@@ -7,7 +7,7 @@ import { product_table_fields_tenantwise } from '../../entity/product_table_fiel
 
 
 interface CreateProductRequestBody{
-    tenantId:string,
+    tenantId:number,
     prodName:string,
     description:string
     sku:string
@@ -35,7 +35,7 @@ router.route('/product_table_fields/:id')
     try {   
     
         //product_table_fields
-        const tenantId=req.params.id;
+        const tenantId=parseInt(req.params.id);
         const prodtblflds  = await AppDataSource
         .getRepository(product_table_fields)
         .createQueryBuilder('product_table_fields')
@@ -64,7 +64,7 @@ router.route('/product_table_fields/:id')
     .get(async (req: Request, res: Response) => {
         try {
             
-            var tenantId=req.params.tenantId;        
+            var tenantId= parseInt( req.params.tenantId);        
             var prodId=parseInt(req.params.id);
             const productService = getProductRepository(); 
             
@@ -85,7 +85,7 @@ router.route('/product_table_fields/:id')
         
             
             const productService = getProductRepository(); // <--- Get the singleton instance from dependencies.ts
-            var activeTenantId=req.query?.activeTenantId?.toString();
+            var activeTenantId= parseInt( req.query?.activeTenantId?.toString()!);
                      
         console.log('m in getproducts activeTenantId:',activeTenantId);
         
@@ -110,7 +110,7 @@ router.route('/product_table_fields/:id')
             console.log('i got p:',p);
             
         var prodId= parseInt(req.params.id);
-            var tenantId=req.params.tenantId;
+            var tenantId= parseInt( req.params.tenantId);
             var custId= parseInt(req.params.custId);
 
             const priceCalcService = new PriceCalculationService(); // <--- Get the singleton instance from dependencies.ts

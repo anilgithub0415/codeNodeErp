@@ -8,7 +8,7 @@ import { getCustomerServiceRepository } from '../dependencies';
 import { AppDataSource } from '../../data-source'; 
 
 interface CreateCustomerDto{
-   tenantId:string;
+   tenantId:number;
     customerName:string;
     customerCategory:string;
     //createdByUserId?:string;
@@ -46,7 +46,7 @@ class CustomerService{
              * @param manager Optional EntityManager.
              * @returns A promise that resolves to the Customer entity or null if not found.
              */
-            async getCustomerById(tenantdId:string,customerId: number, manager?: EntityManager): Promise<Customer | null> {
+            async getCustomerById(tenantdId:number,customerId: number, manager?: EntityManager): Promise<Customer | null> {
                 const customerRepo = manager ? manager.getRepository(Customer) : this.customerRepository;
              
                 
@@ -59,7 +59,7 @@ class CustomerService{
 
 
         async getCustomers(
-            ptenantId:string,           
+            ptenantId:number,           
             manager?: EntityManager
         ): Promise<Customer[]> {
 

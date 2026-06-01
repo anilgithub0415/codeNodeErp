@@ -3,7 +3,7 @@ import { getCustomerServiceRepository} from '../../dependencies'
 
 
 interface CreateCustomerRequestBody{
-    tenantId:string;
+    tenantId:number;
     customerName:string;
     customerCategory:string;
     createdByUserId?:string;
@@ -18,11 +18,11 @@ const router = Router();
         
             
             const customerService = getCustomerServiceRepository(); // <--- Get the singleton instance from dependencies.ts
-            var activeTenantId=req.query?.activeTenantId?.toString();
+            var activeTenantId=parseInt(req.query?.activeTenantId?.toString()!);
                      
         console.log('m in getcustomers activeTenantId:',activeTenantId);
         
-            const customers = await customerService.getCustomers(activeTenantId!);
+            const customers = await customerService.getCustomers( activeTenantId!);
              res.status(200).json(customers);
         } catch (error: any) {
             console.error('Failed to retrieve customers:', error.message || error);

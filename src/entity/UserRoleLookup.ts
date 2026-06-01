@@ -1,9 +1,24 @@
-import { Entity, PrimaryColumn, Column, OneToMany, ManyToMany, JoinTable, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, PrimaryColumn, Column, OneToMany, ManyToMany, JoinTable, CreateDateColumn, UpdateDateColumn, PrimaryGeneratedColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { UserTenantContext } from './UserTenantContext'; // Import UserTenantContext entity
 import { Permission } from './Permission'; // Import Permission entity
+import { Tenant } from './Tenant';
 
 @Entity({ name: 'UserRoleLookup' })
 export class UserRoleLookup {
+
+        // @PrimaryGeneratedColumn()
+        // id!: number;
+
+          @Column({type:'int'})
+    tenantId!:number;
+        
+        // // 2. Define the TypeORM Relation
+        @ManyToOne(() => Tenant, (tenant) => tenant.userrolelookups, { onDelete: "NO ACTION" })
+        @JoinColumn({ name: "tenantId" }) // Maps the relation to the column above
+        tenant!: Tenant;
+
+        
+
     @PrimaryColumn({ type: 'nvarchar', length: 50, name: 'RoleName' })
     rolename!: string;
 

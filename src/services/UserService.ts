@@ -37,7 +37,7 @@ export interface CreateUserAndContextDto {
     password: string;
     displayName?: string;
     //role: UserRoleLookup;//userRole;//changed
-  //  tenantId: string; // Tenant ID is crucial for user creation now
+  //  tenantId: number; // Tenant ID is crucial for user creation now
     googleId?: string;
     createdByUserId?:number;
 
@@ -61,7 +61,7 @@ interface CreateUserInternalDTO {
     password?: string;
     displayName?: string;
     role?: UserRoleLookup;//userRole;
-    tenantId: string;
+    tenantId: number;
     googleId?: string;
     CreatedByUserId?:number;
     personId?:number;
@@ -102,7 +102,9 @@ export class UserService {
      * @param userRepo The TypeORM Repository instance for User.
      * @param tenantRepo The TypeORM Repository instance for Tenant (if UserService needs it).
      */
-    async init(userRepo: Repository<User>,  userRoleLookupRepo:Repository<UserRoleLookup>, userTenantContRepo:Repository<UserTenantContext>): Promise<void> {
+    async init(userRepo: Repository<User>,  userRoleLookupRepo:Repository<UserRoleLookup>
+        , userTenantContRepo:Repository<UserTenantContext>
+    ): Promise<void> {
         this.userRepository = userRepo;
         this.userTenantContextRepository=userTenantContRepo;
         this.userRoleLookupRepository = userRoleLookupRepo;
@@ -143,15 +145,17 @@ export class UserService {
 
         const user = await userRepo.findOne({
             where: { userName: userName },
-          //  relations: ['person'] // Load person data if needed for display/initial setup
+         
         });
 
         if (!user || !user.password) {
+                   
             return null; // User not found or no password set
         }
 
         // Compare the provided password with the hashed password in the database
-        const isPasswordValid = await bcrypt.compare(passwordPlain, user.password);
+        const isPasswordValid = await bcrypt.compare(passwordPlain, user.password!);
+console.log('!!isPasswordValid:',!!isPasswordValid);
 
         if (!!isPasswordValid) { // for a while we allowed invalid password
             return null; // Invalid password
@@ -434,7 +438,7 @@ console.log('m assigning role:',updateData.roleNameInContext,'  for id:',id,' an
     //logic contra tag:roleNameInContext extra field
     
 async getUsers(
-    activeTenantId: string,
+    activeTenantId: number,
     roles?: string[],
     manager?: EntityManager
 ): Promise<UserWithRole[]> {
@@ -512,7 +516,7 @@ console.log('m here');
      */
     async getUserByUserNameAndTenant(
         userName: string,
-        tenantId: string,
+        tenantId: number,
         manager?: EntityManager
     ): Promise<User | null> {
         const userRepo = manager ? manager.getRepository(User) : this.userRepository;
@@ -528,7 +532,7 @@ console.log('m here');
     }
 
     // You might also need a method to get a user's roles for a specific tenant:
-    async getUserRolesForTenant(userId: number, tenantId: string, manager?: EntityManager): Promise<UserRoleLookup[]> {
+    async getUserRolesForTenant(userId: number, tenantId: number, manager?: EntityManager): Promise<UserRoleLookup[]> {
         const userTenantContextRepo = manager ? manager.getRepository(UserTenantContext) : this.userTenantContextRepository;
         
         const contexts = await userTenantContextRepo.find({

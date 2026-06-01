@@ -1,15 +1,21 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany, ManyToOne, JoinColumn, Unique, CreateDateColumn, UpdateDateColumn, OneToOne } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany, ManyToOne, JoinColumn, Unique, CreateDateColumn, UpdateDateColumn, OneToOne, PrimaryColumn } from 'typeorm';
 import { RefreshToken } from './RefreshToken';
 
 import { UserTenantContext } from './UserTenantContext'; // New import for context
+import { Tenant } from './Tenant';
 
 @Unique("UQ_userName", ["userName"]) // userName is now globally unique across all tenants
 @Entity({ name: 'User' })
 export class User {
-    @PrimaryGeneratedColumn()
+   @PrimaryGeneratedColumn('increment')
     id!: number;
-
-    // Removed tenantId from User entity. Tenant association is now via UserTenantContext.
+        
+    @Column('int')
+    tenantId!: number;
+  
+@ManyToOne(() => Tenant, tenant => tenant.users, { onDelete: 'NO ACTION' })
+@JoinColumn({ name: 'tenantId', referencedColumnName: 'tenantId' })
+tenant!: Tenant;
 
     @Column({ name: 'userName', type: 'nvarchar', length: 255, unique: true }) // User's login email (globally unique)
     userName!: string;
@@ -43,25 +49,26 @@ export class User {
     @Column({ type: 'int', nullable: true, name: 'CreatedByUserId' })
     createdByUserId?: number | null;
 
-    @ManyToOne(() => User, user => user.createdUsers, { nullable: true, onDelete: 'NO ACTION' })
-    @JoinColumn({ name: 'CreatedByUserId' })
-    createdBy?: User | null;
+    
+    // @ManyToOne(() => User, user => user.createdUsers, { nullable: true, onDelete: 'NO ACTION' })
+    // @JoinColumn({ name: 'CreatedByUserId' })
+    // createdBy?: User | null;
 
-    @OneToMany(() => User, user => user.createdBy)
-    createdUsers?: User[];
+    // @OneToMany(() => User, user => user.createdBy)
+    // createdUsers?: User[];
 
     // --- One-to-One relationship with Person (personId is UNIQUE) ---
     // @Column({ type: 'int', unique: true, nullable: false, name: 'PersonId' })
     // personId!: number;
 
-    // @OneToOne(() => Person, person => person.user, { nullable: false, onDelete: 'CASCADE' }) // If user is deleted, person is deleted
+    // @OneToOne(() => Person, person => person.user, { nullable: false, onDelete: 'NO ACTION' }) // If user is deleted, person is deleted
     // @JoinColumn({ name: 'PersonId' })
     // person!: Person;
     // --- END One-to-One ---
 // --- NEW: One-to-Many relationship with UserTenantContext ---
     // A global user can have many contexts (tenant + role combinations)
-    @OneToMany(() => UserTenantContext, userTenantContext => userTenantContext.user)
-    userTenantContexts?: UserTenantContext[];
+    // @OneToMany(() => UserTenantContext, context => context.user)
+    // contexts?: UserTenantContext[];
     // --- END NEW ---
 
     @CreateDateColumn({ type: 'datetime2', name: 'CreatedAt' })
@@ -70,6 +77,6 @@ export class User {
     @UpdateDateColumn({ type: 'datetime2', name: 'UpdatedAt' })
     updatedAt!: Date;
 
-    @OneToMany(() => RefreshToken, refreshToken => refreshToken.user)
-    refreshTokens?: RefreshToken[];
+    // @OneToMany(() => RefreshToken, refreshToken => refreshToken.user)
+    // refreshTokens?: RefreshToken[];
 }

@@ -41,7 +41,7 @@ class TenantFormService {
      * @param id The tenantId.
      * @returns The Tenant entity, or undefined if not found.
      */
-    getTenantForm = async (ptenantId:string,pformKey: string
+    getTenantForm = async (ptenantId:number,pformKey: string
         ,manager?: EntityManager): Promise<TenantFormConfigs | null | undefined> => {
         if (!this.tenantFormRepository) {
             throw new Error("TenantFormService repository not initialized. Call init() first.");

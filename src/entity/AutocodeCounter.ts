@@ -6,8 +6,8 @@ export class AutocodeCounter {
     @PrimaryGeneratedColumn()
     id!: number;
 
-    @Column({ type: 'nvarchar', length: 255, nullable: false })
-    tenantId!: string;
+    @Column({type:'int'})
+    tenantId!:number;
 
     @Column({ type: 'nvarchar', length: 50, nullable: false })
     type!: string; // 'faculty', 'student', etc.

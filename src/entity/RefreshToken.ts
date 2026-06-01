@@ -7,18 +7,18 @@ export class RefreshToken {
     @PrimaryGeneratedColumn()
     id!: number;
 
-    @Column({ type: 'nvarchar', length: 255, unique: true })
-    token!: string;
- 
+   
     // Foreign Key to the User entity (this refers to the `User.id`)
-    @Column({ name: 'userId', nullable: false })
+    @Column({type:'int'})
     userId!: number; // Make sure this column name matches the actual column name for the FK
     
-//un commented at 12:51pm
-    @ManyToOne(() => User, user => user.refreshTokens)
-    @JoinColumn({ name: 'userId' }) // Link to the 'userId' column in RefreshToken table
-    user!: User; // Relationship property to access the User object
+    // @ManyToOne(() => User, user => user.refreshTokens)
+    // @JoinColumn({ name: 'userId' }) // Link to the 'userId' column in RefreshToken table
+    // user!: User; // Relationship property to access the User object
 
+ @Column({ type: 'nvarchar', length: 255, unique: true })
+    token!: string;
+ 
     @Column({ type: 'datetime2' })
     expiresAt!: Date;
  

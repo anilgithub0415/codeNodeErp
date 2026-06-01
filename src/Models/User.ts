@@ -5,7 +5,7 @@ import { UserRoleLookup } from '../entity/UserRoleLookup';
 export interface User {
     id: number;
     // --- NEW: Tenant ID and optional Tenant object ---
-    tenantId: string; // The ID of the tenant this user record belongs to
+    tenantId: number; // The ID of the tenant this user record belongs to
     // tenant?: TenantModel; // Optional: If you plan to eager-load the full tenant object
                            // and pass it in your API responses, include this.
                            // Otherwise, just tenantId is often sufficient for most operations.

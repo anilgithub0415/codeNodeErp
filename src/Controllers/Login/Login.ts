@@ -28,7 +28,7 @@ interface CreateUserInternalDTO {
     password?: string;
     displayName?: string;
     role?: UserRoleLookup;//userRole;//changed enum to lookup and made role field optional by '?'
-    tenantId: string;
+    tenantId: number;
     googleId?: string;
 }
 
@@ -41,7 +41,7 @@ interface RegisterResponse {
     exp: number; // Access token expiration timestamp
     userId: number; // Added userId to response
     availableContexts: { // Added availableContexts to response
-        tenantId: string;
+        tenantId: number;
         tenantName: string;
         roleName: string;
         permissions: string[];
@@ -59,7 +59,7 @@ const router = Router();
 // Define the structure for a single available context
 interface AvailableContext {
     userId:number;
-    tenantId: string;
+    tenantId: number;
     tenantName: string; // Include tenant name for display
     roleName: string;
     permissions: string[];
@@ -68,10 +68,10 @@ interface AvailableContext {
 interface ContextSpecificJwtPayload {
     userId: number;
     userName: string;displayName:string;
-    tenantId:string;
+    tenantId:number;
     roleName:string;
     //personId:number;
-   // tenantId: string;
+   // tenantId: number;
    // roleName: string;
     //permissions: string[];
     availableContexts:AvailableContext[];
@@ -82,7 +82,7 @@ interface ContextSpecificJwtPayload {
 interface SelectContextRequestBody {
     userId: number;
     refreshToken: string;
-    tenantId: string;
+    tenantId: number;
     roleName: string;
 }
 
@@ -473,7 +473,7 @@ router.post('/select-context', async (req: Request<{}, {}, SelectContextRequestB
                 availableContexts: [{
                     userId: user.id,
                     tenantId: userContext.tenantId,
-                    tenantName: userContext.tenant.tenantName,
+                    tenantName: userContext.user.tenant.tenantName,
                     roleName: userContext.roleName,
                     permissions: userPermissions
                 }]
@@ -502,8 +502,8 @@ router.post('/select-context', async (req: Request<{}, {}, SelectContextRequestB
                 userId: user.id,
                 displayName: user.displayName,
                 tenantId: userContext.tenantId,
-                tenantName: userContext.tenant.tenantName,
-                tenantType: userContext.tenant.tenantTypeName,
+                tenantName: userContext.user.tenant.tenantName,
+                tenantType: userContext.user.tenant.tenantTypeName,
                 roleName: userContext.roleName,
                 permissions: userPermissions
             };

@@ -14,14 +14,14 @@ interface CreateUserRequestBody {
     lastName: string;  
     contactEmail: string;  
     contactPhone:string;
-    initialTenantId: string;  
+    initialTenantId: number;  
     initialRoleName: string;//earlier UserRoleLookup;  
     deviceInfo : string;
     userName: string;
     password: string;
     displayName?: string;
     role: UserRoleLookup;//userRole;//changed
-    tenantId: string; // Tenant ID is crucial for user creation now
+    tenantId: number; // Tenant ID is crucial for user creation now
     googleId?: string;
 }
 
@@ -121,7 +121,7 @@ router.route('')
         
             
             const userService = getUserRepository(); // <--- Get the singleton instance from dependencies.ts
-            var activeTenantId=req.query?.activeTenantId?.toString();
+            var activeTenantId= parseInt(req.query?.activeTenantId?.toString()!);
             var roles=req.query?.roles?.toString().split(",");
            
             
@@ -153,7 +153,7 @@ router.route('')
               console.log('........is this caled?.........');
               
         try {
-            var tenantid='notexistingtenant'
+            var tenantid=parseInt(req.params.ptenantId)
             const userService = getUserRepository(); // <--- Get the singleton instance from dependencies.ts
             const users = await userService.getUsers(tenantid);
             // In a multi-tenant app, this should usually be filtered by the requesting user's tenantId.
@@ -169,9 +169,9 @@ router.route('')
     router.route('/user_table_fields')
     .get(async (req: Request, res: Response) => {
         try {
-      console.log(' m in user cntroller /user_table_fields where config_usersCreatedby:',config_usersCreatedby);
+      
           var config_usersCreatedby=req.query.config_usersCreatedby?.toString();
-
+console.log(' m in user cntroller /user_table_fields where config_usersCreatedby:',config_usersCreatedby);
             const usertableService = getUser_tableServiceRepository();
             const user_table_fields = await usertableService.get_user_table_fields(config_usersCreatedby);
             res.status(200).json(user_table_fields); 
@@ -185,7 +185,8 @@ router.route('')
         try {
            
             const userService = getUserRepository(); // <--- Get the singleton instance from dependencies.ts
-            const userId = parseInt(req.params.id, 10);
+            const userId = parseInt(req.params.id, 10); console.log('userId:',userId);
+            
             if (isNaN(userId)) {
             //    return res.status(400).json({ message: 'Invalid User ID format.' });
             }

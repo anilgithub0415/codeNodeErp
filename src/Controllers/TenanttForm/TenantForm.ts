@@ -42,7 +42,7 @@ router.use((req, res, next) => {
         try {
        
             
-            const tenantId=req.params.tenantId;
+            const tenantId= parseInt( req.params.tenantId);
             const formKey=req.params.formKey;  
             
           

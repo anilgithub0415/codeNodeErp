@@ -112,7 +112,7 @@ class TenantService {
 
         // 3. Create an instance of the TypeORM Tenant entity
         const newTenant = new Tenant();
-        newTenant.tenantId = generateUUID(); // Assign a UUID
+        //newTenant.tenantId = generateUUID(); // Assign a UUID no increment decorator is used
         newTenant.tenantName = tenantData.tenantName;
         newTenant.isActive = true; // Default
 
@@ -147,7 +147,7 @@ class TenantService {
      * @returns The updated Tenant entity, or undefined if not found.
      */
 
-    updateTenant = async (id: string, tenantData: BackendUpdateTenantDto
+    updateTenant = async (id: number, tenantData: BackendUpdateTenantDto
         ,manager?: EntityManager ): Promise<Tenant | undefined> => {
         // Ensure repository is initialized
         if (!this.tenantRepository) {
@@ -211,7 +211,7 @@ if (tenantData.isActive !== undefined) existingTenant.isActive = tenantData.isAc
      * @param id The tenantId.
      * @returns The Tenant entity, or undefined if not found.
      */
-    getTenant = async (id: string
+    getTenant = async (id: number
         ,manager?: EntityManager): Promise<Tenant | null | undefined> => {
         if (!this.tenantRepository) {
             throw new Error("TenantService repository not initialized. Call init() first.");
@@ -224,7 +224,7 @@ if (tenantData.isActive !== undefined) existingTenant.isActive = tenantData.isAc
      * Retrieves all Tenant records from the database.
      * @returns An array of Tenant entities.
      */
-    getTenants = async (ptenantId:string
+    getTenants = async (ptenantId:number
         ,manager?: EntityManager): Promise<Tenant[]> => {
         if (!this.tenantRepository) {
             throw new Error("TenantService repository not initialized. Call init() first.");
@@ -264,7 +264,7 @@ if (tenantData.isActive !== undefined) existingTenant.isActive = tenantData.isAc
     }
 
     //like Pricing_Strategy, Discount_Strategy
-    getTenantStrategies = async (ptenantId:string): Promise<TenantStrategy[]> => { // Or Observable<EnumOption[]>
+    getTenantStrategies = async (ptenantId:number): Promise<TenantStrategy[]> => { // Or Observable<EnumOption[]>
         
         const tenantStrategyService= getTenantStrategyServiceRepository();
      return await   tenantStrategyService.getTenantStrategies(ptenantId);

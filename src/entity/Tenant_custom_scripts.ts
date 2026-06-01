@@ -2,7 +2,8 @@
 
 
 // src/entity/Product.ts
-import { Entity, PrimaryColumn, Column, PrimaryGeneratedColumn ,Index, CreateDateColumn, UpdateDateColumn} from 'typeorm';
+import { Entity, PrimaryColumn, ManyToOne,JoinColumn, Column, PrimaryGeneratedColumn ,Index, CreateDateColumn, UpdateDateColumn} from 'typeorm';
+import { Tenant } from './Tenant';
 
 
 // This class defines the structure of your 'Product' table in the database.
@@ -13,9 +14,14 @@ export class Tenant_custom_scripts {
     @PrimaryGeneratedColumn()
     id!: number;
  
-    @Column({name:"tenant_id"})
-    tenantId!:string;
+     @Column({type:'int'})
+    tenantId!:number;
     
+    // 2. Define the TypeORM Relation
+    @ManyToOne(() => Tenant, (tenant) => tenant.tenantscripts, { onDelete: 'NO ACTION' })
+    @JoinColumn({ name: "tenantId" }) // Maps the relation to the column above
+    tenant!: Tenant;
+
     @Column({name:"hook_point",length:100})
     hookPoint!:string
  

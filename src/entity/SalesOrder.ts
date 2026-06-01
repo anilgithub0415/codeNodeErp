@@ -1,13 +1,18 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm'
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany, ManyToOne, JoinColumn } from 'typeorm'
 import { SalesOrderItem } from './SalesOrderItem'
+import { Tenant } from './Tenant';
 
 @Entity("sales_orders")
 export class SalesOrder{
     @PrimaryGeneratedColumn()
     id!: number;
 
-    @Column()
-    tenantId!: number;
+      @Column({type:'int'})
+    tenantId!:number;
+
+    //  @ManyToOne(() => Tenant, (tenant) => tenant.salesorders, { onDelete: "RESTRICT" })
+    //     @JoinColumn({ name: "tenantId" }) // Maps the relation to the column above
+    //     tenant!: Tenant;
 
     @Column()
     orderNumber!: string;

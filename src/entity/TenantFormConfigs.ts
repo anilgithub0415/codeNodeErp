@@ -1,12 +1,15 @@
 // src/entity/TenntFormConfigs.ts - MODIFIED
-import { Entity, PrimaryColumn, Column  } from 'typeorm';
+import { Entity, PrimaryColumn, Column, PrimaryGeneratedColumn  } from 'typeorm';
 
 
 
 @Entity({ name: 'TenantFormConfigs' })
 export class TenantFormConfigs { 
-    @PrimaryColumn({ type: 'nvarchar', length: 255, name: 'tenantId' })
-    tenantId!: string;
+
+        @PrimaryGeneratedColumn()
+        id!: number;
+   @Column({type:'int'})
+    tenantId!:number;
 
     @PrimaryColumn({ type: 'nvarchar', length: 50, unique: true })
     FormKey!: string;

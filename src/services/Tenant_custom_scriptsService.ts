@@ -20,7 +20,7 @@ private tenantCustomScriptsRepository!: Repository<Tenant_custom_scripts>;
             console.log("TenantCustomScriptsService repositories initialized.");
         }
 
-    async getTenantSript(tenantId:string, scriptName:string):Promise<any>{
+    async getTenantSript(tenantId:number, scriptName:string):Promise<any>{
 
              if (!this.tenantCustomScriptsRepository) {
             throw new Error("tenantCustomScriptsRepository repository not initialized. Call init() first.");

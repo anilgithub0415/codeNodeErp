@@ -11,8 +11,8 @@ export class product_table_fields_tenantwise {
     @PrimaryGeneratedColumn()
     id!: number;
     
-    @Column({name:"tenant_id",type:'nvarchar'})
-    tenantId!:string;
+    @Column({type:'int'})
+    tenantId!:number;
 
     // Decides whether user added thru superadmin or signup  
     @Column({  name: 'FieldName', type: 'nvarchar', length: 20 })

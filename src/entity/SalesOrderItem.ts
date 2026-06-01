@@ -7,14 +7,14 @@ export class SalesOrderItem {
     @PrimaryGeneratedColumn()
     id!: number;
 
-    @ManyToOne(() => SalesOrder, (order) => order.items, { onDelete: 'CASCADE' })
+    @ManyToOne(() => SalesOrder, (order) => order.items, { onDelete: 'NO ACTION' })
     @JoinColumn({ name: 'sales_order_id' })
     salesOrder!: SalesOrder;
 
     @RelationId((item: SalesOrderItem) => item.salesOrder)
     salesOrderId!: number;
 
-    @ManyToOne(() => Product, { onDelete: 'RESTRICT' })
+    @ManyToOne(() => Product, { onDelete: 'NO ACTION' })
     @JoinColumn({ name: 'product_id' })
     product!: Product;
 

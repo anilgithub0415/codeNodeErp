@@ -24,7 +24,7 @@ export class AutocodeService {
      * @returns The next unique autocode string.
      */
     async generateNextAutocode(
-        tenantId: string,
+        tenantId: number,
         type: 'faculty' | 'student',
         manager?: EntityManager
     ): Promise<string> {

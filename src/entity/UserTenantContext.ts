@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn, Unique } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn, Unique, OneToMany, PrimaryColumn } from 'typeorm';
 import { User } from './User'; // Global User
 import { Tenant } from './Tenant'; // Specific Tenant
 import { UserRoleLookup } from './UserRoleLookup'; // Role within that tenant
@@ -10,31 +10,41 @@ import { UserRoleLookup } from './UserRoleLookup'; // Role within that tenant
 @Unique("UQ_UserTenantContext", ["userId", "tenantId", "roleName"]) // Ensures a user has a unique role in a given tenant
 @Entity({ name: 'UserTenantContext' })
 export class UserTenantContext {
-    @PrimaryGeneratedColumn()
-    id!: number;
-
-    // Many-to-One relationship with User (the global login account)
-    @Column({ type: 'int', nullable: false, name: 'UserId' })
+    @PrimaryColumn()
     userId!: number;
 
-    @ManyToOne(() => User, user => user.userTenantContexts, { onDelete: 'CASCADE' }) // If user is deleted, contexts are deleted
-    @JoinColumn({ name: 'UserId' })
-    user!: User;
+    // @ManyToOne(() => User, user => user.contexts, { onDelete: 'NO ACTION' }) // If user is deleted, contexts are deleted
+    // @JoinColumn([
+    //     { name: 'userId' , referencedColumnName:'id'},
+    // ])
+    // user!: User;
 
-    // Many-to-One relationship with Tenant
-    @Column({ type: 'nvarchar', length: 255, nullable: false, name: 'TenantId' })
-    tenantId!: string;
+    // Many-to-One relationship with User (the global login account)
+    @Column({ type: 'int' })
+    tenantId!: number;  
 
-    @ManyToOne(() => Tenant, tenant => tenant.userTenantContexts, { onDelete: 'CASCADE' }) // If tenant is deleted, contexts are deleted
-    @JoinColumn({ name: 'TenantId' })
+    // @ManyToOne(() => Tenant, tenant => tenant.userTenantContexts, { onDelete: 'NO ACTION' }) // If tenant is deleted, contexts are deleted
+    // @JoinColumn({ name: 'tenantId' })
+    // tenant!: Tenant; 
+    
+    @ManyToOne(() => User)//, user => user.contexts, { onDelete: 'NO ACTION' }) // If user is deleted, contexts are deleted
+    @JoinColumn({name: 'userId' , referencedColumnName:'id'})
+    user!:User;
+
+    @ManyToOne(() => Tenant)//, tenant => tenant.users, { onDelete: 'NO ACTION' }) // If user is deleted, contexts are deleted
+    @JoinColumn({ name: 'tenantId' , referencedColumnName:'tenantId'} )
     tenant!: Tenant;
+
+   
+
+
 
     // Many-to-One relationship with UserRoleLookup (the role within this context)
     @Column({ type: 'nvarchar', length: 50, nullable: false, name: 'RoleName' })
     roleName!: string;
 
     //RESTRICT was not working so replaced by CASCADE                            <!--RESTRICT-->
-    @ManyToOne(() => UserRoleLookup, role => role.userTenantContexts, { onDelete: 'CASCADE' }) // Prevent deleting a role if it's in use // RESTRICT
+    @ManyToOne(() => UserRoleLookup, role => role.userTenantContexts, { onDelete: 'NO ACTION' }) // Prevent deleting a role if it's in use // RESTRICT
     @JoinColumn({ name: 'RoleName', referencedColumnName: 'rolename' })
     role!: UserRoleLookup;
 

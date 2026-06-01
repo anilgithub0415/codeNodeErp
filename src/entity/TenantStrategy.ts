@@ -3,7 +3,8 @@
 
 
 // src/entity/TenantStrategy.ts
-import { Entity, PrimaryColumn, Column, PrimaryGeneratedColumn } from 'typeorm';
+import { Entity, PrimaryColumn, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Tenant } from './Tenant';
 
 // This class defines the structure of your 'TenantStrategy' table in the database.
 @Entity({ name: 'TenantStrategy' }) 
@@ -12,9 +13,14 @@ export class TenantStrategy {
     @PrimaryGeneratedColumn()
     id!: number;
  
-    @Column({name:"tenant_id",type:'nvarchar'})
-    tenantId!:string;
-      
+      @Column({type:'int'})
+    tenantId!:number;
+    
+     @ManyToOne(() => Tenant, (tenant) => tenant.tenantstrategies, { onDelete: 'NO ACTION' })
+     @JoinColumn({ name: "tenantId" }) // Maps the relation to the column above
+     tenant!: Tenant;
+
+
     @Column({  name: 'tenant_strategy_name', type: 'nvarchar', length: 50 })
     tenantStrategyName!: string; 
 

@@ -13,12 +13,12 @@ export class RolePermission {
     permissionName!: string;
 
     // ManyToOne relationship to UserRoleLookup
-    @ManyToOne(() => UserRoleLookup, role => role.rolePermissions, { onDelete: 'CASCADE' }) // Cascade delete if role is removed
+    @ManyToOne(() => UserRoleLookup, role => role.rolePermissions, { onDelete: 'NO ACTION' }) // Cascade delete if role is removed
     @JoinColumn({ name: 'RoleName', referencedColumnName: 'rolename' })
     role!: UserRoleLookup;
 
     // ManyToOne relationship to Permission
-    @ManyToOne(() => Permission, permission => permission.roles, { onDelete: 'CASCADE' }) // Cascade delete if permission is removed
+    @ManyToOne(() => Permission, permission => permission.roles, { onDelete: 'NO ACTION' }) // Cascade delete if permission is removed
     @JoinColumn({ name: 'PermissionName', referencedColumnName: 'permissionName' })
     permission!: Permission;
 

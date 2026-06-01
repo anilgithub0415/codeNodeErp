@@ -28,7 +28,7 @@ const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI!; // This must be th
 
 // Define the structure for a single available context
 interface AvailableContext {
-    tenantId: string;
+    tenantId: number;
     tenantName: string; // Include tenant name for display
     roleName: string;
     permissions: string[];
@@ -38,7 +38,7 @@ interface AvailableContext {
 interface ContextSpecificJwtPayload {
     userId: number;
     userName: string;
-    tenantId: string;
+    tenantId: number;
     roleName: string;
     permissions: string[];
     // Other standard JWT claims (iat, exp) are added by jwt.sign
@@ -48,7 +48,7 @@ interface JwtPayload {
     // role: UserRoleLookup;// string;//changed enum to lookup
     // exp?: number;
     // userId?: number;
-    // tenantId:string;
+    // tenantId:number;
     // permissions: string[]; 
     userId: number;
     userName: string;
@@ -64,7 +64,7 @@ interface LoginResponse {
     userId: number;
     availableContexts: AvailableContext[];
     expires_in: number; //earlier was AccessToken_expiresIn
-    tenantId:string;
+    tenantId:number;
     tenantType:string;
     roleName:string;
 }
@@ -84,7 +84,7 @@ interface RefreshAccessTokenResponse {
     access_token: string;
     newRefreshToken?: string;
     userId: number;
-    tenantId: string;
+    tenantId: number;
     roleName: string;
     permissions: string[];
     AccessToken_expiresIn: number;
@@ -261,8 +261,8 @@ const generateAuthTokens = async (newUser: any, deviceInfo: string = '', manager
         // 2. Map UserTenantContexts to AvailableContext DTOs
         var availableContexts: AvailableContext[] = userContexts.map(context => ({
             tenantId: context.tenantId,
-            tenantName: context.tenant.tenantName, // Assuming tenant name is available on the loaded tenant object
-            tenantType:context.tenant.tenantType,
+            tenantName: context.user.tenant.tenantName, // Assuming tenant name is available on the loaded tenant object
+            tenantType:context.user.tenant.tenantType,
             roleName: context.roleName,
             permissions: context.role.permissions ? context.role.permissions.map(p => p.permissionName) : []
         }));
@@ -546,12 +546,54 @@ const Login = async (credentials: { userName: string; password: string; }, devic
         await refreshTokenRepo.deleteExistingTokenForDevice(authenticatedUser.id, deviceInfo);
         console.log(`Any previous refresh token for user ${authenticatedUser.userName} on device ${deviceInfo} has been invalidated.`);
 
+
+console.log('-------------------------------------------------');
+
+//-----------------------
+const qb = userTenantContextRepo.createQueryBuilder('utc')
+  .leftJoinAndSelect('utc.user','user')
+  .leftJoinAndSelect('user.tenant','tenant')
+  //.leftJoinAndSelect('utc.role','role')
+  //.leftJoinAndSelect('role.permissions','permissions')
+  .where('utc.userId = :id', { id: authenticatedUser.id });
+
+console.log(qb.getSql());
+const rows = await qb.getMany();
+console.log('rows:',rows);
+//-----------------------
+
+console.log('-------------------------------------------------');
+
+
         // 3. Fetch all active UserTenantContexts for this authenticated User
         // Eager load role and its permissions, and tenant for display name
-        const userContexts = await userTenantContextRepo.find({
-            where: { userId: authenticatedUser.id, isActiveInContext: true },
-            relations: ['tenant', 'role', 'role.permissions'] // Load tenant, role, and role's permissions
-        });
+        
+        //replaced below 10 lines by createQueryBuilder
+    //     const userContexts = await userTenantContextRepo.find({
+    //        where: { userId: authenticatedUser.id, isActiveInContext: true },
+    //       //for a while
+    //        // relations: ['tenant', 'role', 'role.permissions'] // Load tenant, role, and role's permissions
+    //        // relations: ['user'] // Load tenant, role, and role's permissions
+    //         relations:{
+    //             user:{
+    //                 tenant:true
+    //             }
+    //         }
+    //    });
+
+var userContexts=await userTenantContextRepo.createQueryBuilder('utc')
+  .leftJoinAndSelect('utc.user', 'user')
+  .leftJoinAndSelect('user.tenant', 'tenant')
+  .where('utc.userId = :id', { id: authenticatedUser.id })
+  .getMany();
+//querybuilder
+        // const userContexts = await userTenantContextRepo.createQueryBuilder('utc')
+        // .leftJoinAndSelect('utc.user','user')
+        // .leftJoinAndSelect('utc.tenant','tenant')
+        // .where('utc.userId=: userId AND utc.tenantId=:tenanId',{userId:1,tenantId:1})
+        // .getMany()
+
+console.log('checkpoint1 , userContexts:',userContexts);
 
         if (userContexts.length === 0) {
             throw new Error(`No active contexts found for user ${authenticatedUser.userName}. Please contact support.`);
@@ -561,7 +603,7 @@ const Login = async (credentials: { userName: string; password: string; }, devic
         const availableContexts: AvailableContext[] = userContexts.map(context => ({
             userId:context.userId,//added
             tenantId: context.tenantId,
-            tenantName: context.tenant.tenantName, // Assuming tenant name is available on the loaded tenant object
+            tenantName: context.user.tenant.tenantName, // Assuming tenant name is available on the loaded tenant object
             roleName: context.roleName,
             permissions: context.role.permissions ? context.role.permissions.map(p => p.permissionName) : []
         }));
@@ -698,7 +740,7 @@ const Login = async (credentials: { userName: string; password: string; }, devic
 const RefreshAccessToken = async (
     refreshToken: string,
     userId: number,
-    tenantId: string, // REQUIRED: The tenant ID of the context to refresh
+    tenantId: number, // REQUIRED: The tenant ID of the context to refresh
     roleName: string // REQUIRED: The role name of the context to refresh
 ): Promise<RefreshAccessTokenResponse> => {
     const userService = getUserRepository();

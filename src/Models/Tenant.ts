@@ -4,7 +4,7 @@ import { Tenant } from '../entity/Tenant'; // Import the Tenant entity and enums
 
 // You might also define an interface for the Tenant model if you want to explicitly use it in User
 export interface TenantModel {
-    tenantId: string;
+    tenantId: number;
     tenantName: string;
     tenantType: string;
     subscriptionPlan: string;

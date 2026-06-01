@@ -7,7 +7,7 @@ import { Product } from '../entity/Product';
 import { AppDataSource } from '../../data-source'; 
 
 interface CreateProductDto{
-    tenantId:string;
+    tenantId:number;
     prodName:string;
     description:string;
     sku:string;
@@ -36,7 +36,7 @@ export class ProductService{
 
 
         async getProduct(
-            ptenantId:string,   pProdId:number,        
+            ptenantId:number,   pProdId:number,        
             manager?: EntityManager
         ): Promise<Product> {
 console.log('hitting url products');
@@ -55,7 +55,7 @@ console.log('hitting url products');
 
 
         async getProducts(
-            ptenantId:string,           
+            ptenantId:number,           
             manager?: EntityManager
         ): Promise<Product[]> {
 console.log('hitting url products');

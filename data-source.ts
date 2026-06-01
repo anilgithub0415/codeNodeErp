@@ -59,6 +59,7 @@ export const AppDataSource = new DataSource({
     //synchronize: false, // Set to true for initial development to auto-create tables, then set to false and use migrations
     synchronize: true,
     logging: false, // Set to true to see SQL queries in console  RolePermission,
+  //logging:['query','error'],
   
     entities: [User,UserRoleLookup,Permission,RefreshToken,Settings,Config,Config_AppName,Tenant,TenantTypeLookup,SubscriptionPlanLookup
     ,Option,UserTenantContext  

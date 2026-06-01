@@ -5,14 +5,14 @@ import { getTenantCustomScriptsServiceRepository } from "../../dependencies";
 //so later switch from vm2 to isolated-vm
 
 export class HookBroker{
-    private async getTenantSript(tenantId:string, scriptName:string):Promise<string>{
+    private async getTenantSript(tenantId:number, scriptName:string):Promise<string>{
         
                 const tenantCustomScriptService= getTenantCustomScriptsServiceRepository();
              var tenantCustomScriptEntry= await   tenantCustomScriptService.getTenantSript(tenantId,scriptName);
             return tenantCustomScriptEntry.scriptCode;
     }
 
-    public async executeHook(scriptName:string, tenantId:string,context:any):Promise<any>{
+    public async executeHook(scriptName:string, tenantId:number,context:any):Promise<any>{
         var customScript =await this.getTenantSript(tenantId, scriptName);
        
         //customScript="var item = context; var category = 'B2C'; if(category== 'B2C' && item.customAttributes?.tier_prices?.B2C_price){     item.finalPrice =item.customAttributes?.tier_prices.B2C_price;     }    else if (category== 'B2BC' && item.customAttributes?.tier_prices?.B2BC_price){     item.finalPrice =item.customAttributes?.tier_prices.B2BC_price;  }    else {   item.finalPrice = item.basePrice   }  context = item;  context;"

@@ -26,7 +26,7 @@ class TenantStrategyService {
         console.log("TenantStrategyService repositories initialized.");
     }
 
-    getTenantStrategies = async (ptenantId:string): Promise<TenantStrategy[]> => { // Or Observable<EnumOption[]>
+    getTenantStrategies = async (ptenantId:number): Promise<TenantStrategy[]> => { // Or Observable<EnumOption[]>
         if (!this.tenantStrategyRepository) {
             throw new Error("tenantStrategyRepository repository not initialized. Call init() first.");
         }
