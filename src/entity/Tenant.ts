@@ -11,6 +11,7 @@ import { SalesOrder } from './SalesOrder';
 import { Customer } from './Customer';
 import { Product } from './Product';
 import { Config } from './Config';
+import { Vendor } from './Vendor';
 
 
 // REMOVE these enums from here, they are now represented by lookup tables
@@ -55,6 +56,10 @@ export class Tenant {
    @OneToMany(() => Product, (product) => product.tenant)
   products!: Product[];
   
+
+   @OneToMany(() => Vendor, (vendor) => vendor.tenant)
+  vendors!: Vendor[];
+
  @OneToMany(() => Config, (config) => config.tenant)
   configs!: Product[];
 

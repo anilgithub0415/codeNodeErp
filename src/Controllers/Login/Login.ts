@@ -424,6 +424,7 @@ router.post('/select-context', async (req: Request<{}, {}, SelectContextRequestB
                 userRepo.findOneBy({ id: userId }),
                 refreshTokenRepo.findOneBy({ token: refreshToken })
             ]);
+console.log('crosscheck 1');
 
             // --- 1. Validation Checks ---
             if (!storedToken || storedToken.userId !== userId) {
@@ -440,7 +441,7 @@ router.post('/select-context', async (req: Request<{}, {}, SelectContextRequestB
             storedTokenDeviceInfo = storedToken.deviceInfo;
             // 2. Invalidate the old refresh token inside the transaction
             await refreshTokenRepo.delete({ token: refreshToken });
-
+console.log('crosscheck 2');
             // 3. Find the specific UserTenantContext
             const userContext = await userTenantContextRepo.findOne({
                 where: {
@@ -451,6 +452,8 @@ router.post('/select-context', async (req: Request<{}, {}, SelectContextRequestB
                 },
                 relations: ['role', 'role.permissions', 'tenant'] //removed , 'person'
             });
+
+            console.log('crosscheck 3 usercontext:',userContext);
 
             if (!userContext || !userContext.role) {
                 throw new Error('Requested context (tenant/role) is invalid or inactive for this user.');
@@ -484,7 +487,7 @@ router.post('/select-context', async (req: Request<{}, {}, SelectContextRequestB
             const currentRefreshTokenLifetime = settingsService.getSettings().refreshTokenLifetime;
             const newRefreshTokenString = uuidv4();
             const newExpiresAt = new Date(Date.now() + currentRefreshTokenLifetime * 1000);
-
+console.log('crosscheck 4');
             const newRefreshToken = new RefreshToken();
             newRefreshToken.token = newRefreshTokenString;
             newRefreshToken.userId = user.id;

@@ -66,6 +66,10 @@ import productC from './src/Controllers/Product/Product';
 app.use('/api/product', productC);
  
 
+
+import vendorC from './src/Controllers/Vendor/Vendor';
+app.use('/api/vendor', vendorC);
+
 import customerC from './src/Controllers/Customer/Customer';
 app.use('/api/customer', customerC);
  

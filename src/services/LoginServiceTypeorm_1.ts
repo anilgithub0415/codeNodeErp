@@ -549,20 +549,8 @@ const Login = async (credentials: { userName: string; password: string; }, devic
 
 console.log('-------------------------------------------------');
 
-//-----------------------
-const qb = userTenantContextRepo.createQueryBuilder('utc')
-  .leftJoinAndSelect('utc.user','user')
-  .leftJoinAndSelect('user.tenant','tenant')
-  //.leftJoinAndSelect('utc.role','role')
-  //.leftJoinAndSelect('role.permissions','permissions')
-  .where('utc.userId = :id', { id: authenticatedUser.id });
 
-console.log(qb.getSql());
-const rows = await qb.getMany();
-console.log('rows:',rows);
-//-----------------------
-
-console.log('-------------------------------------------------');
+console.log('-------------------------------------------------authenticatedUser.id :',authenticatedUser.id );
 
 
         // 3. Fetch all active UserTenantContexts for this authenticated User
@@ -584,14 +572,13 @@ console.log('-------------------------------------------------');
 var userContexts=await userTenantContextRepo.createQueryBuilder('utc')
   .leftJoinAndSelect('utc.user', 'user')
   .leftJoinAndSelect('user.tenant', 'tenant')
+  .leftJoinAndSelect('utc.role', 'role')
+  .addSelect(['tenant.tenantId','tenant.tenantName'])
+
   .where('utc.userId = :id', { id: authenticatedUser.id })
   .getMany();
 //querybuilder
-        // const userContexts = await userTenantContextRepo.createQueryBuilder('utc')
-        // .leftJoinAndSelect('utc.user','user')
-        // .leftJoinAndSelect('utc.tenant','tenant')
-        // .where('utc.userId=: userId AND utc.tenantId=:tenanId',{userId:1,tenantId:1})
-        // .getMany()
+     
 
 console.log('checkpoint1 , userContexts:',userContexts);
 
@@ -608,6 +595,8 @@ console.log('checkpoint1 , userContexts:',userContexts);
             permissions: context.role.permissions ? context.role.permissions.map(p => p.permissionName) : []
         }));
 
+        console.log('-----------availableContexts:',availableContexts);
+        
         // 5. Create JWT Payload
         const payload: JwtPayload = {
             userName: authenticatedUser.userName,

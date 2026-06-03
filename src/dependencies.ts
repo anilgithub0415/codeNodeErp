@@ -41,6 +41,8 @@ import { Customer } from './entity/Customer';
 import { Tenant_custom_scripts } from './entity/Tenant_custom_scripts';
 import TenantFormService from './services/TenantFormService';
 import { TenantFormConfigs } from './entity/TenantFormConfigs';
+import VendorService from './services/VendorService';
+import { Vendor } from './entity/Vendor';
 
 
 
@@ -56,6 +58,7 @@ import { TenantFormConfigs } from './entity/TenantFormConfigs';
 
 
 let userRepositoryInstance: UserService; let productRepositoryInstance: ProductService; 
+let vendorRepositoryInstance:VendorService;
  let refreshTokenRepositoryInstance: RefreshTokenService;
 let settingsServiceInstance: SettingsService; 
 let configServiceInstance:ConfigService; 
@@ -109,11 +112,19 @@ export async function initializeDependencies(): Promise<void> {
 
     console.log("ProductRepository  instances created.");
 
+      vendorRepositoryInstance = new VendorService();
+      // Pass the actual TypeORM repository instance to the service's init method
+      await vendorRepositoryInstance.init(AppDataSource.getRepository(Vendor));
+
+    console.log("ProductRepository  instances created.");
+
     refreshTokenRepositoryInstance = new RefreshTokenService();
     // Pass the actual TypeORM repository instance to the service's init method
     await refreshTokenRepositoryInstance.init(AppDataSource.getRepository(RefreshToken));
     console.log("refreshTokenServiceInstance initialized");
     
+    
+
     // 3. Instantiate and Initialize SettingsService
     // We pass AppDataSource.getRepository(Settings) to its init method
     // to ensure it gets the repository after DataSource is ready.
@@ -208,6 +219,12 @@ export function getProductRepository(): ProductService {
     return productRepositoryInstance;
 }
 
+export function getVendorRepository(): VendorService {
+    if (!vendorRepositoryInstance) {
+        throw new Error("VendorRepository not initialized. Call initializeDependencies() first.");
+    }
+    return vendorRepositoryInstance;
+}
 
 
 
