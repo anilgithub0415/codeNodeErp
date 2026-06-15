@@ -36,21 +36,23 @@ app.use(auth)
 const cache = require('./src/Special/cachemanager');
 const checkCache = require('./src/Middlewares/checkCache');
 
-// Import Controllers (using dynamic import for consistency)
-// The '/api' prefix needs to be handled consistently for all routes.
-// Given your previous discussion, '/api' should be the primary prefix for all API endpoints.
- 
+
+
+import lookupsC from './src/Controllers/lookups/lookups';
+app.use('/api/lookups', lookupsC);
+
 import configC from './src/Controllers/Config/Config';
 app.use('/api/config', configC);
+
+import settingsC from './src/Controllers/Settings/Settings';
+app.use('/api/admin-settings', settingsC); // Consistent mounting example
+
+import formschemasC from './src/Controllers/form-schemas/form-schemas';
+app.use('/api/form-schemas', formschemasC);
 
 // Login Controller - now accessible at /api/login and /api/login/auth/google/callback
 import loginC from './src/Controllers/Login/Login'; // Use default import
 app.use('/api/login', loginC); // Mounts login routes under /api/login
-
-// // You had these before, ensure their paths are correct relative to '/api' prefix
-// import tokenC from './src/Controllers/Token/Token';
-// app.use('/api/token', tokenC); // Mounts token routes under /api/token
-
 
 
 import userC from './src/Controllers/User/User';
@@ -66,6 +68,10 @@ import productC from './src/Controllers/Product/Product';
 app.use('/api/product', productC);
  
 
+
+import vendorC from './src/Controllers/Vendor/Vendor';
+app.use('/api/vendor', vendorC);
+
 import customerC from './src/Controllers/Customer/Customer';
 app.use('/api/customer', customerC);
  
@@ -74,17 +80,9 @@ import formC from './src/Controllers/TenanttForm/TenantForm';
 app.use('/api/form', formC);
 
 
-import settingsC from './src/Controllers/Settings/Settings';
-app.use('/api/admin-settings', settingsC); // Consistent mounting example
-
-//
-import formschemasC from './src/Controllers/form-schemas/form-schemas';
-app.use('/api/form-schemas', formschemasC);
-
-import lookupsC from './src/Controllers/lookups/lookups';
-app.use('/api/lookups', lookupsC);
-
-// 
+import purchaseC from './src/Controllers/Purchase/Purchase';
+app.use('/api/purchase', purchaseC);
+ 
 
 // Centralized error handling middleware (best practice)
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {

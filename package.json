@@ -23,6 +23,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^5.1.0",
+    "isolated-vm": "^5.0.4",
     "jsonwebtoken": "^9.0.2",
     "msnodesqlv8": "^4.5.0",
     "mssql": "^11.0.1",
@@ -33,8 +34,7 @@
     "tsyringe": "^4.10.0",
     "typeorm": "^0.3.23",
     "typescript": "^5.8.3",
-    "uuid": "^11.1.0",
-    "vm2": "^3.11.5"
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@types/mssql": "^9.1.7",

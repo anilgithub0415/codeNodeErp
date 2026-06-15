@@ -1,10 +1,10 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany, ManyToOne, JoinColumn } from 'typeorm'
 import { SalesOrderItem } from './SalesOrderItem'
-import { Tenant } from './Tenant';
+
 
 @Entity("sales_orders")
 export class SalesOrder{
-    @PrimaryGeneratedColumn()
+    @PrimaryGeneratedColumn('increment')
     id!: number;
 
       @Column({type:'int'})
@@ -15,7 +15,7 @@ export class SalesOrder{
     //     tenant!: Tenant;
 
     @Column()
-    orderNumber!: string;
+    soNumber!: string;
 
     @Column()
     customerId!: number;
