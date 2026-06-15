@@ -3,6 +3,7 @@ import { getCustomerServiceRepository} from '../../dependencies'
 
 
 interface CreateCustomerRequestBody{
+    id:number;
     tenantId:number;
     customerName:string;
     customerCategory:string;
@@ -47,7 +48,7 @@ router.route('')
 
           console.log('.........................................................usercontext body:',req.body);
 
-        //  const { tenantId,prodName, description, sku, basePrice } = req.body;
+          const {  tenantId,customerName, customerCategory } = req.body;
             const customer = await customerService.createCustomer(req.body);
 
             // Remove sensitive data (like password) before sending to client
@@ -55,7 +56,7 @@ router.route('')
             //res.status(201).json(userResponse);
             res.status(201).json(customer);
         } catch (error: any) {
-            console.error('User creation failed:', error.message || error);
+            console.error('Customer creation failed:', error.message || error);
             res.status(400).json({ 'message': 'User creation failed: ' + error.message });
         }
     })

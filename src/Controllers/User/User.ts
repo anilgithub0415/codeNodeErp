@@ -139,9 +139,10 @@ router.route('')
     router.route('/roles')
     .get(async (req: Request, res: Response) => {
         try {
+             var activeTenantId= parseInt(req.query?.activeTenantId?.toString()!);
             // Assuming TenantService has a method to get types from TenantTypeLookupRepository
             const userService = getUserRepository();
-            const roles = await userService.getUserRoles(); // This method needs to be implemented in TenantService
+            const roles = await userService.getUserRoles(activeTenantId); // This method needs to be implemented in TenantService
             res.status(200).json(roles.map(t => t.rolename)); // Send back just the string names
         } catch (error: any) {
             console.error('Failed to retrieve tenant types:', error.message || error);

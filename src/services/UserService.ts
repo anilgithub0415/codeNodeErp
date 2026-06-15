@@ -15,6 +15,7 @@ import * as bcrypt from 'bcrypt'; // For password hashing
 //import { StudentProfile } from '../entity/StudentProfile';
 import { AutocodeService } from './autocode.service';
 import { UserTenantContext } from '../entity/UserTenantContext';
+import { Leadsource } from '../entity/LeadSource';
 
 // Define DTOs for input and output (adjust based on your actual needs)
 export interface CreateUserAndContextDto {
@@ -555,7 +556,7 @@ console.log('m here');
         const userRepository = manager ? manager.getRepository(User) : this.userRepository;
         await userRepository.delete(id);
     }
-    getUserRoles = async (): Promise<UserRoleLookup[]> => { // Or Observable<EnumOption[]> if backend sends label/value
+    getUserRoles_earlier = async (): Promise<UserRoleLookup[]> => { // Or Observable<EnumOption[]> if backend sends label/value
             
         if (!this.userRoleLookupRepository) {
             throw new Error("userRoleLookupRepository repository not initialized. Call init() first.");
@@ -564,6 +565,22 @@ console.log('m here');
        return await this.userRoleLookupRepository.find({where:{rolename:Not ('SuperAdmin') }});
 
     }
+    async getUserRoles(
+                ptenantId:number,           
+                manager?: EntityManager
+            ): Promise<UserRoleLookup[]> {
+    
+                 if (!this.userRoleLookupRepository) {
+               throw new Error("userRoleLookupRepository repository not initialized. Call init() first.");
+               }
+                       
+                        
+                        const userRoleLookupRepository = manager ? manager.getRepository(UserRoleLookup) : this.userRoleLookupRepository;
+                        const userRoles= await userRoleLookupRepository.find({where:{tenantId:ptenantId}}); // Use find() to get all 
+                        
+                        
+                        return userRoles;
+                    }
 }
 
 export default UserService; // Export the CLASS

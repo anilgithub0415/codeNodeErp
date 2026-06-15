@@ -41,6 +41,10 @@ import { TenantFormConfigs } from './src/entity/TenantFormConfigs'
 import { PurchaseOrder } from './src/entity/PurchaseOrder';
 import { PurchaseOrderItem } from './src/entity/PurchaseOrderItem';
 import { Vendor } from './src/entity/Vendor';
+import { CustomerCategory } from './src/entity/CustomerCategory';
+import { Leadsource } from './src/entity/LeadSource';
+import { LeadStatus } from './src/entity/LeadStatus';
+import { Organisation } from './src/entity/Organisation';
 
 
 
@@ -63,13 +67,15 @@ export const AppDataSource = new DataSource({
     synchronize: true,
     logging: false, // Set to true to see SQL queries in console  RolePermission,
   //logging:['query','error'],
-   
+     
     entities: [User,UserRoleLookup,Permission,RefreshToken,Settings,Config,Config_AppName,Tenant,TenantTypeLookup,SubscriptionPlanLookup
     ,Option,UserTenantContext  
     ,Product,product_table_fields, Product,product_table_fields_tenantwise,
-    User_table_fields, TenantStrategy, Customer, Vendor
+    User_table_fields, TenantStrategy, 
+    Customer, CustomerCategory, Vendor
     ,Tenant_custom_scripts, TenantFormConfigs
-    ,PurchaseOrder,PurchaseOrderItem
+    ,PurchaseOrder,PurchaseOrderItem   
+    ,Leadsource,LeadStatus,Organisation
 ,AutocodeCounter ], // Register your entities here
     //Tenant,TenantTypeLookup,SubscriptionPlanLookup,User,UserRoleLookup,RolePermission,Permission,RefreshToken,Settings
     

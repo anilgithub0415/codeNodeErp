@@ -43,6 +43,13 @@ import TenantFormService from './services/TenantFormService';
 import { TenantFormConfigs } from './entity/TenantFormConfigs';
 import VendorService from './services/VendorService';
 import { Vendor } from './entity/Vendor';
+import PurchaseService from './services/PurchaseService';
+import { PurchaseOrder } from './entity/PurchaseOrder';
+import CustomerCategoryService from './services/CustomerCategoryService';
+import { CustomerCategory } from './entity/CustomerCategory';
+import { Organisation } from './entity/Organisation';
+import LeadSourceService from './services/LeadSourceService';
+import { Leadsource } from './entity/LeadSource';
 
 
 
@@ -58,6 +65,8 @@ import { Vendor } from './entity/Vendor';
 
 
 let userRepositoryInstance: UserService; let productRepositoryInstance: ProductService; 
+let purchaseOrderRepositoryInstance: PurchaseService;
+
 let vendorRepositoryInstance:VendorService;
  let refreshTokenRepositoryInstance: RefreshTokenService;
 let settingsServiceInstance: SettingsService; 
@@ -73,7 +82,8 @@ let tenantServiceInstance: TenantService; let tenantCustomScriptsInstance:Tenant
 let tenantFormServiceInstance :TenantFormService;
 let tenantStrategyServiceInstance: TenantStrategyService; 
 let customerServiceInstance: CustomerService;
-  
+let customerCategoryServiceInstance: CustomerCategoryService;
+let leadSourceServiceInstance:LeadSourceService;  
 
 
 
@@ -111,6 +121,13 @@ export async function initializeDependencies(): Promise<void> {
       await productRepositoryInstance.init(AppDataSource.getRepository(Product));
 
     console.log("ProductRepository  instances created.");
+
+
+    purchaseOrderRepositoryInstance = new PurchaseService();
+      // Pass the actual TypeORM repository instance to the service's init method
+      await purchaseOrderRepositoryInstance.init(AppDataSource.getRepository(PurchaseOrder));
+
+    console.log("PurchaseOrderRepository  instances created.");
 
       vendorRepositoryInstance = new VendorService();
       // Pass the actual TypeORM repository instance to the service's init method
@@ -191,11 +208,18 @@ export async function initializeDependencies(): Promise<void> {
     
     customerServiceInstance = new CustomerService();
     // Pass the actual TypeORM repository instance to the service's init method
-    await customerServiceInstance.init(AppDataSource.getRepository(Customer));
+    await customerServiceInstance.init(AppDataSource.getRepository(Customer),AppDataSource.getRepository(Organisation));
     console.log("customerServiceInstance initialized");
     
-                   
-
+    customerCategoryServiceInstance = new CustomerCategoryService();
+    // Pass the actual TypeORM repository instance to the service's init method
+    await customerCategoryServiceInstance.init(AppDataSource.getRepository(CustomerCategory));
+    console.log("customerCategoryServiceInstance initialized");
+     
+    leadSourceServiceInstance = new LeadSourceService();
+    // Pass the actual TypeORM repository instance to the service's init method
+    await leadSourceServiceInstance.init(AppDataSource.getRepository(Leadsource));
+    console.log("leadSourceServiceInstance initialized");
 
     console.log("All core application dependencies initialized successfully.");
 }
@@ -217,6 +241,13 @@ export function getProductRepository(): ProductService {
         throw new Error("ProductRepository not initialized. Call initializeDependencies() first.");
     }
     return productRepositoryInstance;
+}
+
+export function getPurchaseOrderRepository(): PurchaseService {
+    if (!purchaseOrderRepositoryInstance) {
+        throw new Error("PurchaseOrderRepository not initialized. Call initializeDependencies() first.");
+    }
+    return purchaseOrderRepositoryInstance;
 }
 
 export function getVendorRepository(): VendorService {
@@ -310,4 +341,17 @@ export function getCustomerServiceRepository(): CustomerService {
         throw new Error("CustomerServiceInstance not initialized. Call initializeDependencies() first.");
     }
     return customerServiceInstance;
+} 
+
+export function getCustomerCategoryServiceRepository(): CustomerCategoryService {
+    if (!customerCategoryServiceInstance) {
+        throw new Error("CustomerCategoryServiceInstance not initialized. Call initializeDependencies() first.");
+    }
+    return customerCategoryServiceInstance;
+} 
+export function getLeadSourceServiceRepository(): LeadSourceService {
+    if (!leadSourceServiceInstance) {
+        throw new Error("LeadSourceServiceInstance not initialized. Call initializeDependencies() first.");
+    }
+    return leadSourceServiceInstance;
 } 

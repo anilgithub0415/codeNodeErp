@@ -40,12 +40,30 @@ export class Product {
     @Column({  name: 'base_price', type: 'decimal', precision:10, scale:2, nullable:true })
     basePrice!: number;
  
+    @Column({type:'bit',default:false})
+    isVariablePrice!:boolean;
+
     @Column({type:'bit',default:true})
     isActive!:boolean;
 
      @Column({type:"simple-json",nullable:true})
     customAttributes!:IProductCustomAttributes|null
  
+
+    @Column({ type:'decimal', precision:10, scale:2, default:0})
+    currentstock!:number;
+
+    //--visibity OEM (for OEM)
+    @Column({type:'bit',default:false})
+    isOEMProduct!:boolean;
+
+    //--visibity BulkPacking (for wholesaler)
+    @Column({type:'bit',default:false})
+    isBulkPacking!:boolean;
+    
+
+    @Column({ nullable:true})
+    reorderLevel!:number;
 
     @Column({ nullable:true})
     createdByUserId!:number;

@@ -17,9 +17,9 @@ private hookBroker =new HookBroker();
          if(pricingStrategy!.tenantStrategy=="CATEGORY_BASED"){
 
             const customer=await customerService.getCustomerById(tenantId,customerId);
-            const customerCategory=customer?.customerCategory;
+            // const customerCategory=customer?.customerCategory;
 
-            return await this.getProductFinalPrice(tenantId,customerCategory!,p);
+            // return await this.getProductFinalPrice(tenantId,customerCategory!,p);
 
          }
 
