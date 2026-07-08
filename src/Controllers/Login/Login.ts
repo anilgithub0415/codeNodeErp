@@ -70,6 +70,8 @@ interface ContextSpecificJwtPayload {
     userName: string;displayName:string;
     tenantId:number;
     roleName:string;
+    siteId?:number;
+    clientId?:number;
     //personId:number;
    // tenantId: number;
    // roleName: string;
@@ -472,6 +474,7 @@ console.log('crosscheck 2');
                 displayName: user.displayName!,
                 tenantId: userContext.tenantId,
                 roleName: userContext.roleName,
+                siteId:user.siteId!,clientId:user.clientId!,
                // personId: userContext.person.id,
                 availableContexts: [{
                     userId: user.id,

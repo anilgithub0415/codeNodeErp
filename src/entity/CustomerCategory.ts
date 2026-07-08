@@ -5,7 +5,8 @@
 // src/entity/CustomerCategory.ts
 import { Entity, PrimaryColumn, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
 import { Tenant } from './Tenant';
-import { Organisation } from './Organisation';
+import { Site } from './Site';
+import { Customer } from './Customer';
 
 // This class defines the structure of your 'CustomerCategory' table in the database.
 @Entity({ name: 'CustomerCategory' }) 
@@ -24,8 +25,8 @@ export class CustomerCategory {
  @PrimaryColumn({ type: 'varchar', length: 100 })
   customerCategory!: string;
 
-  @OneToMany(() => Organisation, org => org.customerCategory)
-  organisations!: Organisation[];
+  @OneToMany(() => Customer, cust => cust.customerCategory)
+  sites!: Site[];
    
     @Column({ nullable:true})
     createdByUserId!:number;

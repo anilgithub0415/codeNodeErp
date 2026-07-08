@@ -51,7 +51,7 @@ export interface CreateUserAndContextDto {
 export interface CreatedUserResponse {
     user: User;
     initialContext: UserTenantContext;
-    
+    verificationToken?:string;
     password?: string;
   
 }

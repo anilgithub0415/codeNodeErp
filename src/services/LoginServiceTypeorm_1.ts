@@ -48,10 +48,12 @@ interface JwtPayload {
     // role: UserRoleLookup;// string;//changed enum to lookup
     // exp?: number;
     // userId?: number;
-    // tenantId:number;
+    // 
     // permissions: string[]; 
     userId: number;
     userName: string;
+    siteId?:number;
+    clientId?:number;tenantId:number;
     // This initial token will contain all available contexts
     availableContexts: AvailableContext[];
     // Other standard JWT claims (iat, exp) are added by jwt.sign
@@ -62,6 +64,7 @@ interface LoginResponse {
     access_token: string;
     refresh_token: string;
     userId: number;
+    siteId:number; clientId:number;
     availableContexts: AvailableContext[];
     expires_in: number; //earlier was AccessToken_expiresIn
     tenantId:number;
@@ -280,7 +283,7 @@ const generateAuthTokens = async (newUser: any, deviceInfo: string = '', manager
         // 3. Create JWT Payload
         const payload: JwtPayload = {
             userName: newUser_confirmed.userName,
-            userId: newUser_confirmed.id,
+            userId: newUser_confirmed.id, tenantId:newUser_confirmed.tenantId,          
             availableContexts:  availableContexts// Include all contexts in the initial token
         };
         
@@ -522,7 +525,8 @@ const generateAuthTokens = async (newUser: any, deviceInfo: string = '', manager
 // };
 
 // --- MODIFIED Login function ---
-const Login = async (credentials: { userName: string; password: string; }, deviceInfo: string): Promise<LoginResponse> => {
+const Login = async (credentials: { userName: string; password: string; }, deviceInfo: string): Promise<LoginResponse> => 
+    {
     // Get instances from the dependency getters
     const userService = getUserRepository(); // Use the UserService instance
     const refreshTokenRepo = getRefreshTokenRepository();
@@ -551,6 +555,7 @@ console.log('-------------------------------------------------');
 
 
 console.log('-------------------------------------------------authenticatedUser.id :',authenticatedUser.id );
+console.log('--------------authenticatedUser :',authenticatedUser );
 
 
         // 3. Fetch all active UserTenantContexts for this authenticated User
@@ -580,7 +585,7 @@ var userContexts=await userTenantContextRepo.createQueryBuilder('utc')
 //querybuilder
      
 
-console.log('checkpoint1 , userContexts:',userContexts);
+
 
         if (userContexts.length === 0) {
             throw new Error(`No active contexts found for user ${authenticatedUser.userName}. Please contact support.`);
@@ -595,14 +600,17 @@ console.log('checkpoint1 , userContexts:',userContexts);
             permissions: context.role.permissions ? context.role.permissions.map(p => p.permissionName) : []
         }));
 
-        console.log('-----------availableContexts:',availableContexts);
+        
         
         // 5. Create JWT Payload
         const payload: JwtPayload = {
             userName: authenticatedUser.userName,
             userId: authenticatedUser.id,
+            siteId:authenticatedUser.siteId!,
+            clientId:authenticatedUser.clientId!,tenantId:authenticatedUser.tenantId,
             availableContexts: availableContexts // Include all contexts in the initial token
         };
+console.log('payload is:',payload);
 
         const currentAccessTokenLifetime = settingsService.getSettings().accessTokenLifetime;
         const currentRefreshTokenLifetime = settingsService.getSettings().refreshTokenLifetime;
@@ -627,13 +635,16 @@ console.log('checkpoint1 , userContexts:',userContexts);
         await refreshTokenRepo.save(newRefreshToken);
         
         console.log(`Login successful for user ${authenticatedUser.userName}. Generated access and refresh tokens.`);
+console.log('availableContexts[0]:',availableContexts[0]);
 
 
         // 8. Return the response
         return {
             access_token: accessToken,
             refresh_token: refreshTokenString,
-            userId: authenticatedUser.id,
+            userId: authenticatedUser.id, 
+            siteId: authenticatedUser.siteId!, 
+            clientId: authenticatedUser.clientId!, 
             availableContexts: availableContexts, // Return the contexts to the frontend
             expires_in : currentAccessTokenLifetime //earlier was AccessToken_expiresIn
             ,tenantId: availableContexts[0]!.tenantId,

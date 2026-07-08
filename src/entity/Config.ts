@@ -25,8 +25,10 @@ export class Config {
 
  
     // Decides whether user added thru superadmin or signup  
-    @Column({  name: 'config_useraddthru', type: 'nvarchar', length: 10 })
+    @Column({  name: 'config_useraddthru', type: 'nvarchar', length: 20 ,nullable:true})
    config_useraddthru!: string;
 
+    @Column({  name: 'config_productFlatOrVariant', type: 'nvarchar', length: 20, default:'ProductFlat' })
+   config_productFlatOrVariant!: string;
     
 }

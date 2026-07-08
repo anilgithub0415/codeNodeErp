@@ -8,13 +8,13 @@
 //LostLead
 
 
-// src/entity/LeadStatus.ts
+// src/entity/ClientStatus.ts
 import { Entity, PrimaryColumn, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { Tenant } from './Tenant';
 
-// This class defines the structure of your 'LeadStatus' table in the database.
-@Entity({ name: 'LeadStatus' }) 
-export class LeadStatus {
+// This class defines the structure of your 'ClientStatus' table in the database.
+@Entity({ name: 'ClientStatus' }) 
+export class ClientStatus {
 
     @PrimaryGeneratedColumn()
     id!: number;
@@ -23,7 +23,7 @@ export class LeadStatus {
     tenantId!:number;
    
     @Column({  name: 'lead_status', type: 'nvarchar', length: 50 })
-    leadStatus!: string; 
+    clientStatus!: string; 
 
    
     @Column({ nullable:true})

@@ -3,23 +3,26 @@ import { RefreshToken } from './RefreshToken';
 
 import { UserTenantContext } from './UserTenantContext'; // New import for context
 import { Tenant } from './Tenant';
-
-@Unique("UQ_userName", ["userName"]) // userName is now globally unique across all tenants
+  // src/entity/User.ts
+import { Site } from './Site'; 
+import { Customer } from './Customer';
+// 1. Define a composite unique constraint combining tenant and username
+@Unique("UQ_tenant_userName", ["tenantId", "userName"]) 
 @Entity({ name: 'User' })
 export class User {
-   @PrimaryGeneratedColumn('increment')
+    @PrimaryGeneratedColumn('increment')
     id!: number;
         
     @Column('int')
     tenantId!: number;
-  
-@ManyToOne(() => Tenant, tenant => tenant.users, { onDelete: 'NO ACTION' })
-@JoinColumn({ name: 'tenantId', referencedColumnName: 'tenantId' })
-tenant!: Tenant;
-
-    @Column({ name: 'userName', type: 'nvarchar', length: 255, unique: true }) // User's login email (globally unique)
+    
+    @ManyToOne(() => Tenant, { nullable: false, onDelete: 'CASCADE' })
+    @JoinColumn({ name: 'tenantId' })
+    tenant!: Tenant; 
+    // 2. Remove "unique: true" from here so it is not globally locked
+    @Column({ name: 'userName', type: 'nvarchar', length: 255 }) 
     userName!: string;
-
+    
     @Column({ name: 'displayName', type: 'nvarchar', length: 100, nullable: true })
     displayName?: string | null;
     
@@ -49,27 +52,24 @@ tenant!: Tenant;
     @Column({ type: 'int', nullable: true, name: 'CreatedByUserId' })
     createdByUserId?: number | null;
 
+  
+
+// ... inside your User class definition:
+
+    @Column({ type: 'int', nullable: true, name: 'SiteId' })
+    siteId?: number | null; // 👈 Raw foreign key integer column
+
     
-    // @ManyToOne(() => User, user => user.createdUsers, { nullable: true, onDelete: 'NO ACTION' })
-    // @JoinColumn({ name: 'CreatedByUserId' })
-    // createdBy?: User | null;
+    @ManyToOne(() => Site, { nullable: true, onDelete: 'CASCADE' }) // 👈 Relational link
+    @JoinColumn({ name: 'SiteId' })
+    site?: Site | null;
 
-    // @OneToMany(() => User, user => user.createdBy)
-    // createdUsers?: User[];
+    @Column({ type: 'int', nullable: true, name: 'ClientId' })
+    clientId?: number | null; // 👈 Raw foreign key integer column
 
-    // --- One-to-One relationship with Person (personId is UNIQUE) ---
-    // @Column({ type: 'int', unique: true, nullable: false, name: 'PersonId' })
-    // personId!: number;
-
-    // @OneToOne(() => Person, person => person.user, { nullable: false, onDelete: 'NO ACTION' }) // If user is deleted, person is deleted
-    // @JoinColumn({ name: 'PersonId' })
-    // person!: Person;
-    // --- END One-to-One ---
-// --- NEW: One-to-Many relationship with UserTenantContext ---
-    // A global user can have many contexts (tenant + role combinations)
-    // @OneToMany(() => UserTenantContext, context => context.user)
-    // contexts?: UserTenantContext[];
-    // --- END NEW ---
+    @ManyToOne(() => Customer, { nullable: true, onDelete: 'CASCADE' }) // 👈 Relational link
+    @JoinColumn({ name: 'ClientId' })
+    client?: Customer | null;
 
     @CreateDateColumn({ type: 'datetime2', name: 'CreatedAt' })
     createdAt!: Date;
@@ -78,5 +78,22 @@ tenant!: Tenant;
     updatedAt!: Date;
 
     // @OneToMany(() => RefreshToken, refreshToken => refreshToken.user)
-    // refreshTokens?: RefreshToken[];
 }
+
+/*
+payload will be
+{
+  "userId": 109,
+  "tenantId": 1,
+  "role": "SitePortalUser",
+  "siteId": 52 
+}
+ */
+/*// ❌ UNSAFE: Trusting the client UI input
+const siteId = req.query.siteId; 
+const orders = await orderRepo.find({ where: { siteId } });
+
+//  SECURE: Hard-locking to the Token Context
+const siteId = req.user.siteId; // Extracted straight from the verified JWT
+const orders = await orderRepo.find({ where: { siteId } }); 
+ */

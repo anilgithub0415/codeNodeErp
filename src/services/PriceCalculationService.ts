@@ -6,6 +6,8 @@ class PriceCalculationService{
 private hookBroker =new HookBroker();         
    
       async  calculateFinalPrice(tenantId:number, productId:number, customerId:number,p:any){
+         console.log('in calculateFinalPrice, customerId:',customerId);
+         
          const tenantStrategyService=getTenantStrategyServiceRepository();
          const customerService=getCustomerServiceRepository();
          const strategies =await tenantStrategyService.getTenantStrategies(tenantId);
@@ -17,9 +19,11 @@ private hookBroker =new HookBroker();
          if(pricingStrategy!.tenantStrategy=="CATEGORY_BASED"){
 
             const customer=await customerService.getCustomerById(tenantId,customerId);
-            // const customerCategory=customer?.customerCategory;
+            console.log('find category of customer:',customer);
+            
+             const customerCategory=customer?.customerCategoryId;
 
-            // return await this.getProductFinalPrice(tenantId,customerCategory!,p);
+             return await this.getProductFinalPrice(tenantId,customerCategory!,p);
 
          }
 
@@ -28,10 +32,13 @@ private hookBroker =new HookBroker();
 
       async getProductFinalPrice(tenantId:number,  customerCategory:string,p:any){
          Object.assign(p,{customerCategory:customerCategory})          
+         Object.assign(p,{customerCategory:customerCategory})          
+         console.log('for finalprice, customerCategory:',customerCategory);
          
          //hook for single product pricing
          var hookName='A_Product_Pricing_Rule'
          const processedProduct=await this.hookBroker.executeHook(hookName,tenantId,p);        
+         console.log('finalprice:',processedProduct.finalPrice);
          
          return processedProduct.finalPrice; 
 

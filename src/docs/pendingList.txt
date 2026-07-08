@@ -13,3 +13,4 @@
 
 . how do cascade delete to manage in fk, as we can delete tenant directly
 
+. I think for all entities, we need PUT and POST seperate methods

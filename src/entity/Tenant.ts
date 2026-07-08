@@ -12,6 +12,9 @@ import { Customer } from './Customer';
 import { Product } from './Product';
 import { Config } from './Config';
 import { Vendor } from './Vendor';
+//import { product_table_fields_tenantwise } from './product_table_fields_tenantwise';
+import { City } from './city';
+import { District } from './District';
 
 
 // REMOVE these enums from here, they are now represented by lookup tables
@@ -55,11 +58,18 @@ export class Tenant {
 
    @OneToMany(() => Product, (product) => product.tenant)
   products!: Product[];
-  
+  // @OneToMany(() => product_table_fields_tenantwise, (ptftwise) => ptftwise.tenant)
+  // prodtblfieldtenantwises!: Product[];
 
    @OneToMany(() => Vendor, (vendor) => vendor.tenant)
   vendors!: Vendor[];
 
+   @OneToMany(() => City, (ct) => ct.tenant)
+  citys!: City[];
+
+  @OneToMany(()=>District,(dst) =>dst.tenant)
+  districts!:District[];
+  
  @OneToMany(() => Config, (config) => config.tenant)
   configs!: Product[];
 

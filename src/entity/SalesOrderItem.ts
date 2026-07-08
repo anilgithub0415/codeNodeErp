@@ -1,37 +1,59 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, RelationId, CreateDateColumn, UpdateDateColumn } from 'typeorm'
-import { SalesOrder } from './SalesOrder'
-import { Product } from './Product'
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn, Check } from 'typeorm';
+import { SalesOrder } from './SalesOrder';
+import { Product } from './Product';
+import { ProductVariant } from './productVariant';
 
 @Entity('sales_order_items')
+// 🌟 DATABASE PROTECTION: Guarantees exactly one relationship is populated
+@Check(`("product_id" IS NOT NULL AND "product_variant_id" IS NULL) OR ("product_id" IS NULL AND "product_variant_id" IS NOT NULL)`)
 export class SalesOrderItem {
-    @PrimaryGeneratedColumn()
+    
+    @PrimaryGeneratedColumn('increment')
     id!: number;
 
-    @ManyToOne(() => SalesOrder, (order) => order.items, { onDelete: 'NO ACTION' })
+    @Column({ name: 'sales_order_id', type: 'int' })
+    salesOrderId!: number;
+
+    @ManyToOne(() => SalesOrder, (order) => order.items, { onDelete: 'CASCADE' })
     @JoinColumn({ name: 'sales_order_id' })
     salesOrder!: SalesOrder;
 
-    @RelationId((item: SalesOrderItem) => item.salesOrder)
-    salesOrderId!: number;
+    // --- RELATION 1: FLAT PRODUCT ---
+    @Column({ name: 'product_id', type: 'int', nullable: true })
+    productId!: number | null;
 
-    @ManyToOne(() => Product, { onDelete: 'NO ACTION' })
+    @ManyToOne(() => Product, { onDelete: 'NO ACTION', nullable: true })
     @JoinColumn({ name: 'product_id' })
-    product!: Product;
+    product!: Product | null;
 
-    @RelationId((item: SalesOrderItem) => item.product)
-    productId!: number;
+    // --- RELATION 2: VARIANT PRODUCT ---
+    @Column({ name: 'product_variant_id', type: 'int', nullable: true })
+    productVariantId!: number | null;
 
-    @Column({ type: 'int', default: 1 })
+    @ManyToOne(() => ProductVariant, { onDelete: 'NO ACTION', nullable: true })
+    @JoinColumn({ name: 'product_variant_id' })
+    productVariant!: ProductVariant | null;
+
+    // --- TRANSACTIONAL SNAPSHOTS ---
+    @Column({ type: 'varchar', length: 100 })
+    prodName!: string;
+
+    @Column({ type: 'varchar', length: 50, nullable: true })
+    sku!: string | null;
+
+    @Column({ type: 'decimal', precision: 10, scale: 2, default: 1.00 })
     quantity!: number;
 
-    @Column({ name: 'unit_price', type: 'decimal', precision: 10, scale: 2, default: 0 })
-    unitPrice!: number;
+    // UNIFIED: Renamed database column metadata target from 'finalPrice' to 'finalPrice' to match Purchase convention precisely
+    @Column({ name: 'finalPrice', type: 'decimal', precision: 10, scale: 2, default: 0.00, transformer: {
+    to: (value: number) => value,
+    from: (value: string) => parseFloat(value)
+  } })
+    finalPrice!: number; 
 
-    @Column({ type: 'varchar', nullable: true })
-    description!: string | null;
-
-    @Column({ type: 'varchar', nullable: true })
-    sku!: string | null;
+    // UNIFIED: Shifted property parameters from 'saleUom nvarchar' over to 'sales_uom varchar' matching purchase_uom
+    @Column({ name: 'sales_uom', type: 'varchar', length: 20, nullable: true })
+    salesUom!: string | null; 
 
     @Column({ type: 'simple-json', nullable: true })
     customAttributes!: Record<string, any> | null;
@@ -41,5 +63,4 @@ export class SalesOrderItem {
 
     @UpdateDateColumn({ name: 'updated_at' })
     updatedAt!: Date;
-
 }

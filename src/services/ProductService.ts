@@ -7,6 +7,7 @@ import { Product } from '../entity/Product';
 import { AppDataSource } from '../../data-source'; 
 
 interface CreateProductDto{
+    id?:number;
     tenantId:number;
     prodName:string;
     description:string;
@@ -66,7 +67,7 @@ console.log('hitting url products');
                     console.log('ptenantId:',ptenantId);
                     
                     const productRepository = manager ? manager.getRepository(Product) : this.productRepository;
-                    const ps= await productRepository.find({where:{tenantId:ptenantId}}); // Use find() to get all 
+                    const ps= await productRepository.find({where:{tenantId:ptenantId}, relations: ['hsnTaxRule'] }); // Use find() to get all 
                     console.log('products count:',ps.length);
                     
                     return ps;
@@ -100,40 +101,37 @@ console.log('hitting url products');
             const productRepo = queryRunner!.manager.getRepository(Product);
                     
 
+            console.log('finding createDto.id:',createDto.id);
             
 
             // 3. Create or Find Product (existing logic)
             let newORexistingproduct: Product;
-            let aProduct = await productRepo.findOne({ where: {tenantId:createDto.tenantId, prodName: createDto.prodName } });
-           
-            if (aProduct) {
-                console.log(`found product with name: ${createDto.prodName}`);
-              
-                
-                 Object.assign(aProduct, createDto);  newORexistingproduct =aProduct;
-                console.log('updating:',aProduct);
+            // 1. Look up by a unique, unchanging identifier
+            // 1. Guard against undefined ID to force a new product creation
+let aProduct = null;
+if (createDto.id) {
+    aProduct = await productRepo.findOne({ 
+        where: { id: createDto.id, tenantId: createDto.tenantId } 
+    });
+}
 
-                await productRepo.save(aProduct); 
-            } else {
-                console.log(`creating product with data customattributes: ${createDto.customAttributes.tier_prices.B2C_price}`);
-               
-                let newProduct = productRepo.create(
-                    createDto                   
-                );
-           
-                newORexistingproduct = newProduct;
-                   await productRepo.save(newProduct);  
-            }
+if (aProduct) {
+    console.log('editing existing prod..................');
+    Object.assign(aProduct, createDto);  
+    newORexistingproduct = await productRepo.save(aProduct); // Assign to tracking variable
+} else {
+    console.log('creating new prod......................');
+    let newProduct = productRepo.create(createDto);
+    newORexistingproduct = await productRepo.save(newProduct); // Assign to tracking variable
+}
 
+if (shouldReleaseQueryRunner) {
+    await queryRunner!.commitTransaction();
+}
 
+// 2. Fix the return variable (was aProduct, should be newORexistingproduct)
+return { product: newORexistingproduct };
 
-           
-
-            if (shouldReleaseQueryRunner) {
-                await queryRunner!.commitTransaction();
-            }
-
-          return { product: newORexistingproduct };
        
             
 

@@ -1,18 +1,20 @@
 // src/dto/CreateCustomer.dto.ts
-export interface OrganisationDto {
+export interface SiteDto {
   id?: number;
-  organisationName: string;
-  customerCategory: string;   // <-- id of CustomerCategory
+  siteName: string;
+     // <-- id of CustomerCategory
   contactPersonName?: string;
-  mobileNumber?: string;
-  EmailId?: string;
-  city?: string;
-  Remarks?: string;
+  
+  
 }
 
 export interface CreateCustomerDto {
   id?: number;                 // **primary key** – present only for edit
   tenantId: number;
   customerName: string;
-  organisations: OrganisationDto[];
+  customerCategoryId: string;
+  mobileNumber?: string;
+  EmailId?: string;
+  city?: number;
+  sites: SiteDto[];
 }

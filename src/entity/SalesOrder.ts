@@ -1,5 +1,8 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany, ManyToOne, JoinColumn } from 'typeorm'
 import { SalesOrderItem } from './SalesOrderItem'
+import { MinLength } from 'class-validator';
+import { Site } from './Site';
+import { Customer } from './Customer';
 
 
 @Entity("sales_orders")
@@ -15,10 +18,30 @@ export class SalesOrder{
     //     tenant!: Tenant;
 
     @Column()
+      @MinLength(5, { message: "POnumber must be at least 5 characters long" }) // 2. Application-level validation
     soNumber!: string;
 
-    @Column()
-    customerId!: number;
+    // Inside your sales-order.entity.ts
+    @Column({ name: "customer_po_number", type: "varchar", length: 50, nullable: true })
+    customerPoNumber!: string; // The PO number sent by your client
+
+    @Column({ type: "date", nullable: true })
+    customerPoDate!: Date; // The date printed on the client's PO
+
+
+   @Column()
+    clientId!: number; // Keeps raw numeric access
+
+    @ManyToOne(() => Customer, { onDelete: 'NO ACTION' }) // Protects data, smooth transactions
+    @JoinColumn({ name: 'clientId' })
+    client!: Customer;
+
+   @Column({nullable:true})
+    siteId!: number; // Keeps raw numeric access
+
+    @ManyToOne(() => Site, { onDelete: 'NO ACTION' }) // Protects data, smooth transactions
+    @JoinColumn({ name: 'siteId' })
+    site!: Site;
 
     @Column({ default: 'draft' })
     status!: string;
@@ -41,10 +64,10 @@ export class SalesOrder{
     @Column({ type: 'simple-json', nullable: true })
     customAttributes!: Record<string, any> | null;
 
-    @CreateDateColumn({ name: 'created_at' })
+    @CreateDateColumn({ name: 'created_at' ,nullable: true})
     createdAt!: Date;
 
-    @UpdateDateColumn({ name: 'updated_at' })
+    @UpdateDateColumn({ name: 'updated_at' ,nullable: true})
     updatedAt!: Date;
 
 }

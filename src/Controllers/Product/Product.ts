@@ -1,9 +1,9 @@
 import { Router, Request, Response } from 'express';
-import { getProduct_tableServiceRepository,getProductRepository} from '../../dependencies'
+import { getProductRepository, getProductTemplateRepository} from '../../dependencies'
 import PriceCalculationService from '../../services/PriceCalculationService';
 import { AppDataSource } from '../../../data-source';
-import { product_table_fields } from '../../entity/product_table_fields';
-import { product_table_fields_tenantwise } from '../../entity/product_table_fields_tenantwise';
+//import { product_table_fields } from '../../entity/product_table_fields';
+//import { product_table_fields_tenantwise } from '../../entity/product_table_fields_tenantwise';
 
 
 interface CreateProductRequestBody{
@@ -30,34 +30,34 @@ router.use((req, res, next) => {
 
 
 // get ussert table fields
-router.route('/product_table_fields/:id')
-.get(async (req: Request, res: Response) => {
-    try {   
+// router.route('/product_table_fields/:id')
+// .get(async (req: Request, res: Response) => {
+//     try {   
     
-        //product_table_fields
-        const tenantId=parseInt(req.params.id);
-        const prodtblflds  = await AppDataSource
-        .getRepository(product_table_fields)
-        .createQueryBuilder('product_table_fields')
-        .getMany();
+//         //product_table_fields
+//         const tenantId=parseInt(req.params.id);
+//         const prodtblflds  = await AppDataSource
+//         .getRepository(product_table_fields)
+//         .createQueryBuilder('product_table_fields')
+//         .getMany();
 
-        //product_table_fields_tenantwise
-        const tenatprodtblflds = await AppDataSource
-        .getRepository(product_table_fields_tenantwise)
-        .createQueryBuilder('product_table_fields_tenantwise')
-        .where("product_table_fields_tenantwise.tenantId= :tenantId",{tenantId})
-        .getMany();
+//         //product_table_fields_tenantwise
+//         const tenatprodtblflds = await AppDataSource
+//         .getRepository(product_table_fields_tenantwise)
+//         .createQueryBuilder('product_table_fields_tenantwise')
+//         .where("product_table_fields_tenantwise.tenantId= :tenantId",{tenantId})
+//         .getMany();
 
-        //both results made union and returned
-        const unionArray = [...prodtblflds, ...tenatprodtblflds]
+//         //both results made union and returned
+//         const unionArray = [...prodtblflds, ...tenatprodtblflds]
 
-        res.status(200).json(unionArray); 
+//         res.status(200).json(unionArray); 
         
-    } catch (error: any) {
-        console.error('Failed to retrieveproduct_table_fields:', error.message || error);
-        res.status(500).json({ message: 'Failed to retrieve product_table_fields.' });
-    }
-});
+//     } catch (error: any) {
+//         console.error('Failed to retrieveproduct_table_fields:', error.message || error);
+//         res.status(500).json({ message: 'Failed to retrieve product_table_fields.' });
+//     }
+// });
 
 
     router.route('/:tenantId/:id')
@@ -77,19 +77,17 @@ router.route('/product_table_fields/:id')
         }
     });
 
-    router.route('/')
+    router.route('/:tenantId')
     .get(async (req: Request, res: Response) => {
         try {
             
-            
-        
-            
+                 
             const productService = getProductRepository(); // <--- Get the singleton instance from dependencies.ts
-            var activeTenantId= parseInt( req.query?.activeTenantId?.toString()!);
+           var tenantId=parseInt(req.params.tenantId);
                      
-        console.log('m in getproducts activeTenantId:',activeTenantId);
+       
         
-            const products = await productService.getProducts(activeTenantId!);
+            const products = await productService.getProducts(tenantId!);
             // In a multi-tenant app, this should usually be filtered by the requesting product's tenantId.
             // Example: const products = await productService.getProductsByTenant(req.tenantId);
             //var products2=products.filter(usr=>roles?.includes(usr.role.rolename))
@@ -100,6 +98,29 @@ router.route('/product_table_fields/:id')
         }
     });
 
+    //withvariant
+    router.route('/withvariant/:tenantId')
+    .get(async (req: Request, res: Response) => {
+        try {
+            
+            
+        
+            
+            const productTempService = getProductTemplateRepository(); // <--- Get the singleton instance from dependencies.ts
+         var tenantId=parseInt(req.params.tenantId);
+                     
+        
+        
+            const products = await productTempService.getProductTemplates(tenantId!);
+            // In a multi-tenant app, this should usually be filtered by the requesting product's tenantId.
+            // Example: const products = await productService.getProductsByTenant(req.tenantId);
+            //var products2=products.filter(usr=>roles?.includes(usr.role.rolename))
+            res.status(200).json(products);
+        } catch (error: any) {
+            console.error('Failed to retrieve products:', error.message || error);
+            res.status(500).json({ "message": "Failed to retrieve products: " + error.message });
+        }
+    });
 
 //Note: custId treated as number tenantId treated as string
 
@@ -123,10 +144,47 @@ router.route('/product_table_fields/:id')
             res.status(500).json({ "message": "Failed to calculatefinalprice of product: " + error.message });
         }
     });
-router.route('')
+
+    router.route('')
     .post(async (req: Request<{}, {}, CreateProductRequestBody>, res: Response) => {
         try {
-            const productService = getProductRepository(); // <--- Get the singleton instance from dependencies.ts
+            const productService = getProductRepository();
+
+            // 1. Basic validation (with explicit early return on failure)
+            if (!req.body.prodName || !req.body.basePrice) {
+               console.log('Basic validation fail: product name or base_price missing');
+               return res.status(400).json({ message: 'Product name and base price are required.' });
+            }
+
+            // 2. EXTRACT FROM DECODED JWT (Enforces backend data isolation authority)
+            const loggedInTenantId = req.user.tenantId; 
+            const loggedInUserId = req.user.id; // Or req.user.userId depending on token payload configuration
+
+            // 3. OVERWRITE FRONTEND INJECTIONS FOR BULLETPROOF SECURITY
+            const secureProductPayload = {
+                ...req.body,
+                tenantId: loggedInTenantId,       // Enforce token tenant isolation
+                createdByUserId: loggedInUserId    // Injected audit trail stamp
+            };
+
+            console.log('.........................................................Sanitised Payload Context Body:');
+            console.log(secureProductPayload);
+
+            // 4. Pass sanitized payload directly to your repository/service pipeline
+            const product = await productService.createProduct(secureProductPayload);
+
+            // 5. Semantic HTTP response (201 Created for new resource generation)
+            res.status(201).json(product);
+        } catch (error: any) {
+            console.error('Product creation failed:', error.message || error);
+            res.status(400).json({ 'message': 'Product creation failed: ' + error.message });
+        }
+    });
+
+router.route('/withvariant')
+    .post(async (req: Request<{}, {}, CreateProductRequestBody>, res: Response) => {
+        try {
+            const productTempService = getProductTemplateRepository(); // <--- Get the singleton instance from dependencies.ts
 
             // Basic validation
             if (!req.body.prodName ||!req.body.basePrice
@@ -139,10 +197,10 @@ router.route('')
                //  return res.status(400).json({ message: `Invalid user role: ${req.body.Role}` });
           // }
 
-          console.log('.........................................................usercontext body:',req.body);
+          console.log('.........................................................posting withvariant body:',req.body);
 
           const { tenantId,prodName, description, sku, basePrice } = req.body;
-            const product = await productService.createProduct(req.body);
+            const product = await productTempService.createProductTemplate(req.body);
 
             // Remove sensitive data (like password) before sending to client
             //const { password, ...userResponse } = user;//pending-password must be skipped here
@@ -153,6 +211,5 @@ router.route('')
             res.status(400).json({ 'message': 'User creation failed: ' + error.message });
         }
     })
-
  
 export default router;

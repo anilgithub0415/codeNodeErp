@@ -7,6 +7,7 @@ import { AppDataSource } from '../../../data-source';
 interface CreateVendorRequestBody{
     tenantId:number,
     vendorName:string,
+    description:string
     
 }
 const router = Router();
@@ -32,8 +33,8 @@ router.use((req, res, next) => {
         try {
             
             
-            var tenantId= parseInt( req.params.tenantId);        
-            var prodId=parseInt(req.params.id);
+            var tenantId= parseInt( req.params.tenantId as string);        
+            var prodId=parseInt(req.params.id as string);
             const vendorService = getVendorRepository(); 
             
         
@@ -45,7 +46,7 @@ router.use((req, res, next) => {
         }
     });
 
-    router.route('/')
+    router.route('/:tenantId')
     .get(async (req: Request, res: Response) => {
         try {
             
@@ -53,11 +54,11 @@ router.use((req, res, next) => {
         
             
             const vendorService = getVendorRepository(); // <--- Get the singleton instance from dependencies.ts
-            var activeTenantId= parseInt( req.query?.activeTenantId?.toString()!);
+            var tenantId=parseInt(req.params.tenantId);
                      
-        console.log('m in getvendors activeTenantId:',activeTenantId);
         
-            const vendors = await vendorService.getVendors(activeTenantId!);
+        
+            const vendors = await vendorService.getVendors(tenantId!);
             // In a multi-tenant app, this should usually be filtered by the requesting vendor's tenantId.
             // Example: const vendors = await vendorService.getVendorsByTenant(req.tenantId);
             //var vendors2=vendors.filter(usr=>roles?.includes(usr.role.rolename))
@@ -68,6 +69,40 @@ router.use((req, res, next) => {
         }
     });
 
+router.route('')
+    .post(async (req: Request<{}, {}, CreateVendorRequestBody>, res: Response) => {
+        try {
+            const vendorService = getVendorRepository();
+
+            // 1. Basic validation
+            if (!req.body.vendorName) {
+               console.log('Basic validation fail: vendorName missing');
+               return res.status(400).json({ message: 'Vendor name is required' });
+            }
+
+            // 2. EXTRACT FROM DECODED JWT (Enforces backend-level authority)
+            const loggedInTenantId = req.user.tenantId; 
+            const loggedInUserId = req.user.id; // Or req.user.userId depending on your token payload
+
+            // 3. OVERWRITE FRONTEND INJECTIONS FOR BULLETPROOF SECURITY
+            const secureVendorPayload = {
+                ...req.body,
+                tenantId: loggedInTenantId,       // Force token tenant isolation
+                createdByUserId: loggedInUserId    // Automatically stamp creating user
+            };
+
+            console.log('Hitting secure vendor post processing...');
+            console.log(secureVendorPayload);
+
+            // 4. Pass the sanitized payload to your service layer
+            const vendor = await vendorService.createVendor(secureVendorPayload);
+
+            res.status(201).json(vendor);
+        } catch (error: any) {
+            console.error('Vendor creation failed:', error.message || error);
+            res.status(400).json({ 'message': 'Vendor creation failed: ' + error.message });
+        }
+    });
 
  
 export default router;

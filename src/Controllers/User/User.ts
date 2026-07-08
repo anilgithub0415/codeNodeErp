@@ -23,6 +23,7 @@ interface CreateUserRequestBody {
     role: UserRoleLookup;//userRole;//changed
     tenantId: number; // Tenant ID is crucial for user creation now
     googleId?: string;
+    
 }
 
 interface UpdateUserRequestBody {
@@ -80,37 +81,46 @@ router.post('/upload-profile-picture',async(req:Request,res:Response)=>{
 //             res.status(400).json({ 'message': 'User creation failed: ' + error.message });
 //         }
 //     })
-
 router.route('')
     .post(async (req: Request<{}, {}, CreateUserRequestBody>, res: Response) => {
         try {
-            const userService = getUserRepository(); // <--- Get the singleton instance from dependencies.ts
+            const userService = getUserRepository();
 
-            // Basic validation
-            if (!req.body.firstName ||!req.body.lastName ||!req.body.contactEmail ||!req.body.contactPhone
-                  ) {
-               // return res.status(400).json({ message: 'User Name, Role, and Tenant ID are required for user creation.' });
-               console.log('Basic validation fail like firstName, lastName missing');
-               
+            // 1. Basic validation (with explicit early return on failure)
+            if (!req.body.firstName || !req.body.lastName || !req.body.contactEmail || !req.body.userName) {
+               console.log('Basic validation fail: missing critical user creation inputs');
+               return res.status(400).json({ message: 'First name, last name, contact email, and username are required.' });
             }
-          //  if (req.body.role && !Object.values(userRole).includes(req.body.role)) {
-               //  return res.status(400).json({ message: `Invalid user role: ${req.body.Role}` });
-          // }
 
-          console.log('.........................................................usercontext body:',req.body);
+            // 2. EXTRACT FROM DECODED JWT (Enforces backend data isolation authority)
+            const loggedInTenantId = req.user.tenantId; 
+            const loggedInUserId = req.user.id; 
 
-          const { firstName, lastName, contactEmail, password, initialTenantId, initialRoleName, deviceInfo } = req.body;
-            const user = await userService.createUserAndContext(req.body);
+            // 3. OVERWRITE FRONTEND INJECTIONS AND SANITIZE CONTEXT PAYLOAD
+            const secureUserPayload = {
+                ...req.body,
+                tenantId: loggedInTenantId,       // Enforce composite constraint [@Unique("UQ_tenant_userName")]
+                createdByUserId: loggedInUserId,   // Secure audit trail tracking
+                // If this endpoint seeds a user to the caller's context, force the tenant id match
+                initialTenantId: loggedInTenantId 
+            };
 
-            // Remove sensitive data (like password) before sending to client
-            //const { password, ...userResponse } = user;//pending-password must be skipped here
-            //res.status(201).json(userResponse);
-            res.status(201).json(user);
+            console.log('.........................................................Sanitised User Context Payload:');
+            console.log(secureUserPayload);
+
+            // 4. Create the composite user schema record via custom service controller
+            const user = await userService.createUserAndContext(secureUserPayload);
+
+            // 5. REMOVE SENSITIVE DATA BEFORE ISSUING RESPONSE DATA OBJECT
+            const { password, verificationToken, ...userResponse } = user;
+
+            // 6. Semantic HTTP response (201 Created for new account generation loops)
+            res.status(201).json(userResponse);
         } catch (error: any) {
             console.error('User creation failed:', error.message || error);
             res.status(400).json({ 'message': 'User creation failed: ' + error.message });
         }
-    })
+    });
 
    
     router.route('/')

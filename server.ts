@@ -36,7 +36,14 @@ app.use(auth)
 const cache = require('./src/Special/cachemanager');
 const checkCache = require('./src/Middlewares/checkCache');
 
-
+//sanitize middleware for removing zero id from req.body
+// Write the function inline to completely avoid import loops
+app.use((req, res, next) => {
+    if (req.body && req.body.id === 0) {
+        delete req.body.id; 
+    }
+    next();
+});
 
 import lookupsC from './src/Controllers/lookups/lookups';
 app.use('/api/lookups', lookupsC);
@@ -68,12 +75,23 @@ import productC from './src/Controllers/Product/Product';
 app.use('/api/product', productC);
  
 
+import hsnC from './src/Controllers/HSNTaxRule/HSNTaxRule';
+app.use('/api/hsntaxrule', hsnC);
 
 import vendorC from './src/Controllers/Vendor/Vendor';
 app.use('/api/vendor', vendorC);
 
+import cityC from './src/Controllers/City/City';
+app.use('/api/city', cityC);
+
+import districtC from './src/Controllers/District/District';
+app.use('/api/district', districtC);
+
 import customerC from './src/Controllers/Customer/Customer';
 app.use('/api/customer', customerC);
+ 
+import siteC from './src/Controllers/Site/Site';
+app.use('/api/site', siteC);
  
 
 import formC from './src/Controllers/TenanttForm/TenantForm';
@@ -83,6 +101,22 @@ app.use('/api/form', formC);
 import purchaseC from './src/Controllers/Purchase/Purchase';
 app.use('/api/purchase', purchaseC);
  
+import clientPurchaseC from './src/Controllers/ClientPurchase/ClientPurchase'
+app.use('/api/clientPurchase', clientPurchaseC);
+ 
+import salesC from './src/Controllers/Sales/Sales';
+app.use('/api/sales', salesC);
+
+import uomconversionC from './src/Controllers/uomconversion/uomconversion';
+app.use('/api/uom-conversion', uomconversionC);
+
+
+import delichallC from './src/Controllers/DeliveryChallan/DeliveryChallan';
+app.use('/api/delichall',delichallC)
+
+
+import userprefC from './src/Controllers/user_preferences/user_preferences';
+app.use('/api/user_preferences',userprefC)
 
 // Centralized error handling middleware (best practice)
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {

@@ -5,6 +5,7 @@
 // src/entity/Product.ts
 import { Entity, PrimaryColumn, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { Tenant } from './Tenant';
+import { HsnTaxRule } from './HsnTaxRule';
 
 interface ITierPrices{
     [categoryName:string]:number
@@ -67,6 +68,24 @@ export class Product {
 
     @Column({ nullable:true})
     createdByUserId!:number;
+
+    //for default units
+    @Column({ name: 'base_uom', type: 'nvarchar', length: 20, default: 'PCS' })
+    baseUom!: string; // The system inventory baseline (e.g., 'PCS', 'KG')
+
+    @Column({ name: 'default_purchase_uom', type: 'nvarchar', length: 20, nullable:true })
+    defaultPurchaseUom!: string; // Auto-populates Purchase Orders
+
+    @Column({ name: 'default_sales_uom', type: 'nvarchar', length: 20, nullable:true })
+    defaultSalesUom!: string; // Auto-populates Sales Orders
     
+   
+   // 🌟 ADD THESE LINE ITEMS FOR TAX COMPLIANCE:
+    @Column({ type: 'int', nullable: true }) // Make it nullable: true temporary if you have existing seed data
+    hsnId!: number;
+
+    @ManyToOne(() => HsnTaxRule, { onDelete: 'NO ACTION' }) 
+    @JoinColumn({ name: "hsnId" })
+    hsnTaxRule!: HsnTaxRule;
 }
 

@@ -1,5 +1,5 @@
 
-import { EntityManager, Not, Repository } from 'typeorm';
+import { EntityManager, FindOptionsWhere, Not, Repository } from 'typeorm';
 import { Vendor } from '../entity/Vendor';
 
 
@@ -7,9 +7,10 @@ import { Vendor } from '../entity/Vendor';
 import { AppDataSource } from '../../data-source'; 
 
 interface CreateVendorDto{
+    id?:number;
     tenantId:number;
     vendorName:string;
-    
+    description: string;
     [key:string]:any;
 }
 
@@ -101,8 +102,20 @@ console.log('hitting url vendors');
 
             // 3. Create or Find Vendor (existing logic)
             let newORexistingvendor: Vendor;
-            let aVendor = await vendorRepo.findOne({ where: {tenantId:createDto.tenantId, vendorName: createDto.prodName } });
-           
+          
+                          const { id, tenantId, ...uniqueIdentifiers } = createDto;
+                          let queryCondition: FindOptionsWhere<Vendor> = { tenantId };
+                          if (createDto.id) {
+                              queryCondition.id = createDto.id;
+                          } else {
+                               Object.assign(queryCondition, uniqueIdentifiers);
+                          }
+                          // FIX: Find by ID so you can safely update the districtName property
+                          let aVendor = await vendorRepo.findOne({ 
+                              where: queryCondition
+                          });
+                  
+          
             if (aVendor) {
                 console.log(`found vendor with name: ${createDto.prodName}`);
               
@@ -112,7 +125,7 @@ console.log('hitting url vendors');
 
                 await vendorRepo.save(aVendor); 
             } else {
-                console.log(`creating vendor with data customattributes: ${createDto.customAttributes.tier_prices.B2C_price}`);
+             
                
                 let newVendor = vendorRepo.create(
                     createDto                   

@@ -1,0 +1,59 @@
+// tenant-context.ts
+import { AsyncLocalStorage } from 'async_hooks';
+export const tenantStorage = new AsyncLocalStorage<number>();
+
+
+//-----------------------------------------------------------------------------------------------------------------------------------
+// tenant-aware.repository.ts
+import { Repository, SelectQueryBuilder, ObjectLiteral } from 'typeorm';
+import { tenantStorage } from './tenant-context';
+
+export class TenantAwareRepository<Entity extends ObjectLiteral> extends Repository<Entity> {
+  
+  // Custom query builder wrapper that implicitly appends tenant constraints
+  createTenantQueryBuilder(alias: string): SelectQueryBuilder<Entity> {
+    const currentTenantId = tenantStorage.getStore();
+    if (!currentTenantId) {
+      throw new Error('Tenant context missing in current thread execution window.');
+    }
+    
+    return this.createQueryBuilder(alias)
+      .andWhere(`${alias}.tenantId = :currentTenantId`, { currentTenantId });
+  }
+
+  // Override standard find options safely
+  async findTenantData(): Promise<Entity[]> {
+    return this.createTenantQueryBuilder('entity').getMany();
+  }
+}
+
+
+
+
+//-----------------------------------------------------------------------------------------------------------------------------------
+
+// src/subscriber/TenantLineItemSubscriber.ts
+import { EntitySubscriberInterface, EventSubscriber, InsertEvent, UpdateEvent } from 'typeorm';
+import { tenantStorage } from '../tenant-context';
+
+@EventSubscriber()
+export class TenantLineItemSubscriber implements EntitySubscriberInterface {
+  
+  beforeInsert(event: InsertEvent<any>) {
+    const currentTenantId = tenantStorage.getStore();
+    if (currentTenantId && 'tenantId' in event.entity) {
+      // Force injection of current tenant context
+      event.entity.tenantId = currentTenantId;
+    }
+  }
+
+  beforeUpdate(event: UpdateEvent<any>) {
+    const currentTenantId = tenantStorage.getStore();
+    if (currentTenantId && event.entity && 'tenantId' in event.entity) {
+      // Prevent cross-tenant data pollution via manipulation payloads
+      if (event.entity.tenantId !== currentTenantId) {
+        throw new Error('Security Violation: Unauthorized cross-tenant modification attempt.');
+      }
+    }
+  }
+}

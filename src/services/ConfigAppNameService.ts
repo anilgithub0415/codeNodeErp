@@ -34,6 +34,7 @@ export interface ConfigAppNameSettings {
           
       // // 3. Update the in-memory cache with values from the database
        this.currentConfigAppName.appname = dbConfigAppName[0]['appname'];
+  console.log('this.currentConfigAppName.appname:',this.currentConfigAppName.appname);
   
       return await this.currentConfigAppName.appname;
   } catch (error) {

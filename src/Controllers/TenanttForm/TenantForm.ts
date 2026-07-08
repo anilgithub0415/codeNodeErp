@@ -51,7 +51,7 @@ console.log('tenantid:',tenantId,' formkey:',formKey);
 
             const tenantFormService = getTenantFormServiceRepository();
             const aForm = await tenantFormService.getTenantForm(tenantId,formKey,); 
-              console.log('getting form for ',formKey,' with config:',aForm?.FormlyConfig);
+             
 
             res.status(200).json(aForm); 
         } catch (error: any) {
