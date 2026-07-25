@@ -37,7 +37,7 @@ export class DistrictService{
             ptenantId:number,   pId:number,        
             manager?: EntityManager
         ): Promise<District> {
-console.log('hitting url districts');
+
              if (!this.districtRepository) {
                         throw new Error("DistrictService repository not initialized. Call init() first.");
                     }
@@ -56,16 +56,16 @@ console.log('hitting url districts');
             ptenantId:number,           
             manager?: EntityManager
         ): Promise<District[]> {
-console.log('hitting url districts');
+
              if (!this.districtRepository) {
                         throw new Error("DistrictService repository not initialized. Call init() first.");
                     }
 
-                    console.log('ptenantId:',ptenantId);
+                  
                     
                     const districtRepository = manager ? manager.getRepository(District) : this.districtRepository;
                     const ps= await districtRepository.find({where:{tenantId:ptenantId}}); // Use find() to get all 
-                    console.log('districts count:',ps.length);
+                 
                     
                     return ps;
                 }
@@ -112,8 +112,7 @@ console.log('hitting url districts');
         });
 
         if (aDistrict) {
-            console.log(`Found existing district ID: ${createDto.id}. Updating fields.`);
-            
+                     
             
             const updateData = {
                 ...createDto,

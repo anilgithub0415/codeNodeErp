@@ -44,10 +44,6 @@ router.use((req, res, next) => {
             
             const tenantId= parseInt( req.params.tenantId);
             const formKey=req.params.formKey;  
-            
-          
-console.log('tenantid:',tenantId,' formkey:',formKey);
-
 
             const tenantFormService = getTenantFormServiceRepository();
             const aForm = await tenantFormService.getTenantForm(tenantId,formKey,); 

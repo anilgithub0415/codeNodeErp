@@ -1,4 +1,4 @@
-export interface Settings {
+export interface SecuritySettings {
     settingKey: string;
     accessTokenLifetime: number;  // NEVER send this back to the client
     refreshTokenLifetime: number;

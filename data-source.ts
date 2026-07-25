@@ -3,13 +3,13 @@ import 'reflect-metadata'; // Required for TypeORM decorators
 import { DataSource } from 'typeorm';
 import * as dotenv from 'dotenv';
 import { User } from './src/entity/User'; // Import your User entity
-import {Settings} from './src/entity/Settings'
+import {SecuritySettings} from './src/entity/SecuritySettings'
 import {Config} from './src/entity/Config'
 import {  Config_AppName } from './src/entity/Config_Appname';
 
 import {RefreshToken} from './src/entity/RefreshToken'
 import { refreshTokens } from './src/memory/memoryStore';
-import { SubscriptionPlanLookup} from './src/entity/SubscriptionPlanLookup';
+
 import { UserRoleLookup } from './src/entity/UserRoleLookup';
 //import { RolePermission } from './src/entity/RolePermission';
 import { Permission } from './src/entity/Permission';
@@ -43,6 +43,7 @@ import { PurchaseOrderItem } from './src/entity/PurchaseOrderItem';
 import { Vendor } from './src/entity/Vendor';
 import { CustomerCategory } from './src/entity/CustomerCategory';
 import { Leadsource } from './src/entity/LeadSource';
+import { SubscriptionPlanLookup } from './src/entity/SubscriptionPlanLookup';
 import { ClientStatus } from './src/entity/LeadStatus';
 import { Site } from './src/entity/Site';
 import { City } from './src/entity/city';
@@ -64,6 +65,15 @@ import { ClientPurchaseOrderItem } from './src/entity/ClientPurchaseOrderItem';
 import { ProductUomConversion } from './src/entity/ProductUomConversion';
 import { UserPreferences } from './src/entity/user_preferences';
 import { District } from './src/entity/District';
+import { ClientRequirement } from './src/entity/ClientRequirement';
+import { Quotation } from './src/entity/Quotation';
+import { ClientRequirementItem } from './src/entity/ClientRequirementItem';
+import { QuotationItem } from './src/entity/QuotationItem';
+import { ProductCategory } from './src/entity/ProductCategory';
+import { RolePermission } from './src/entity/RolePermission';
+import { LineDiscount } from './src/entity/LineDiscount';
+import { DiscountType } from './src/entity/DiscountType';
+import { Interaction } from './src/entity/Interaction';
 
 
 
@@ -77,7 +87,7 @@ export const AppDataSource = new DataSource({
     host: process.env.DB_SERVER || 'localhost',
     port: parseInt(process.env.DB_PORT || '1433', 10), // Default SQL Server port
     username: process.env.DB_USER || 'sa',
-    password: process.env.DB_PASSWORD || 'saadmin',
+    password: process.env.DB_PASSWORD  || 'saadmin',
     database: process.env.DB_DATABASE || 'test',
       
     // Set to true to automatically create database schema on sync (development only)
@@ -87,11 +97,17 @@ export const AppDataSource = new DataSource({
     logging: false, // Set to true to see SQL queries in console  RolePermission,
   //logging:['query','error'],
      
-    entities: [User,UserRoleLookup,Permission,RefreshToken,Settings,Config,Config_AppName,Tenant,TenantTypeLookup,SubscriptionPlanLookup
+    entities: [
+        //Global Masters -----------------------------------------------
+        HsnTaxRule,Leadsource,SubscriptionPlanLookup,
+        //End global master --------------------------------------------
+        User,UserRoleLookup,Permission,RolePermission,RefreshToken,SecuritySettings,Config,Config_AppName,Tenant,TenantTypeLookup
     ,Option,UserTenantContext  
-    //,Product //without variant
-    ,ProductTemplate,ProductVariant ,HsnTaxRule//with variant
-    , Product,
+    ,Quotation,QuotationItem
+    ,ClientRequirement,ClientRequirementItem
+
+    ,ProductTemplate,ProductVariant //with variant
+    , Product,ProductCategory,
     //,product_table_fields,    product_table_fields_tenantwise
    // ,product_template_table_fields,product_variant_table_fields,
     product_template_table_fields_tenantwise,
@@ -100,12 +116,33 @@ export const AppDataSource = new DataSource({
     Customer, CustomerCategory, Vendor, City, District
     ,Tenant_custom_scripts, TenantFormConfigs
     ,PurchaseOrder,PurchaseOrderItem   
-    ,ClientPurchaseOrder,ClientPurchaseOrderItem
+    ,ClientPurchaseOrder,ClientPurchaseOrderItem 
     ,SalesOrder,SalesOrderItem
     ,DeliveryChallan,DeliveryChallanItem
     ,Leadsource,ClientStatus,Site
+
+    ,LineDiscount,DiscountType
+    ,Interaction
 ,AutocodeCounter ,DocumentSequence, CustomerCategoryMapping
-,UserPreferences], // Register your entities here
+,UserPreferences], 
+
+// src/data-source.ts
+// entities: [
+//   Settings, 
+//     User, UserRoleLookup, Permission, RefreshToken, Config, Config_AppName, Tenant, 
+//     TenantTypeLookup, SubscriptionPlanLookup, Option, UserTenantContext,
+//     ProductTemplate, ProductVariant, HsnTaxRule, 
+//     Product, // 👈 Keep this one
+//     product_template_table_fields_tenantwise, ProductUomConversion, User_table_fields, 
+//     TenantStrategy, Customer, CustomerCategory, Vendor, City, District, 
+//     Tenant_custom_scripts, TenantFormConfigs, PurchaseOrder, PurchaseOrderItem, 
+//     ClientPurchaseOrder, ClientPurchaseOrderItem, SalesOrder, SalesOrderItem, 
+//     DeliveryChallan, DeliveryChallanItem, Leadsource, ClientStatus, Site, 
+//     AutocodeCounter, DocumentSequence, CustomerCategoryMapping, UserPreferences
+//     // ❌ REMOVED THE DUPLICATE ", Product," FROM HERE
+// ],
+
+// Register your entities here
     //Tenant,TenantTypeLookup,SubscriptionPlanLookup,User,UserRoleLookup,RolePermission,Permission,RefreshToken,Settings
     
     

@@ -1,25 +1,45 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany, ManyToOne, JoinColumn, Unique, CreateDateColumn, UpdateDateColumn, OneToOne, PrimaryColumn } from 'typeorm';
-import { RefreshToken } from './RefreshToken';
+/** Use below code for SuperAdmin pretending 
+ * // Example authorization step inside your authentication service
+async function startImpersonationSession(superAdminId: number, targetTenantId: number, targetRole: string) {
+    // 1. Verify that the requesting user is a legitimate SuperAdmin in global context (TenantId: 1 or NULL)
+    const isAdmin = await userRepository.findOne({ where: { id: superAdminId, tenantId: 1 } });
+    if (!isAdmin) throw new Error("Unauthorized access request");
 
-import { UserTenantContext } from './UserTenantContext'; // New import for context
+    // 2. Build the Payload reflecting the target tenant & target role constraints
+    const impersonationPayload = {
+        userId: superAdminId,          // Real identity remains intact for auditing logs
+        tenantId: targetTenantId,      // Swapped target tenant context
+        activeRole: targetRole,        // Swapped target role view context
+        isImpersonating: true          // Flags frontend to show warning ribbons
+    };
+
+    // 3. Generate short-lived JWT token containing this custom payload configuration
+    return jwt.sign(impersonationPayload, process.env.JWT_SECRET, { expiresIn: '15m' });
+}
+
+We need 2 things from SuperAdmin login  
+1.Stage 1: Global Management Mode (The Default Login)
+2.Stage 2: Impersonation Mode (The Switch)
+
+*/
+// src/entity/User.ts
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn, Index } from 'typeorm';
 import { Tenant } from './Tenant';
-  // src/entity/User.ts
-import { Site } from './Site'; 
-import { Customer } from './Customer';
-// 1. Define a composite unique constraint combining tenant and username
-@Unique("UQ_tenant_userName", ["tenantId", "userName"]) 
+
 @Entity({ name: 'User' })
 export class User {
     @PrimaryGeneratedColumn('increment')
     id!: number;
         
-    @Column('int')
-    tenantId!: number;
+    // 🔀 CHANGE: Made nullable to support global system contexts / SuperAdmins
+    @Column('int', { nullable: true })
+    tenantId!: number | null;
     
-    @ManyToOne(() => Tenant, { nullable: false, onDelete: 'CASCADE' })
-    @JoinColumn({ name: 'tenantId' })
-    tenant!: Tenant; 
-    // 2. Remove "unique: true" from here so it is not globally locked
+    // 🔀 CHANGE: Made nullable: true to align with the column change
+    @ManyToOne(() => Tenant, { nullable: true, onDelete: 'CASCADE' })
+    @JoinColumn({ name: 'tenantId', referencedColumnName: 'tenantId' })
+    tenant!: Tenant | null; 
+
     @Column({ name: 'userName', type: 'nvarchar', length: 255 }) 
     userName!: string;
     
@@ -31,8 +51,6 @@ export class User {
 
     @Column({ name: 'password', type: 'nvarchar', length: 255, nullable: true })
     password?: string | null;
-
-    // Removed direct 'role' column/relationship. Roles are now via UserTenantContext.
 
     @Column({ name: 'isActive', type: 'bit', default: true })
     isActive!: boolean;
@@ -52,48 +70,25 @@ export class User {
     @Column({ type: 'int', nullable: true, name: 'CreatedByUserId' })
     createdByUserId?: number | null;
 
-  
-
-// ... inside your User class definition:
-
+    @Index("IX_User_siteId", ["siteId"])     
     @Column({ type: 'int', nullable: true, name: 'SiteId' })
-    siteId?: number | null; // 👈 Raw foreign key integer column
+    siteId?: number | null;
 
-    
-    @ManyToOne(() => Site, { nullable: true, onDelete: 'CASCADE' }) // 👈 Relational link
+    @ManyToOne('Site', 'users', { nullable: true, onDelete: 'SET NULL' }) 
     @JoinColumn({ name: 'SiteId' })
-    site?: Site | null;
+    site?: any;
 
+    @Index("IX_User_clientId", ["clientId"]) 
     @Column({ type: 'int', nullable: true, name: 'ClientId' })
-    clientId?: number | null; // 👈 Raw foreign key integer column
+    clientId?: number | null;
 
-    @ManyToOne(() => Customer, { nullable: true, onDelete: 'CASCADE' }) // 👈 Relational link
+    @ManyToOne('Customer', 'users', { nullable: true }) 
     @JoinColumn({ name: 'ClientId' })
-    client?: Customer | null;
+    client?: any;
 
     @CreateDateColumn({ type: 'datetime2', name: 'CreatedAt' })
     createdAt!: Date;
 
     @UpdateDateColumn({ type: 'datetime2', name: 'UpdatedAt' })
     updatedAt!: Date;
-
-    // @OneToMany(() => RefreshToken, refreshToken => refreshToken.user)
 }
-
-/*
-payload will be
-{
-  "userId": 109,
-  "tenantId": 1,
-  "role": "SitePortalUser",
-  "siteId": 52 
-}
- */
-/*// ❌ UNSAFE: Trusting the client UI input
-const siteId = req.query.siteId; 
-const orders = await orderRepo.find({ where: { siteId } });
-
-//  SECURE: Hard-locking to the Token Context
-const siteId = req.user.siteId; // Extracted straight from the verified JWT
-const orders = await orderRepo.find({ where: { siteId } }); 
- */

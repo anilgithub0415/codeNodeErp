@@ -32,7 +32,7 @@ export class HsnTaxRuleService {
         pHsnCode: string,        
         manager?: EntityManager
     ): Promise<HsnTaxRule> {
-        console.log('hitting url hsnTaxRules by code');
+        
         if (!this.hsnTaxRuleRepository) {
             throw new Error("HsnTaxRuleService repository not initialized. Call init() first.");
         }
@@ -46,14 +46,14 @@ export class HsnTaxRuleService {
     async getHsnTaxRules(
         manager?: EntityManager
     ): Promise<HsnTaxRule[]> {
-        console.log('hitting url hsnTaxRules list');
+        
         if (!this.hsnTaxRuleRepository) {
             throw new Error("HsnTaxRuleService repository not initialized. Call init() first.");
         }
         
         const hsnTaxRuleRepository = manager ? manager.getRepository(HsnTaxRule) : this.hsnTaxRuleRepository;
         const taxRules = await hsnTaxRuleRepository.find(); 
-        console.log('hsnTaxRules count:', taxRules.length);
+        
         
         return taxRules;
     }

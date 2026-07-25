@@ -1,152 +1,201 @@
-
-import { EntityManager, Not, Repository } from 'typeorm';
+import { EntityManager, Like, Repository, Not } from 'typeorm';
 import { Product } from '../entity/Product';
-
-
-
+import { ProductCategory } from '../entity/ProductCategory';
 import { AppDataSource } from '../../data-source'; 
 
-interface CreateProductDto{
-    id?:number;
-    tenantId:number;
-    prodName:string;
-    description:string;
-    sku:string;
-    basePrice:number;
-    createdByUserId?:number;
-    [key:string]:any;
+interface CreateProductDto {
+    id?: number;
+    tenantId: number;
+    prodName: string;
+    description: string | null;
+    sku: string | null;
+    basePrice: number;
+    categoryId?: number; 
+    hsnId?: number;      
+    createdByUserId?: number;
+    [key: string]: any;
 }
 
 export interface CreatedProductResponse {
     product: Product;
-  
 }
 
-export class ProductService{
- private productRepository!: Repository<Product>;
-     /**
-         * Initializes the ProductService with its TypeORM repository instances.
-         * This MUST be called AFTER AppDataSource.initialize() has completed.
-         * @param productRepo The TypeORM Repository instance for Product.
-         * @param tenantRepo The TypeORM Repository instance for Tenant (if ProductService needs it).
-         */
-        async init(productRepo: Repository<Product>): Promise<void> {
-            this.productRepository = productRepo;
-                console.log("ProductService repository initialized.");       
+export class ProductService {
+    private productRepository!: Repository<Product>;
+
+    async init(productRepo: Repository<Product>): Promise<void> {
+        this.productRepository = productRepo;
+        console.log("ProductService repository initialized.");       
+    }
+
+    async getProduct(ptenantId: number, pProdId: number, manager?: EntityManager): Promise<Product> {
+        if (!this.productRepository) {
+            throw new Error("ProductService repository not initialized. Call init() first.");
         }
-
-
-        async getProduct(
-            ptenantId:number,   pProdId:number,        
-            manager?: EntityManager
-        ): Promise<Product> {
-console.log('hitting url products');
-             if (!this.productRepository) {
-                        throw new Error("ProductService repository not initialized. Call init() first.");
-                    }
-
-                   
-                    
-                    const productRepository = manager ? manager.getRepository(Product) : this.productRepository;
-                    const ps= await productRepository.findOne({where:{tenantId:ptenantId , id:pProdId}}); // Use find() to get all 
-                 
-                    
-                    return ps!; 
-                }
-
-
-        async getProducts(
-            ptenantId:number,           
-            manager?: EntityManager
-        ): Promise<Product[]> {
-console.log('hitting url products');
-             if (!this.productRepository) {
-                        throw new Error("ProductService repository not initialized. Call init() first.");
-                    }
-
-                    console.log('ptenantId:',ptenantId);
-                    
-                    const productRepository = manager ? manager.getRepository(Product) : this.productRepository;
-                    const ps= await productRepository.find({where:{tenantId:ptenantId}, relations: ['hsnTaxRule'] }); // Use find() to get all 
-                    console.log('products count:',ps.length);
-                    
-                    return ps;
-                }
-
-
-    /**
-     * Creates a new global Product, links them to a Person, and establishes their initial context
-     * within a specified tenant and role.
-     * This method now also atomically creates a role-specific profile (e.g., FacultyProfile).
-     *
-     * @param createDto Data for creating the product and their initial context.
-     * @param manager Optional EntityManager for transactional operations.
-     * @returns The created Product entity along with its initial context.
-     */
-    async createProduct(
-        createDto: CreateProductDto,
-        manager?: EntityManager
-    ): Promise<CreatedProductResponse> {
-        const queryRunner = manager ? manager.queryRunner : AppDataSource.createQueryRunner();
-        let shouldReleaseQueryRunner = false;
-
+        const productRepository = manager ? manager.getRepository(Product) : this.productRepository;
+        
+        // Defensive query strategy: Try loading with relations first, catch and fall back if mapping crashes
         try {
-            if (!manager) {
-                await queryRunner!.connect();
-                await queryRunner!.startTransaction();
-                shouldReleaseQueryRunner = true;
-            }
-
-          
-            const productRepo = queryRunner!.manager.getRepository(Product);
-                    
-
-            console.log('finding createDto.id:',createDto.id);
+            const ps = await productRepository.findOne({
+                where: { tenantId: ptenantId, id: pProdId },
+                relations: ['hsnTaxRule', 'productCategory'] 
+            }); 
             
+            if (ps) return ps;
+        } catch (relationError) {
+            console.warn("Failed to eager load relations, falling back to base object query:", relationError);
+        }
 
-            // 3. Create or Find Product (existing logic)
-            let newORexistingproduct: Product;
-            // 1. Look up by a unique, unchanging identifier
-            // 1. Guard against undefined ID to force a new product creation
-let aProduct = null;
-if (createDto.id) {
-    aProduct = await productRepo.findOne({ 
-        where: { id: createDto.id, tenantId: createDto.tenantId } 
-    });
-}
+        // Fallback: Fetch clean base row record without forcing potentially missing relation constraints
+        const baseProduct = await productRepository.findOne({
+            where: { tenantId: ptenantId, id: pProdId }
+        });
 
-if (aProduct) {
-    console.log('editing existing prod..................');
-    Object.assign(aProduct, createDto);  
-    newORexistingproduct = await productRepo.save(aProduct); // Assign to tracking variable
-} else {
-    console.log('creating new prod......................');
-    let newProduct = productRepo.create(createDto);
-    newORexistingproduct = await productRepo.save(newProduct); // Assign to tracking variable
-}
+        if (!baseProduct) {
+            throw new Error(`Product with ID ${pProdId} does not exist for tenant ${ptenantId}.`);
+        }
 
-if (shouldReleaseQueryRunner) {
-    await queryRunner!.commitTransaction();
-}
+        return baseProduct;
+    }
 
-// 2. Fix the return variable (was aProduct, should be newORexistingproduct)
-return { product: newORexistingproduct };
-
-       
-            
-
-        } catch (error) {
-            if (shouldReleaseQueryRunner) {
-                await queryRunner!.rollbackTransaction();
-            }
-            console.error('Error in createProductAndContext:', error);
-            throw error;
-        } finally {
-            if (shouldReleaseQueryRunner) {
-                await queryRunner!.release();
-            }
+    async getProducts(ptenantId: number, manager?: EntityManager): Promise<Product[]> {
+        if (!this.productRepository) {
+            throw new Error("ProductService repository not initialized. Call init() first.");
+        }
+        const productRepository = manager ? manager.getRepository(Product) : this.productRepository;
+        
+        try {
+            return await productRepository.find({
+                where: { tenantId: ptenantId },
+                relations: ['hsnTaxRule', 'productCategory'] 
+            }); 
+        } catch (relationError) {
+            console.warn("Failed to find list with relations, loading base dataset:", relationError);
+            return await productRepository.find({
+                where: { tenantId: ptenantId }
+            });
         }
     }
+
+    async getProductSuggestions(tenantId: number, searchQuery: string): Promise<any[]> {
+        if (!this.productRepository) {
+            throw new Error("ProductService repository not initialized.");
+        }
+        return await this.productRepository.find({
+            where: {
+                tenantId: tenantId,
+                prodName: Like(`%${searchQuery.trim()}%`)
+            },
+            select: {
+                id: true,
+                prodName: true,
+                sku: true,
+                isActive: true
+            },
+            take: 10 
+        });
     }
-           
-export default ProductService
+
+    async createProduct(productData: Partial<CreateProductDto>): Promise<Product> {
+        if (!this.productRepository) {
+            throw new Error("ProductService repository not initialized.");
+        }
+
+        const trimmedName = productData.prodName?.trim();
+        if (!trimmedName) throw new Error("Product name is required.");
+
+        const duplicateMatch = await this.productRepository.findOne({
+            where: {
+                tenantId: productData.tenantId,
+                prodName: trimmedName
+            }
+        });
+
+        if (duplicateMatch) {
+            if (duplicateMatch.isActive) {
+                throw new Error(`VALIDATION: Active product matching '${trimmedName}' already exists.`);
+            }
+            throw new Error(`ARCHIVED_CONFLICT:${duplicateMatch.id}`);
+        }
+
+        const brandNewItem = this.productRepository.create({
+            ...productData,
+            prodName: trimmedName,
+            isActive: true
+        });
+
+        return await this.productRepository.save(brandNewItem);
+    }
+
+    async updateProduct(productData: Partial<CreateProductDto>): Promise<Product> {
+        if (!this.productRepository) {
+            throw new Error("ProductService repository not initialized.");
+        }
+
+        const trimmedName = productData.prodName?.trim();
+        if (!trimmedName) throw new Error("Product name is required.");
+        if (!productData.id) throw new Error("Product ID is required for execution.");
+
+        const duplicateMatch = await this.productRepository.findOne({
+            where: {
+                tenantId: productData.tenantId,
+                prodName: trimmedName,
+                id: Not(productData.id)
+            }
+        });
+
+        if (duplicateMatch) {
+            if (duplicateMatch.isActive) {
+                throw new Error(`VALIDATION: Active product matching '${trimmedName}' already exists.`);
+            }
+            throw new Error(`ARCHIVED_CONFLICT:${duplicateMatch.id}`);
+        }
+
+        const existingItem = await this.productRepository.findOne({
+            where: { id: productData.id, tenantId: productData.tenantId }
+        });
+
+        if (!existingItem) {
+            throw new Error("Product target resource not found inside current workspace context.");
+        }
+
+        Object.assign(existingItem, {
+            ...productData,
+            prodName: trimmedName
+        });
+
+        return await this.productRepository.save(existingItem);
+    }
+
+    async reactivateProduct(tenantId: number, productId: number): Promise<Product> {
+        if (!this.productRepository) {
+            throw new Error("ProductService repository not initialized.");
+        }
+
+        const product = await this.productRepository.findOne({
+            where: { id: productId, tenantId: tenantId }
+        });
+
+        if (!product) throw new Error("Target product not found matching current tenant workspace rules.");
+        if (product.isActive) return product; 
+
+        product.isActive = true;
+        return await this.productRepository.save(product);
+    }
+
+    async deleteProduct(ptenantId: number, pProdId: number, manager?: EntityManager): Promise<void> {
+        if (!this.productRepository) {
+            throw new Error("ProductService repository not initialized. Call init() first.");
+        }
+        const productRepository = manager ? manager.getRepository(Product) : this.productRepository;
+        const ps = await productRepository.findOne({
+            where: { tenantId: ptenantId, id: pProdId }
+        });
+
+        if (!ps) {
+            throw new Error("Product not found inside this company scope account.");
+        }
+        await productRepository.remove(ps);
+    }
+}
+export default ProductService;

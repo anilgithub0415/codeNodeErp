@@ -1,45 +1,31 @@
-  // src/entity/Site.ts
-import { User } from './User';
 // src/entity/Site.ts
-import {
-  Entity,
-  PrimaryGeneratedColumn,
-  Column,
-  ManyToOne,
-  Index,
-  JoinColumn,
-  RelationId,
-  OneToMany,
-} from 'typeorm';
-import { Customer } from './Customer';
-import { CustomerCategory } from './CustomerCategory';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, Index, JoinColumn, OneToMany } from 'typeorm';
+import { Customer } from './Customer'; // 🌟 Ensure you import your Customer entity
 
-@Entity()
+@Entity({ name: 'site' }) 
 export class Site {
   @PrimaryGeneratedColumn()
   id!: number;
-//pending: check whether few more precautions need for tenantId constraints
-  @Column({type:'int'})
-    tenantId!:number;
-    
+
+  @Index("IX_Site_TenantId") 
+  @Column({ type: 'int' })
+  tenantId!: number;
+
   @Column()
-  siteName!: string;                     // e.g. “ABC Ltd”, “XYZ Ltd” 
+  siteName!: string;                     
 
+  @Column({ nullable: true })
+  siteContactPerson!: string;
 
-  @Column({nullable:true})
-  contactPersonName!:string;
+  @Index("IX_Site_clientId", ["clientId"]) 
+  @Column({ type: 'int', nullable: false, name: 'ClientId' })
+  clientId!: number;
 
-  // FK back to the client
-  @ManyToOne(() => Customer, cust => cust.sites, {
-    onDelete: 'NO ACTION',  
-  })
-  @Index()
-  customer!: Customer;
+  // 🌟 FIX: Change 'Customer' string to a structural arrow function returning the Class Type
+  @ManyToOne(() => Customer, (customer) => customer.sites, { nullable: false, onDelete: 'CASCADE' }) 
+  @JoinColumn({ name: 'ClientId' })
+  customer!: Customer; // 🌟 Type cleanly as Customer instead of any
 
-
-// ... inside your Site class definition:
-
-  @OneToMany(() => User, (user) => user.site)
-  users!: User[]; // 👈 Array representing all credential accounts assigned to this site
-
+  @OneToMany('User', 'site')
+  users!: any[]; 
 }

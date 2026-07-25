@@ -33,11 +33,11 @@ export class SalesService {
         this.salesRepository = salesRepo;
         console.log("SalesService repository initialized.");       
     }
-
     async createSalesOrder(
         createDto: CreateSalesOrderDto,
         manager?: EntityManager
     ): Promise<CreatedSalesOrderResponse> {
+
         console.log('createDto at first..............', createDto);
 
         const isExternalTransaction = !!manager;
@@ -61,7 +61,7 @@ export class SalesService {
             const variantRepo = activeManager.getRepository(ProductVariant);
 
             const orgProfile = await custRepo.findOne({
-                where: { id: createDto.customerId },
+                where: { id: createDto.clientId },
                 relations: ['customerCategory']
             });
 
@@ -154,10 +154,7 @@ export class SalesService {
                 orderItem.finalPrice = Number(itemInput.finalPrice || itemInput.unitPrice || itemInput.price || extractedPrice || 0.00);
                 enrichedItems.push(orderItem);
             }
-
             if (existingSales) {
-                console.log(`Found existing Sales Order: ${existingSales.soNumber}, performing update.`);
-                
                 const oldItems = await poiRepo.find({ where: { salesOrderId: existingSales.id } });
                 await poiRepo.delete({ salesOrderId: existingSales.id });
 
@@ -171,50 +168,56 @@ export class SalesService {
                 existingSales.items = enrichedItems;
                 targetOrder = await salesRepo.save(existingSales);
 
-                await this.adjustStockDeltaOnUpdate(activeManager, createDto.tenantId, oldItems, enrichedItems);
+                // Only evaluate stock adjustments if the order has been pushed past DRAFT stage
+                if (existingSales.status !== 'DRAFT') {
+                    await this.adjustStockDeltaOnUpdate(activeManager, createDto.tenantId, oldItems, enrichedItems);
+                } else {
+                    console.log(`[SalesService] Existing order is a DRAFT. Modifying structure without stock impacts.`);
+                }
 
-          } else {
-    console.log(`Creating fresh Sales Order. Provided No: ${createDto.soNumber || 'Will Auto-Generate'}`);
-    
-    console.log('Generating autonumbering...');
-    const generatedSONumber = await this.generateSalesOrderNumber(activeManager, computedChannelCode);
-    createDto.soNumber = generatedSONumber;
+            } else {
+                console.log(`Creating fresh Sales Order. Provided No: ${createDto.soNumber || 'Will Auto-Generate'}`);
+                
+                console.log('Generating autonumbering...');
+                const generatedSONumber = await this.generateSalesOrderNumber(activeManager, computedChannelCode);
+                createDto.soNumber = generatedSONumber;
 
-    // 🌟 FIX: Retain explicit type-safe primitives that map directly to the entity columns
-    const cleanCreatePayload = {
-        tenantId: createDto.tenantId,
-        soNumber: createDto.soNumber,
-        clientId: Number(createDto.clientId), // Force raw primitive assignment matching @Column() clientId
-        siteId: createDto.siteId ? Number(createDto.siteId) : null,
-        status: createDto.status || 'DRAFT',
-        subTotal: Number(createDto.subTotal || 0),
-        taxAmount: Number(createDto.taxAmount || 0),
-        shippingAmount: Number(createDto.shippingAmount || 0),
-        totalAmount: Number(createDto.totalAmount || 0),
-        customAttributes: createDto.customAttributes || null
-    };
+                const cleanCreatePayload = {
+                    tenantId: createDto.tenantId,
+                    soNumber: createDto.soNumber,
+                    clientId: Number(createDto.clientId),
+                    siteId: createDto.siteId ? Number(createDto.siteId) : null,
+                    status: createDto.status || 'DRAFT',
+                    subTotal: Number(createDto.subTotal || 0),
+                    taxAmount: Number(createDto.taxAmount || 0),
+                    shippingAmount: Number(createDto.shippingAmount || 0),
+                    totalAmount: Number(createDto.totalAmount || 0),
+                    customAttributes: createDto.customAttributes || null
+                };
 
-    console.log('TypeORM creation mapping context target profile:', cleanCreatePayload);
+                console.log('TypeORM creation mapping context target profile:', cleanCreatePayload);
 
-    const newOrder = salesRepo.create(cleanCreatePayload);
-    newOrder.items = enrichedItems;
+                const newOrder = salesRepo.create(cleanCreatePayload);
+                newOrder.items = enrichedItems;
 
-    // Save parent first to establish a valid identity key index context 
-    targetOrder = await salesRepo.save(newOrder);
+                targetOrder = await salesRepo.save(newOrder);
 
-    // Explicitly set relationship identifiers on new creation items
-    for (const item of enrichedItems) {
-        item.salesOrderId = targetOrder.id;
-        item.salesOrder = targetOrder;
-    }
+                for (const item of enrichedItems) {
+                    item.salesOrderId = targetOrder.id;
+                    item.salesOrder = targetOrder;
+                }
 
-    // Save line items through child repository directly to bypass parent cascade checks
-    await poiRepo.save(enrichedItems);
-    targetOrder.items = enrichedItems;
+                await poiRepo.save(enrichedItems);
+                targetOrder.items = enrichedItems;
 
-    // Decrement product inventory safely
-    await this.decrementProductStock(activeManager, createDto.tenantId, enrichedItems);
-}
+                // ✅ WORKAROUND PROTECTION: Only decrement inventory if the order state is active
+                if (newOrder.status !== 'DRAFT') {
+                    console.log(`[SalesService] Sales Order is active. Decrementing product stock...`);
+                    await this.decrementProductStock(activeManager, createDto.tenantId, enrichedItems);
+                } else {
+                    console.log(`[SalesService] Sales Order is a DRAFT. Skipping stock adjustments on creation.`);
+                }
+            }
 
             if (!isExternalTransaction && queryRunner) {
                 await queryRunner.commitTransaction();
@@ -231,6 +234,104 @@ export class SalesService {
         } catch (error) {
             if (!isExternalTransaction && queryRunner) await queryRunner.rollbackTransaction();
             console.error('Error in createSalesOrder:', error);
+            throw error;
+        } finally {
+            if (!isExternalTransaction && queryRunner) await queryRunner.release();
+        }
+    }
+    /**
+     * Strict DELETE/CANCEL Action: Asserts lifecycle conditions using the immutable soNumber. 
+     * Hard deletes the entry if in 'DRAFT' status (skipping stock adjustments as drafts do not touch inventory); 
+     * otherwise transitions to 'CANCELLED' and returns real-time stock balances.
+     */
+    async handleDeleteOrCancelRequest(
+        tenantId: string,
+        soNumber: string,
+        manager?: EntityManager
+    ): Promise<{ success: boolean; action: 'DELETED' | 'CANCELLED'; message: string }> {
+        console.log(`Processing UI delete action for SO: ${soNumber}, Tenant: ${tenantId}`);
+
+        const isExternalTransaction = !!manager;
+        const txManager = isExternalTransaction ? manager! : AppDataSource.manager;
+        let queryRunner: any = null;
+
+        try {
+            if (!isExternalTransaction) {
+                queryRunner = AppDataSource.createQueryRunner();
+                await queryRunner.connect();
+                await queryRunner.startTransaction();
+            }
+
+            const activeManager = isExternalTransaction ? txManager : queryRunner.manager;
+            const salesRepo = activeManager.getRepository(SalesOrder);
+            const poiRepo = activeManager.getRepository(SalesOrderItem);
+
+            const existingOrder = await salesRepo.findOne({
+                where: { tenantId: Number(tenantId), soNumber },
+                relations: ['items']
+            });
+
+            if (!existingOrder) {
+                throw new Error(`Sales Order ${soNumber} does not exist.`);
+            }
+
+            // =========================================================================
+            // CASE A: ORDER IS A DRAFT -> PERFORM HARD DELETE
+            // =========================================================================
+            if (existingOrder.status === 'DRAFT') {
+                console.log(`Order ${soNumber} is a DRAFT. Executing hard delete...`);
+                
+                if (existingOrder.items && existingOrder.items.length > 0) {
+                    await poiRepo.delete({ salesOrderId: existingOrder.id });
+                }
+
+                await salesRepo.delete({ id: existingOrder.id });
+
+                if (!isExternalTransaction && queryRunner) {
+                    await queryRunner.commitTransaction();
+                }
+
+                return { 
+                    success: true, 
+                    action: 'DELETED', 
+                    message: `Draft Sales Order ${soNumber} has been permanently removed.` 
+                };
+            }
+
+            // =========================================================================
+            // CASE B: ORDER IS NOT A DRAFT -> PERFORM CANCEL & RESTORE STOCK
+            // =========================================================================
+            console.log(`Order ${soNumber} is active (${existingOrder.status}). Executing cancellation...`);
+
+            if (existingOrder.status === 'SHIPPED' || existingOrder.status === 'INVOICED') {
+                throw new Error(`Cannot cancel Sales Order ${soNumber} because it has already been shipped or invoiced.`);
+            }
+            if (existingOrder.status === 'CANCELLED') {
+                throw new Error(`Sales Order ${soNumber} is already cancelled.`);
+            }
+
+            // ✅ RESTORE STOCK: Since it was active, it previously subtracted stock. Add it back now.
+            if (existingOrder.items && existingOrder.items.length > 0) {
+                console.log(`Reversing active product stock allocations...`);
+                await this.incrementProductStock(activeManager, Number(tenantId), existingOrder.items);
+            }
+
+            existingOrder.status = 'CANCELLED';
+            await salesRepo.save(existingOrder);
+
+            if (!isExternalTransaction && queryRunner) {
+                await queryRunner.commitTransaction();
+            }
+
+            return { 
+                success: true, 
+                action: 'CANCELLED',
+                message: `Sales Order ${soNumber} has been successfully cancelled and inventory counts restored.` 
+            };
+
+        } catch (error) {
+            if (!isExternalTransaction && queryRunner) await queryRunner.rollbackTransaction();
+            console.error('Error handling delete/cancel request:', error);
             throw error;
         } finally {
             if (!isExternalTransaction && queryRunner) await queryRunner.release();
@@ -339,7 +440,6 @@ export class SalesService {
             }
         }
     }
-
     private async decrementProductStock(
         txManager: EntityManager,
         tenantId: number,
@@ -413,6 +513,196 @@ export class SalesService {
             await repoToUpdate.decrement(lookupCriteria, 'currentstock', targetStockQty);
         }
     }
+
+    private async incrementProductStock(
+        txManager: EntityManager,
+        tenantId: number,
+        items: SalesOrderItem[]
+    ): Promise<void> {
+        const productRepo = txManager.getRepository(Product);
+        const variantRepo = txManager.getRepository(ProductVariant);
+
+        for (const it of items) {
+            const saleQty = Number(it.quantity || 0);
+            if (saleQty === 0) continue;
+
+            const pid = it.productId ? Number(it.productId) : null;
+            const vid = it.productVariantId ? Number(it.productVariantId) : null;
+
+            let inventoryTrackingUom = 'PCS';
+            let repoToUpdate: typeof productRepo | typeof variantRepo;
+            let lookupCriteria: { id: number };
+
+            if (pid) {
+                const product = await productRepo.findOne({ where: { id: pid }, select: ['id', 'baseUom'] });
+                if (!product) throw new Error(`Product ID ${pid} not found.`);
+                inventoryTrackingUom = product.baseUom;
+                repoToUpdate = productRepo;
+                lookupCriteria = { id: pid };
+            } else if (vid) {
+                const variant = await variantRepo.findOne({ where: { id: vid }, select: ['id', 'baseUom'] });
+                if (!variant) throw new Error(`Variant ID ${vid} not found.`);
+                inventoryTrackingUom = variant.baseUom;
+                repoToUpdate = variantRepo;
+                lookupCriteria = { id: vid };
+            } else {
+                continue;
+            }
+
+            let factor = 1.0000;
+            const incomingSaleUom = it.salesUom || inventoryTrackingUom;
+
+            if (incomingSaleUom.toLowerCase() !== inventoryTrackingUom.toLowerCase()) {
+                factor = await this.getConversionFactor(txManager, tenantId, pid, vid, incomingSaleUom);
+            }
+
+            const targetStockQty = saleQty * factor;
+            console.log(`Incrementing Stock [ID: ${lookupCriteria.id}]: Adding +${targetStockQty}`);
+            await repoToUpdate.increment(lookupCriteria, 'currentstock', targetStockQty);
+        }
+    }
+    /**
+     * Strict Action: Commits a DRAFT Sales Order to an active state,
+     * changing its status to 'APPROVED' and directly executing real-time stock deductions.
+     */
+    async finalizeDraftSalesOrder(
+        soId: number,
+        tenantId: number,
+        manager?: EntityManager
+    ): Promise<SalesOrder> {
+        const isExternalTransaction = !!manager;
+        const txManager = isExternalTransaction ? manager! : AppDataSource.manager;
+        let queryRunner: any = null;
+
+        try {
+            if (!isExternalTransaction) {
+                queryRunner = AppDataSource.createQueryRunner();
+                await queryRunner.connect();
+                await queryRunner.startTransaction();
+            }
+
+            const activeManager = isExternalTransaction ? txManager : queryRunner.manager;
+            const salesRepo = activeManager.getRepository(SalesOrder);
+
+            const targetSO = await salesRepo.findOne({
+                where: { id: soId, tenantId },
+                relations: ['items']
+            });
+
+            if (!targetSO) {
+                throw new Error(`[SalesService] Sales Order not found for ID: ${soId}`);
+            }
+
+            if (targetSO.status !== 'DRAFT') {
+                throw new Error(`[SalesService] Sales Order cannot be finalized. Current status is '${targetSO.status}', expected 'DRAFT'.`);
+            }
+
+            console.log(`[SalesService] Finalizing DRAFT Sales Order: ${targetSO.soNumber}`);
+
+            targetSO.status = 'APPROVED'; 
+            const finalizedSO = await salesRepo.save(targetSO);
+
+            // 🔥 Deduct Stock: Execute the stock deduction now that the draft is finalized
+            await this.decrementProductStock(activeManager, tenantId, finalizedSO.items);
+
+            if (!isExternalTransaction && queryRunner) {
+                await queryRunner.commitTransaction();
+            }
+
+            return finalizedSO;
+        } catch (error) {
+            if (!isExternalTransaction && queryRunner) await queryRunner.rollbackTransaction();
+            throw error;
+        } finally {
+            if (!isExternalTransaction && queryRunner) await queryRunner.release();
+        }
+    }
+
+    /**
+ * PATCH Action: Shifts status cleanly without evaluating product inventory stock deltas.
+ */
+async updateSalesOrderStatus(
+    soId: number,
+    tenantId: number,
+    newStatus: string, // Passes "PENDING_APPROVAL"
+    manager?: EntityManager
+): Promise<SalesOrder> {
+    const activeManager = manager ? manager : AppDataSource.manager;
+    const salesRepo = activeManager.getRepository(SalesOrder);
+
+    const targetSO = await salesRepo.findOne({
+        where: { id: soId, tenantId }
+    });
+
+    if (!targetSO) {
+        throw new Error(`[SalesService] Sales Order not found for ID: ${soId}`);
+    }
+
+    if (targetSO.status !== 'DRAFT') {
+        throw new Error(`[SalesService] Only DRAFT sales orders can be submitted for approval.`);
+    }
+
+    targetSO.status = newStatus;
+    return await salesRepo.save(targetSO);
+}
+
+/**
+ * Strict Action: Commits a PENDING_APPROVAL Sales Order to an active APPROVED state,
+ * verifying limits and directly executing real-time stock deductions.
+ */
+async approvePendingSalesOrder(
+    soId: number,
+    tenantId: number,
+    manager?: EntityManager
+): Promise<SalesOrder> {
+    const isExternalTransaction = !!manager;
+    const txManager = isExternalTransaction ? manager! : AppDataSource.manager;
+    let queryRunner: any = null;
+
+    try {
+        if (!isExternalTransaction) {
+            queryRunner = AppDataSource.createQueryRunner();
+            await queryRunner.connect();
+            await queryRunner.startTransaction();
+        }
+
+        const activeManager = isExternalTransaction ? txManager : queryRunner.manager;
+        const salesRepo = activeManager.getRepository(SalesOrder);
+
+        const targetSO = await salesRepo.findOne({
+            where: { id: soId, tenantId },
+            relations: ['items']
+        });
+
+        if (!targetSO) {
+            throw new Error(`[SalesService] Sales Order not found for ID: ${soId}`);
+        }
+
+        // State Change Check: Make sure it's coming from PENDING_APPROVAL now
+        if (targetSO.status !== 'PENDING_APPROVAL') {
+            throw new Error(`[SalesService] Sales Order cannot be approved. Current status is '${targetSO.status}', expected 'PENDING_APPROVAL'.`);
+        }
+
+        console.log(`[SalesService] Approving Sales Order: ${targetSO.soNumber}`);
+
+        targetSO.status = 'APPROVED'; 
+        const finalizedSO = await salesRepo.save(targetSO);
+
+        // 🔥 Deduct Stock: Runs your deep conversion factor and safety validation checks
+        await this.decrementProductStock(activeManager, tenantId, finalizedSO.items);
+
+        if (!isExternalTransaction && queryRunner) {
+            await queryRunner.commitTransaction();
+        }
+
+        return finalizedSO;
+    } catch (error) {
+        if (!isExternalTransaction && queryRunner) await queryRunner.rollbackTransaction();
+        throw error;
+    } finally {
+        if (!isExternalTransaction && queryRunner) await queryRunner.release();
+    }
+}
 
     private async getConversionFactor(
         txManager: EntityManager,

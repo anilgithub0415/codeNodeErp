@@ -26,8 +26,7 @@ router.route('/:tenantId')
             }
 
             const challans = await dcService.getChallans(tenantId);
-            console.log('getChallans:',challans);
-            
+                      
             res.status(200).json(challans);
         } catch (error: any) {
             console.error('Failed to retrieve Challans:', error.message || error);

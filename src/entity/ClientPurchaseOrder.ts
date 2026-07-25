@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany, Check } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany, Check, Index } from 'typeorm';
 import { ClientPurchaseOrderItem } from './ClientPurchaseOrderItem';
 
 export enum POStatus {
@@ -15,6 +15,7 @@ export enum POStatus {
 //few more statuses://'PENDING_REVIEW' | 'ACCEPTED' | 'REJECTED' | 'PARTIALLY_CONVERTED';
 
 @Entity("client_purchase_orders")
+@Index(['tenantId', 'clientPoNumber'], { unique: true }) 
 export class ClientPurchaseOrder {
     @PrimaryGeneratedColumn('increment')
     id!: number;
@@ -35,6 +36,9 @@ export class ClientPurchaseOrder {
 
     @Column({ name: 'client_po_number', type: 'varchar', length: 50 })
     clientPoNumber!: string; 
+
+    @Column({ name: 'site_id', type: 'int', nullable: true })
+siteId!: number | null; // 👈 Make sure this camelCase variable exists!
 
     @Column({ name: 'po_date', type: 'date' })
     poDate!: Date; 

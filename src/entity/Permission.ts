@@ -1,24 +1,28 @@
-import { Entity, PrimaryColumn, Column, ManyToMany, CreateDateColumn, UpdateDateColumn } from 'typeorm';
-import { UserRoleLookup } from './UserRoleLookup'; // Import UserRoleLookup entity
+// src/entity/Permission.ts
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany, CreateDateColumn, UpdateDateColumn, Index } from 'typeorm';
+import { RolePermission } from './RolePermission'; 
 
 @Entity({ name: 'Permission' })
+@Index(['tenantId', 'permissionName'], { unique: true }) 
 export class Permission {
-    @PrimaryColumn({ type: 'nvarchar', length: 255, name: 'PermissionName' })
-    permissionName!: string; // e.g., 'user.create', 'person.view.all', 'assignment.grade'
+    @PrimaryGeneratedColumn() 
+    id!: number;
+
+    @Column({ type: 'int', default: 1, name: 'tenantId' })
+    tenantId!: number;
+
+    @Column({ type: 'nvarchar', length: 255, name: 'PermissionName' })
+    permissionName!: string; 
 
     @Column({ type: 'nvarchar', length: 500, nullable: true })
     description?: string | null;
 
-    @Column({ type: 'bit', default: true })
+    @Column({ type: 'bit', default: true })  
     isActive!: boolean;
 
-    // --- Many-to-Many relationship with UserRoleLookup ---
-    // Many permissions can be assigned to many roles.
-    // The inverse side of UserRoleLookup.permissions
-    @ManyToMany(() => UserRoleLookup, userRole => userRole.permissions)
-    roles?: UserRoleLookup[];
+    @OneToMany(() => RolePermission, (rolePermission) => rolePermission.permission)
+    rolePermissions?: RolePermission[];
 
-    // Audit fields
     @CreateDateColumn({ type: 'datetime2', name: 'CreatedAt' })
     createdAt!: Date;
 

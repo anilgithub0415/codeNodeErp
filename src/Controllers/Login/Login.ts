@@ -5,7 +5,7 @@ import * as LoginService from '../../services/LoginServiceTypeorm_1'; // Changed
 import {  CreateUserDto, RegisterAndSubscribeDto } from '../../dto/CreateUser.dto';
 import { getUserRepository } from '../../dependencies';
 import { getRefreshTokenRepository } from '../../dependencies';
-import { getSettingsServiceRepository } from '../../dependencies';
+import { getSeuritySettingsServiceRepository } from '../../dependencies';
 import { User } from '../../entity/User';
 import { AppDataSource } from '../../../data-source';
 import { SubscriptionPlanLookup } from '../../entity/SubscriptionPlanLookup';
@@ -203,7 +203,7 @@ router.post('/register-and-subscribeAtomic', async (req: Request<{}, {}, Registe
 
 //     const userService = getUserRepository();
 //     const refreshTokenRepo = getRefreshTokenRepository();
-//     const settingsService = getSettingsServiceRepository();
+//     const securitySettingsService = getSeuritySettingsServiceRepository();
 //     const userTenantContextRepo = AppDataSource.getRepository(UserTenantContext);
 
 //     try {
@@ -247,7 +247,7 @@ router.post('/register-and-subscribeAtomic', async (req: Request<{}, {}, Registe
 //         const userPermissions = userContext!.role.permissions ? userContext!.role.permissions.map(p => p.permissionName) : [];
 
 //         // 5. Generate a NEW, context-specific Access Token
-//         const currentAccessTokenLifetime = settingsService.getSettings().accessTokenLifetime;
+//         const currentAccessTokenLifetime = securitySettingsService.getSettings().accessTokenLifetime;
 //         const payload: ContextSpecificJwtPayload = {
 //             userId: user!.id,
 //             userName: user!.userName,
@@ -258,7 +258,7 @@ router.post('/register-and-subscribeAtomic', async (req: Request<{}, {}, Registe
 //         const accessToken = jwt.sign(payload, ACCESS_TOKEN_SECRET, { expiresIn: currentAccessTokenLifetime });
 
 //         // 6. Generate and save a NEW Refresh Token (for rotation)
-//         const currentRefreshTokenLifetime = settingsService.getSettings().refreshTokenLifetime;
+//         const currentRefreshTokenLifetime = securitySettingsService.getSettings().refreshTokenLifetime;
 //         const newRefreshTokenString = uuidv4();
 //         const newExpiresAt = new Date(Date.now() + currentRefreshTokenLifetime * 1000);
 
@@ -293,7 +293,7 @@ router.post('/register-and-subscribeAtomic', async (req: Request<{}, {}, Registe
 
 //     const userService = getUserRepository();
 //     const refreshTokenRepo = getRefreshTokenRepository();
-//     const settingsService = getSettingsServiceRepository();
+//     const securitySettingsService = getSeuritySettingsServiceRepository();
 //     const userTenantContextRepo = AppDataSource.getRepository(UserTenantContext);
 
 //     try {
@@ -352,7 +352,7 @@ router.post('/register-and-subscribeAtomic', async (req: Request<{}, {}, Registe
 //         const userPermissions = userContext!.role.permissions ? userContext!.role.permissions.map(p => p.permissionName) : [];
 
 //         // 5. Generate a NEW, context-specific Access Token
-//         const currentAccessTokenLifetime = settingsService.getSettings().accessTokenLifetime;
+//         const currentAccessTokenLifetime = securitySettingsService.getSettings().accessTokenLifetime;
 //         const payload: ContextSpecificJwtPayload = {
 //             userId: user!.id,
 //             userName: user!.userName,displayName:user!.displayName!,
@@ -362,7 +362,7 @@ router.post('/register-and-subscribeAtomic', async (req: Request<{}, {}, Registe
 //         const accessToken = jwt.sign(payload, ACCESS_TOKEN_SECRET, { expiresIn: currentAccessTokenLifetime });
 
 //         // 6. Generate and save a NEW Refresh Token (for rotation)
-//         const currentRefreshTokenLifetime = settingsService.getSettings().refreshTokenLifetime;
+//         const currentRefreshTokenLifetime = securitySettingsService.getSettings().refreshTokenLifetime;
 //         const newRefreshTokenString = uuidv4();
 //         const newExpiresAt = new Date(Date.now() + currentRefreshTokenLifetime * 1000);
 
@@ -462,11 +462,11 @@ console.log('crosscheck 2');
             }
 
             // 4. Extract permissions
-            const userPermissions = userContext.role.permissions ? userContext.role.permissions.map((p:any) => p.permissionName) : [];
+            const userPermissions = userContext.role.rolePermissions ? userContext.role.rolePermissions.map((p:any) => p.permissionName) : []; //here was error for .permissions
 
             // 5. Generate NEW Access Token
-            const settingsService = getSettingsServiceRepository();
-            const currentAccessTokenLifetime = settingsService.getSettings().accessTokenLifetime;
+            const securitySettingsService = getSeuritySettingsServiceRepository();
+            const currentAccessTokenLifetime = securitySettingsService.getSettings().accessTokenLifetime;
 
             const payload: ContextSpecificJwtPayload = {
                 userId: user.id,
@@ -479,7 +479,7 @@ console.log('crosscheck 2');
                 availableContexts: [{
                     userId: user.id,
                     tenantId: userContext.tenantId,
-                    tenantName: userContext.user.tenant.tenantName,
+                    tenantName: userContext.user.tenant!.tenantName,
                     roleName: userContext.roleName,
                     permissions: userPermissions
                 }]
@@ -487,7 +487,7 @@ console.log('crosscheck 2');
             const accessToken = jwt.sign(payload, ACCESS_TOKEN_SECRET, { expiresIn: currentAccessTokenLifetime });
 
             // 6. Generate and save a NEW Refresh Token
-            const currentRefreshTokenLifetime = settingsService.getSettings().refreshTokenLifetime;
+            const currentRefreshTokenLifetime = securitySettingsService.getSettings().refreshTokenLifetime;
             const newRefreshTokenString = uuidv4();
             const newExpiresAt = new Date(Date.now() + currentRefreshTokenLifetime * 1000);
 console.log('crosscheck 4');
@@ -508,8 +508,8 @@ console.log('crosscheck 4');
                 userId: user.id,
                 displayName: user.displayName,
                 tenantId: userContext.tenantId,
-                tenantName: userContext.user.tenant.tenantName,
-                tenantType: userContext.user.tenant.tenantTypeName,
+                tenantName: userContext.user.tenant!.tenantName,
+                tenantType: userContext.user.tenant!.tenantTypeName,
                 roleName: userContext.roleName,
                 permissions: userPermissions
             };

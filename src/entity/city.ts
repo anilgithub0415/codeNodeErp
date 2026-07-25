@@ -3,12 +3,14 @@
 
 
 // src/entity/City.ts
-import { Entity, PrimaryColumn, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryColumn, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { Tenant } from './Tenant';
 
 
 // This class defines the structure of your 'City' table in the database.
 @Entity({ name: 'City' }) 
+@Index(['tenantId', 'cityName'], { unique: true }) 
+
 export class City {
 
     @PrimaryGeneratedColumn()

@@ -4,6 +4,14 @@ import { MinLength } from 'class-validator';
 import { Site } from './Site';
 import { Customer } from './Customer';
 
+/*
+corrected summary: 
+in master detail relation in 
+      1. master use cascade: true   
+      2. child onDelete: 'CASCADE'  , orphanedRowAction: "delete"  
+  
+  In flat entity (not a masterdetail) specify onDelete: 'NO ACTION' and never say onDelete: 'cascade'
+ */
 
 @Entity("sales_orders")
 export class SalesOrder{
@@ -58,7 +66,7 @@ export class SalesOrder{
     @Column({ name: "total_amount", type: "decimal", precision: 10, scale: 2, default: 0 })
     totalAmount!: number;
 
-    @OneToMany(() => SalesOrderItem, (item: SalesOrderItem) => item.salesOrder, { cascade: true })
+    @OneToMany(() => SalesOrderItem, (item: SalesOrderItem) => item.salesOrder, { cascade: true , orphanedRowAction: "delete"  })
     items!: SalesOrderItem[];
 
     @Column({ type: 'simple-json', nullable: true })

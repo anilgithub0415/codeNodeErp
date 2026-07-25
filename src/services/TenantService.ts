@@ -46,6 +46,7 @@ class TenantService {
     async init(tenantRepo: Repository<Tenant>,
         tenantTypeLookupRepo: Repository<TenantTypeLookup>,
         subscriptionPlanLookupRepo: Repository<SubscriptionPlanLookup>): Promise<void> {
+            
         this.tenantRepository = tenantRepo
         this.tenantTypeLookupRepository = tenantTypeLookupRepo;
         this.subscriptionPlanLookupRepository = subscriptionPlanLookupRepo;

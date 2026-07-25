@@ -26,7 +26,7 @@ export class ProductUomConversion {
     @Column({ type: 'int' })
     tenantId!: number;
 
-    @ManyToOne(() => Tenant, { onDelete: 'CASCADE' })
+    @ManyToOne(() => Tenant, { onDelete: 'NO ACTION' })
     @JoinColumn({ name: 'tenantId' })
     tenant!: Tenant;
 
@@ -34,7 +34,7 @@ export class ProductUomConversion {
     @Column({ name: 'product_id', type: 'int', nullable: true })
     productId!: number | null;
 
-    @ManyToOne(() => Product, { onDelete: 'CASCADE', nullable: true })
+    @ManyToOne(() => Product, { onDelete: 'NO ACTION', nullable: true })
     @JoinColumn({ name: 'product_id' })
     product!: Product | null;
 
@@ -42,7 +42,7 @@ export class ProductUomConversion {
     @Column({ name: 'product_variant_id', type: 'int', nullable: true })
     productVariantId!: number | null;
 
-    @ManyToOne(() => ProductVariant, { onDelete: 'CASCADE', nullable: true })
+    @ManyToOne(() => ProductVariant, { onDelete: 'NO ACTION', nullable: true })
     @JoinColumn({ name: 'product_variant_id' })
     productVariant!: ProductVariant | null;
 

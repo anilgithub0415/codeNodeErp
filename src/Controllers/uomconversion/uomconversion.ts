@@ -53,11 +53,7 @@ router.use((req, res, next) => {
     router.route('/:tenantId')
     .get(async (req: Request, res: Response) => {
         try {
-            
-            console.log('its hitting uom conversion....................');
-            
-        
-            
+                             
             const productUomConversionService = getProductUomConversionRepository(); // <--- Get the singleton instance from dependencies.ts
            var tenantId=parseInt(req.params.tenantId)
              var productId= parseInt( req.query?.productId?.toString()!);
@@ -83,7 +79,7 @@ router.route('')
             const productUomConversionService = getProductUomConversionRepository(); // <--- Get the singleton instance from dependencies.ts
 
             // Basic validation
-            // if (!req.body.siteName ||!req.body.contactPersonName
+            // if (!req.body.siteName ||!req.body.siteContactPerson
             //       ) {
             //     console.log('Basic validation fail like site name, base_price missing');
             // }
@@ -93,7 +89,7 @@ router.route('')
 
           console.log('.........................................................usercontext body:',req.body);
 
-          const { tenantId,siteName, contactPersonName } = req.body;
+         // const { tenantId,siteName } = req.body;
             const site = await productUomConversionService.createProductUomConversion(req.body);
 
             // Remove sensitive data (like password) before sending to client

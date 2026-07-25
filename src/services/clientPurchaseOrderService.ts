@@ -80,8 +80,7 @@ export class ClientPurchaseOrderService {
         });
 
         if (existingPo) {
-            console.log(`Found existing Client PO: ${existingPo.clientPoNumber}, performing update.`);
-            
+                       
             // Prevent payload from overwriting the established PO number
             const { clientPoNumber, ...updateData } = createDto;
 

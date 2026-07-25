@@ -1,7 +1,7 @@
 // src/Controllers/User/User_1.ts
 import { Router, Request, Response } from 'express';
 // Import the specific getter for UserService from dependencies.ts
-import {    getCityRepository, getCustomerCategoryServiceRepository, getCustomerServiceRepository, getHSNRepository, getLeadSourceServiceRepository, getProductRepository, getProductTemplateRepository, getUserRepository, getVendorRepository } from '../../dependencies'; // <--- Get the service via getter
+import {    getCityRepository, getCustomerCategoryServiceRepository, getCustomerServiceRepository, getDiscountTypeRepository, getHSNRepository, getLeadSourceServiceRepository, getProductCategoryRepository, getProductRepository, getProductTemplateRepository, getSubscriptionPlanLookupRepository, getTenantTypeRepository, getUserRepository, getVendorRepository } from '../../dependencies'; // <--- Get the service via getter
 import { Leadsource } from '../../entity/LeadSource';
 
 interface FirmTypeLookup {
@@ -17,7 +17,7 @@ const router = Router();
   //custcategoriesTypes
     router.route('/customerCategoryTypes/ptenantId/:ptenantId')
     .get(async (req: Request, res: Response) => {
-        console.log('this is cattypes get');
+        
         try {
             
             const customerCategoryService = getCustomerCategoryServiceRepository(); // <--- Get the singleton instance from dependencies.ts
@@ -40,7 +40,7 @@ const router = Router();
 //customerTypes
 router.route('/customerTypes/ptenantId/:ptenantId')
     .get(async (req: Request, res: Response) => {
-        console.log('this is customerTypes get');
+        
         try {
             
             const customerService = getCustomerServiceRepository(); // <--- Get the singleton instance from dependencies.ts
@@ -65,7 +65,7 @@ router.route('/customerTypes/ptenantId/:ptenantId')
 //customerWithFirmTypes
 router.route('/customerWithFirmTypes/ptenantId/:ptenantId')
     .get(async (req: Request, res: Response) => {
-        console.log('this is customerTypes get');
+        
         try {
             
             const customerService = getCustomerServiceRepository(); // <--- Get the singleton instance from dependencies.ts
@@ -74,7 +74,8 @@ router.route('/customerWithFirmTypes/ptenantId/:ptenantId')
         
             const customers = await customerService.getCustomers(activeTenantId);//pass tenantId here as parameter
             var customerWithFirmTypesAsLookup:FirmTypeLookup[]=[];
-            customers.map(aCust => {
+            customers.map(aCust => { 
+          
                 // const {  customerName,id } = item; // Destructure to extract id and name
                 // return { label: customerName, value:id };      // Return a new object with only id and name
                       if (aCust.sites && aCust.sites.length > 0) {
@@ -110,8 +111,7 @@ const paddedCustomer = aCust.customerName.padEnd(customerWidth, 'c');
     //roleTypes
     router.route('/roleTypes/ptenantId/:ptenantId')
     .get(async (req: Request, res: Response) => {
-        console.log('this is rtypes get');
-        
+                
         try {
             
             const userService = getUserRepository(); // <--- Get the singleton instance from dependencies.ts
@@ -131,11 +131,56 @@ const paddedCustomer = aCust.customerName.padEnd(customerWidth, 'c');
             res.status(500).json({ "message": "Failed to retrieve roleType: " + error.message });
         }
     });
+    //tenantTypes
+    router.route('/tenantTypes/ptenantId/:ptenantId')
+    .get(async (req: Request, res: Response) => {
+                
+        try {
+            
+            const tenantTypeService = getTenantTypeRepository(); // <--- Get the singleton instance from dependencies.ts
+           
+            const tenantTypes = await tenantTypeService.getTenantTypes();//pass tenantId here as parameter
+            var tenantTypesAsLookup=tenantTypes.map(item => {
+                const {  typeName } = item; // Destructure to extract id and name
+                return { label: typeName, value:typeName };      // Return a new object with only id and name
+              });
+
+              
+              
+            res.status(200).json(tenantTypesAsLookup);
+        } catch (error: any) {
+            console.error('Failed to retrieve tenantTypes:', error.message || error);
+            res.status(500).json({ "message": "Failed to retrieve roleType: " + error.message });
+        }
+    });
+
+    //subscriptionTypes
+    router.route('/subscriptionTypes/ptenantId/:ptenantId')
+    .get(async (req: Request, res: Response) => {
+                
+        try {
+            
+            const subscriptionTypeService = getSubscriptionPlanLookupRepository(); // <--- Get the singleton instance from dependencies.ts
+           
+            const subscriptionTypes = await subscriptionTypeService.getSubscriptionPlans();//pass tenantId here as parameter
+            var subscriptionTypesAsLookup=subscriptionTypes.map(item => {
+                const {  planName } = item; // Destructure to extract id and name
+                return { label: planName, value:planName };      // Return a new object with only id and name
+              });
+
+              
+              
+            res.status(200).json(subscriptionTypesAsLookup);
+        } catch (error: any) {
+            console.error('Failed to retrieve subscriptionTypes:', error.message || error);
+            res.status(500).json({ "message": "Failed to retrieve roleType: " + error.message });
+        }
+    });
+
 //productTypes use this for flat product
     router.route('/productTypes/ptenantId/:ptenantId')
     .get(async (req: Request, res: Response) => {
-        console.log('this is rtypes get');
-        
+             
         try {
             
             const productService = getProductRepository(); // <--- Get the singleton instance from dependencies.ts
@@ -211,10 +256,100 @@ const paddedCustomer = aCust.customerName.padEnd(customerWidth, 'c');
         }
     });
 
+  //productCetegoriesTypes
+    router.route('/productCetegoryTypes/ptenantId/:ptenantId')
+    .get(async (req: Request, res: Response) => {
+        
+        try {
+            
+            const productCetegoryService = getProductCategoryRepository(); // <--- Get the singleton instance from dependencies.ts
+            var activeTenantId=parseInt( req.params.ptenantId?.toString());
+
+        
+            const productCetegoryTypes = await productCetegoryService.getCategories(activeTenantId);//pass tenantId here as parameter
+            var productCetegoryTypesAsLookup=productCetegoryTypes.map(item => {
+                const {  id,categoryName } = item; // Destructure to extract id and name
+                return { label: categoryName, value:categoryName };      // Return a new object with only id and name
+              });
+
+                 
+            res.status(200).json(productCetegoryTypesAsLookup);
+        } catch (error: any) {
+            console.error('Failed to retrieve productCetegoryTypes:', error.message || error);
+            res.status(500).json({ "message": "Failed to retrieve productCetegoryTypes: " + error.message });
+        }
+    });
+    
+    router.route('/discountStrategyTypes/ptenantId/:ptenantId')
+    .get(async (req: Request, res: Response) => {
+        
+        
+        try {
+            
+            const discountTypeService = getDiscountTypeRepository(); // <--- Get the singleton instance from dependencies.ts
+            var activeTenantId=parseInt( req.params.ptenantId?.toString());
+
+            const discountTypes = await discountTypeService.getDiscountTypes(activeTenantId);//pass tenantId here as parameter
+            var discountTypeServiceAsLookup=discountTypes.map(item => {
+                const {  id,typeName } = item; // Destructure to extract id and name
+                return { label: typeName, value: id};      // Return a new object with only id and name
+              });
+
+              
+              
+            res.status(200).json(discountTypeServiceAsLookup);
+        } catch (error: any) {
+            console.error('Failed to retrieve leadSourceTypes:', error.message || error);
+            res.status(500).json({ "message": "Failed to retrieve leadSourceType: " + error.message });
+        }
+    });
+
+    //InteractionChannelTypes
+    router.route('/InteractionChannelTypes/ptenantId/:ptenantId')
+    .get(async (req: Request, res: Response) => {
+        
+        
+        try {
+            
+            var InteractionChannel=[
+                  { label: 'Phone', value: 'Phone'},
+                  { label: 'Email', value: 'Email'},
+                  { label: 'Whatsapp', value: 'Whatsapp'},
+                  { label: 'Visit', value: 'Visit'}
+                ]
+              
+              
+            res.status(200).json(InteractionChannel);
+        } catch (error: any) {
+            console.error('Failed to retrieve leadSourceTypes:', error.message || error);
+            res.status(500).json({ "message": "Failed to retrieve leadSourceType: " + error.message });
+        }
+    });
+    //InteractionPurposeTypes
+    router.route('/InteractionPurposeTypes/ptenantId/:ptenantId')
+    .get(async (req: Request, res: Response) => {
+        
+      
+        try {
+            
+            var InteractionPurpose=[{ label: 'Sample Feedback', value: 'Sample Feedback'},
+                                    { label: 'Price Negotiation', value: 'Price Negotiation'}, 
+                                    {label:'Payment Follow-up', value: 'Payment Follow-up'}]
+              
+              
+            res.status(200).json(InteractionPurpose);
+              
+            res.status(200).json(InteractionPurpose);
+        } catch (error: any) {
+            console.error('Failed to retrieve leadSourceTypes:', error.message || error);
+            res.status(500).json({ "message": "Failed to retrieve leadSourceType: " + error.message });
+        }
+    });
+
     //leadSourceTypes
     router.route('/leadSourceTypes/ptenantId/:ptenantId')
     .get(async (req: Request, res: Response) => {
-        console.log('this is leadSources get');
+        
         
         try {
             
@@ -261,11 +396,61 @@ const paddedCustomer = aCust.customerName.padEnd(customerWidth, 'c');
         }
     });
 
+
+//customerMobileTypes
+    router.route('/customerMobileTypes/ptenantId/:ptenantId')
+    .get(async (req: Request, res: Response) => {
+                
+        try {
+            
+            const custService = getCustomerServiceRepository(); // <--- Get the singleton instance from dependencies.ts
+           var activeTenantId=parseInt( req.params.ptenantId?.toString());
+
+            const customerMobileTypes = await custService.getCustomers(activeTenantId);//pass tenantId here as parameter
+            var customerMobileTypesAsLookup=customerMobileTypes.map(item => {
+                const {  commercialContactPhone,id } = item; // Destructure to extract id and name
+                return { commercialContactPhone: commercialContactPhone, value:id };      // Return a new object with only id and name
+              });
+
+              
+              
+            res.status(200).json(customerMobileTypesAsLookup);
+        } catch (error: any) {
+            console.error('Failed to retrieve customerMobileTypes:', error.message || error);
+            res.status(500).json({ "message": "Failed to retrieve vendorType: " + error.message });
+        }
+    });
+
+
+
+//customerEmailIdTypes
+    router.route('/customerEmailIdTypes/ptenantId/:ptenantId')
+    .get(async (req: Request, res: Response) => {
+                
+        try {
+            
+            const custService = getCustomerServiceRepository(); // <--- Get the singleton instance from dependencies.ts
+           var activeTenantId=parseInt( req.params.ptenantId?.toString());
+
+            const customerEmailIdTypes = await custService.getCustomers(activeTenantId);//pass tenantId here as parameter
+            var customerEmailIdTypesAsLookup=customerEmailIdTypes.map(item => {
+                const {  EmailId,id } = item; // Destructure to extract id and name
+                return { EmailId: EmailId, value:id };      // Return a new object with only id and name
+              });
+
+              
+              
+            res.status(200).json(customerEmailIdTypesAsLookup);
+        } catch (error: any) {
+            console.error('Failed to retrieve customerEmailIdTypes:', error.message || error);
+            res.status(500).json({ "message": "Failed to retrieve vendorType: " + error.message });
+        }
+    });
+
 //hsnTypes
     router.route('/hsnTypes/ptenantId/:ptenantId')
     .get(async (req: Request, res: Response) => {
-                console.log('getting hsn lookups');
-                
+                              
         try {
             
             const hsnService = getHSNRepository(); // <--- Get the singleton instance from dependencies.ts

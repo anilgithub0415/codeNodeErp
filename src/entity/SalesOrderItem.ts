@@ -36,7 +36,7 @@ export class SalesOrderItem {
 
     // --- TRANSACTIONAL SNAPSHOTS ---
     @Column({ type: 'varchar', length: 100 })
-    prodName!: string;
+    prodName!: string;  
 
     @Column({ type: 'varchar', length: 50, nullable: true })
     sku!: string | null;

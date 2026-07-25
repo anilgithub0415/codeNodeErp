@@ -9,7 +9,7 @@ import { AppDataSource } from '../../data-source';
 interface CreateSiteDto{
     tenantId:number;
     siteName:string;
-    contactPersonName:string;
+    siteContactPerson:string;
     createdByUserId?:number;
     [key:string]:any;
 }
@@ -37,7 +37,7 @@ export class SiteService{
             ptenantId:number,   pProdId:number,        
             manager?: EntityManager
         ): Promise<Site> {
-console.log('hitting url sites');
+
              if (!this.siteRepository) {
                         throw new Error("SiteService repository not initialized. Call init() first.");
                     }
@@ -56,16 +56,16 @@ console.log('hitting url sites');
             ptenantId:number,           
             manager?: EntityManager
         ): Promise<Site[]> {
-console.log('hitting url sites');
+
              if (!this.siteRepository) {
                         throw new Error("SiteService repository not initialized. Call init() first.");
                     }
 
-                    console.log('ptenantId:',ptenantId);
+                  
                     
                     const siteRepository = manager ? manager.getRepository(Site) : this.siteRepository;
                     const ps= await siteRepository.find({where:{tenantId:ptenantId} }); // Use find() to get all 
-                    console.log('sites count:',ps.length);
+                    
                     
                     return ps;
                 }
@@ -113,7 +113,7 @@ console.log('hitting url sites');
         let aSite = await siteRepo.findOne({ where: queryCondition });
        
         if (aSite) {
-            console.log(`Found existing site for update: ${createDto.siteName}`);
+          
             
             // 💡 Precaution 2: Use deep assignment logic if 'customer' is passed as an object
             // This guarantees TypeORM tracks the foreign key change correctly

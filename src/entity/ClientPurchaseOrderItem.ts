@@ -34,22 +34,20 @@ export class ClientPurchaseOrderItem {
     
         // --- TRANSACTIONAL SNAPSHOTS ---
         // Critical for audit compliance: stores values exactly as they were when purchased
-        @Column({ type: 'varchar', length: 100 })
-        prodName!: string;
+       @Column({ name: 'prod_name', type: 'varchar', length: 100 }) // 👈 Explicit name map fixed your error
+prodName!: string;
+       @Column({ name: 'sku', type: 'varchar', length: 50, nullable: true })
+sku!: string | null;
     
-        @Column({ type: 'varchar', length: 50, nullable: true })
-        sku!: string | null;
-    
-        @Column({ type: 'decimal', precision: 10, scale: 2, default: 1.00 })
-        quantity!: number;
+       @Column({ name: 'quantity', type: 'decimal', precision: 10, scale: 2, default: 1.00 })
+quantity!: number;
     
         // Renamed from 'price' to 'finalPrice' to match billing conventions
-        @Column({ name: 'finalPrice', type: 'decimal', precision: 10, scale: 2, default: 0.00 })
-        finalPrice!: number;
-    
+        @Column({ name: 'final_price', type: 'decimal', precision: 10, scale: 2, default: 0.00 }) // 👈 Matches your snake_case DB standard
+finalPrice!: number;
         // Add this tracking property inside your PurchaseOrderItem.ts entity file
         @Column({ name: 'purchase_uom', type: 'varchar', length: 20, nullable: true })
-        purchaseUom!: string | null;
+purchaseUom!: string | null;
     
 
     @CreateDateColumn({ name: 'created_at' })

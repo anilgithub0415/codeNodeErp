@@ -41,7 +41,7 @@ router.route('/:tenantId/:id')
             var tenantId=parseInt(req.params.tenantId)
            
             const sos = await salesService.getSOs( tenantId!);
-            console.log('SalesOrders:',sos);
+           
            
              res.status(200).json(sos);
         } catch (error: any) {
@@ -54,11 +54,7 @@ router.route('/:tenantId/:id')
     router.route('/fetchTenantRulesMatrix/:tenantId/:productId/:productVariantId')
     .get(async (req: Request, res: Response) => {
         try {
-            console.log('hitting fetchTenantRulesMatrix..........');
-            
-            
-        
-            
+             
             const salesService = getSalesOrderRepository(); 
 
             var activeTenantId=parseInt(req.query?.activeTenantId?.toString()!);
@@ -232,6 +228,97 @@ router.route('/:id')
             return res.status(400).json({ message: 'Sales Order update failed: ' + error.message });
         }
     });
+
+
+    
+
+    // =====================================================================
+// DELETE: TERMINATE DRAFT OR VOID/CANCEL SUBMITTED SALES ORDER
+// if it is DRAFT deletes it (hard delete)
+// if it is non DRAFT cancel flag
+// =====================================================================
+router.route('/:id')
+    .delete(async (req: Request, res: Response) => {
+        try {
+            const salesService = getSalesOrderRepository(); 
+            const targetSoId = parseInt(req.params.id, 10);
+
+            // 1. Validate route path variable matching constraints
+            if (isNaN(targetSoId)) {
+                return res.status(400).json({ message: 'Invalid Sales Order identification tracking path.' });
+            }
+
+            const loggedInTenantId = req.user.tenantId;
+
+            // 2. Fetch the entity context using the ID to obtain the required immutable 'soNumber'
+            // NOTE: Replace 'findOne' syntax or method calls to match your exact base repository usage if needed
+            const salesOrderInstance = await AppDataSource.getRepository(SalesOrder).findOne({
+                where: { id: targetSoId, tenantId: loggedInTenantId }
+            });
+
+            if (!salesOrderInstance) {
+                return res.status(404).json({ message: `Sales Order record with identification tracking index ${targetSoId} not found.` });
+            }
+
+            // 3. Forward straight into service transactional persistence layer engine
+            const operationResult = await salesService.handleDeleteOrCancelRequest(
+                loggedInTenantId,
+                salesOrderInstance.soNumber
+            );
+
+            // 4. Return appropriate status codes based on the service layer execution results
+            // 'DELETED' returns 200 OK or 204 No Content, 'CANCELLED' returns 200 OK with the modified state payload
+            return res.status(200).json(operationResult);
+
+        } catch (error: any) {
+            console.error('Sales Order removal/cancellation failed:', error.message || error);
+            
+            // Handle forbidden updates explicitly if thrown from service check guards
+            if (error.message && error.message.includes('Forbidden') || error.message.includes('Cannot cancel')) {
+                return res.status(403).json({ message: 'Action Forbidden: ' + error.message });
+            }
+
+            return res.status(400).json({ message: 'Sales Order removal execution failed: ' + error.message });
+        }
+    });
+// =========================================================
+// PATCH: SUBMIT DRAFT TO WORKFLOW (NO INVENTORY CHANGED)
+// =========================================================
+router.route('/:id/finalize').patch(async (req: Request, res: Response) => {
+    try {
+        const salesService = getSalesOrderRepository(); 
+        const targetSoId = parseInt(req.params.id, 10);
+        const loggedInTenantId = parseInt(req.user.tenantId, 10);
+
+        const result = await salesService.updateSalesOrderStatus(
+            targetSoId,
+            loggedInTenantId,
+            "PENDING_APPROVAL"
+        );
+        return res.status(200).json(result);
+    } catch (error: any) {
+        return res.status(400).json({ message: 'Submission failed: ' + error.message });
+    }
+});
+
+// =========================================================
+// PATCH: APPROVE PENDING SALES ORDER (DEDUCTS CURRENT STOCK)
+// =========================================================
+router.route('/:id/approve').patch(async (req: Request, res: Response) => {
+    try {
+        const salesService = getSalesOrderRepository(); 
+        const targetSoId = parseInt(req.params.id, 10);
+        const loggedInTenantId = parseInt(req.user.tenantId, 10);
+
+        const result = await salesService.approvePendingSalesOrder(
+            targetSoId,
+            loggedInTenantId
+        );
+        return res.status(200).json(result);
+    } catch (error: any) {
+        return res.status(400).json({ message: 'Approval failed: ' + error.message });
+    }
+});
 
 export default router;
 

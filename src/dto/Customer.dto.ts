@@ -1,9 +1,10 @@
 // src/dto/CreateCustomer.dto.ts
 export interface SiteDto {
   id?: number;
+  tenantId:number;
   siteName: string;
      // <-- id of CustomerCategory
-  contactPersonName?: string;
+  siteContactPerson?: string;
   
   
 }
@@ -13,7 +14,7 @@ export interface CreateCustomerDto {
   tenantId: number;
   customerName: string;
   customerCategoryId: string;
-  mobileNumber?: string;
+  commercialContactPhone?: string;
   EmailId?: string;
   city?: number;
   sites: SiteDto[];

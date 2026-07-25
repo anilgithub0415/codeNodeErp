@@ -7,7 +7,7 @@ import { AppDataSource } from '../../../data-source';
 interface CreateSiteRequestBody{
     tenantId:number,
     siteName:string,
-    contactPersonName:string
+    siteContactPerson:string
    
 }
 const router = Router();

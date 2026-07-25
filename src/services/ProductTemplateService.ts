@@ -40,7 +40,7 @@ export class ProductTemplateService{
             ptenantId:number,   pProdId:number,        
             manager?: EntityManager
         ): Promise<ProductTemplate> {
-console.log('hitting url products');
+
              if (!this.productTemplateRepository) {
                         throw new Error("ProductTemplateService repository not initialized. Call init() first.");
                     }
@@ -59,16 +59,16 @@ console.log('hitting url products');
             ptenantId:number,           
             manager?: EntityManager
         ): Promise<ProductTemplate[]> {
-console.log('hitting url products');
+
              if (!this.productTemplateRepository) {
                         throw new Error("ProductTemplateService repository not initialized. Call init() first.");
                     }
 
-                    console.log('ptenantId:',ptenantId);
+                    
                     
                     const productRepository = manager ? manager.getRepository(ProductTemplate) : this.productTemplateRepository;
                     const ps= await productRepository.find({where:{tenantId:ptenantId},relations:['variants']}); // Use find() to get all 
-                    console.log('products count:',ps.length);
+                    
                     
                     return ps;
                 }

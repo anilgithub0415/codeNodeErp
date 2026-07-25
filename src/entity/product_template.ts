@@ -1,11 +1,13 @@
 // src/entity/ProductTemplate.ts
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, OneToMany, Index } from 'typeorm';
 import { Tenant } from './Tenant';
 import { ProductVariant } from './productVariant';
 import { HsnTaxRule } from './HsnTaxRule';
-
+import { ProductCategory } from './ProductCategory'; // 🌟 Imported new category entity
 
 @Entity({ name: 'ProductTemplate' }) 
+@Index(['tenantId', 'prodName'], { unique: true }) // Prevents identical product names within the same tenant
+
 export class ProductTemplate {
 
     @PrimaryGeneratedColumn()
@@ -21,7 +23,7 @@ export class ProductTemplate {
     @Column({ name: 'prod_name', type: 'nvarchar', length: 100 }) // Increased length for descriptive template names
     prodName!: string; 
     
-     @Column({ name: 'description', type: 'nvarchar', length: 500, nullable: true }) // Increased length for rich details
+    @Column({ name: 'description', type: 'nvarchar', length: 500, nullable: true }) // Increased length for rich details
     description!: string | null;
 
     @Column({ name: 'sku', type: 'nvarchar', length: 50, unique: true }) // Added unique constraint for standard B2B lookups
@@ -40,7 +42,6 @@ export class ProductTemplate {
     @Column({ nullable: true })
     createdByUserId!: number;
 
-
     //for default units
     @Column({ name: 'base_uom', type: 'nvarchar', length: 20, default: 'PCS' })
     baseUom!: string; // The system inventory baseline (e.g., 'PCS', 'KG')
@@ -51,7 +52,13 @@ export class ProductTemplate {
     @Column({ name: 'default_sales_uom', type: 'nvarchar', length: 20, default: 'PCS' })
     defaultSalesUom!: string; // Auto-populates Sales Orders
 
-    
+    // 🌟 ADDED CATEGORY RELATIONSHIP LINE ITEMS:
+    @Column({ type: 'int', nullable: true }) // Nullable: true protects existing legacy rows during migrations
+    categoryId!: number | null;
+
+    @ManyToOne(() => ProductCategory, { onDelete: 'NO ACTION' })
+    @JoinColumn({ name: "categoryId" })
+    productCategory!: ProductCategory | null;
 
     // 🌟 ADD THESE LINE ITEMS FOR TAX COMPLIANCE:
     @Column({ type: 'int', nullable: false }) // Make it nullable: true temporary if you have existing seed data

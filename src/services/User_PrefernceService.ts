@@ -56,7 +56,7 @@ async getUser_Preference(
     ptenantId: number, pUserId: number,        
     manager?: EntityManager
 ): Promise<UserPreferences | any> {
-    console.log('hitting url user_Preference for userid:', pUserId);
+    
     if (!this.user_PreferenceRepository) {
         throw new Error("User_PreferenceService repository not initialized. Call init() first.");
     }
@@ -91,11 +91,11 @@ async getUser_Preference(
                         throw new Error("User_PreferenceService repository not initialized. Call init() first.");
                     }
 
-                    console.log('ptenantId:',ptenantId);
+                   
                     
                     const user_PreferenceRepository = manager ? manager.getRepository(UserPreferences) : this.user_PreferenceRepository;
                     const ps= await user_PreferenceRepository.find({where:{tenantId:ptenantId}}); // Use find() to get all 
-                    console.log('user_Preferences count:',ps.length);
+                    
                     
                     return ps;
                 }
@@ -141,7 +141,7 @@ async getUser_Preference(
         let newORexistinguser_Preference: UserPreferences;
 
         if (aUser_Preference) {
-            console.log(`Found existing user_Preference record matching userId: ${targetUserId}`);
+           
           
             // Selective merging to ensure safe updates
             Object.assign(aUser_Preference, {

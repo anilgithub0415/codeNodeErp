@@ -1,648 +1,444 @@
-
-import { EntityManager, Not, Repository } from 'typeorm';
-
+import { EntityManager, Repository } from 'typeorm';
 import { AppDataSource } from '../../data-source'; 
-import { ClientPurchaseOrder } from '../entity/ClientPurchaseOrder';
-import {ClientPurchaseOrderItem} from '../entity/ClientPurchaseOrderItem'
+import { ClientPurchaseOrder, POStatus } from '../entity/ClientPurchaseOrder';
+import { ClientPurchaseOrderItem } from '../entity/ClientPurchaseOrderItem';
 import { Product } from '../entity/Product';
-import { DocumentSequence } from '../entity/DocumentSequence';
 import { ProductVariant } from '../entity/productVariant';
-import { ProductUomConversion } from '../entity/ProductUomConversion';
-import { getProductRepository, getProductUomConversionRepository, getProductVariantRepository } from '../dependencies';
+import { DocumentSequence } from '../entity/DocumentSequence';
 
-export interface ICreateClientPurchaseOrderItemInput {
-    productId?: number;
-    productVariantId?: number;
-    quantity: number;
-    unitPrice?: number;
-    price?: number;
-    clientClientPurchaseUom?: string; // Optional: If empty, code will look up the product default!
+interface CreateClientPoDto {
+    id?:number;
+    tenantId: number;
+    clientId: number;
+    siteId: number | null;
+    clientPoNumber:string;
+    status: string;
+    clientNotes?: string;
+    requestedDeliveryDate?: Date | null;
+    items: Array<{
+        productId: number | null;
+        productVariantId: number | null;
+        quantity: number;
+        purchaseUom: string | null;
+    }>;
 }
 
-interface CreateClientPurchaseOrderDto{
-    tenantId:number;
-    
-    createdByUserId?:number;
-    items: ICreateClientPurchaseOrderItemInput[]; 
-    [key:string]:any;
-}
+export class ClientPurchaseOrderService {
+    private clientPoRepo!: Repository<ClientPurchaseOrder>;
 
-export interface CreatedClientPurchaseOrderResponse {
-    clientClientPurchaseOrder: ClientPurchaseOrder;
-  
-}
-export class ClientPurchaseService{
+    async init(repo: Repository<ClientPurchaseOrder>): Promise<void> {
+        this.clientPoRepo = repo;
+        console.log("ClientPurchaseOrderService backend layer initialized successfully.");
+    }
 
- private clientClientPurchaseRepository!: Repository<ClientPurchaseOrder>;
-
- //============================================================================================================================================
-     /**
-         * Initializes the ClientPurchaseService with its TypeORM repository instances.
-         * This MUST be called AFTER AppDataSource.initialize() has completed.
-         * @param clientClientPurchaseRepo The TypeORM Repository instance for ClientPurchase.
-         */
-        async init(clientClientPurchaseRepo: Repository<ClientPurchaseOrder>
-    ): Promise<void> {
-            this.clientClientPurchaseRepository = clientClientPurchaseRepo;
-           
-                console.log("ClientPurchaseService repository initialized.");       
+        /* ---------------------------------------------------------
+       GET SINGLE CLIENT PO FOR TENANT & ID – Aligned for Client Orders
+       --------------------------------------------------------- */
+    async getClientPO(
+        tenantId: number,
+        cpoId: number,
+        manager?: EntityManager
+    ): Promise<ClientPurchaseOrder[]> {
+        if (!this.clientPoRepo) {
+            throw new Error(
+                'ClientPurchaseOrderService repository not initialized. Call init() first.'
+            );
         }
-//============================================================================================================================================
+
+        const repo = manager
+            ? manager.getRepository(ClientPurchaseOrder)
+            : this.clientPoRepo;
+
+        // Fetches a specific tracking record isolated securely within the tenant space
+        const orders = await repo.find({ 
+            where: { tenantId, id: cpoId }, 
+            relations: { items: true } 
+        });
+      
+        return orders;
+    }
+
+        /* ---------------------------------------------------------
+       GET CLIENT PO LIST FOR TENANT, SITE, & OPTIONAL CLIENT ID
+       --------------------------------------------------------- */
+        /* ---------------------------------------------------------
+       GET CLIENT PO LIST FOR TENANT, SITE, & OPTIONAL CLIENT ID
+       --------------------------------------------------------- */
+    async getClientPOsFiltered(
+        tenantId: number,
+        siteId?: number,
+        clientId?: number,
+        manager?: EntityManager
+    ): Promise<ClientPurchaseOrder[]> {
+        if (!this.clientPoRepo) {
+            throw new Error('ClientPurchaseOrderService repository not initialized.');
+        }
+
+        console.log('Filtering Client Purchase Orders for Tenant:', tenantId, ' Site:', siteId, ' Client:', clientId);
+
+        const repo = manager ? manager.getRepository(ClientPurchaseOrder) : this.clientPoRepo;
+
+        // 1. Initialize the TypeORM conditional query block matching primary tenant indexes
+        const whereConditions: any = { tenantId };
+
+        // 2. Map structural query target arguments securely
+        // Matches your entity declaration line: siteId!: number | null;
+        if (siteId !== undefined && siteId !== null && !isNaN(siteId)) {
+            whereConditions.siteId = siteId;
+        }
+
+        // Matches your entity declaration line: clientId!: number;
+        if (clientId !== undefined && clientId !== null && !isNaN(clientId)) {
+            whereConditions.clientId = clientId;
+        }
+
+        // 3. Execute find operation tracking nested line item sub-tables
+        return await repo.find({
+            where: whereConditions,
+            relations: { items: true },
+            order: { id: 'DESC' } // Most recent purchase rows render on top of grid matrix layouts
+        });
+    }
 
 
+    /* ---------------------------------------------------------
+       GET ALL CLIENT POs FOR TENANT – Aligned for Client Orders
+       --------------------------------------------------------- */
+    async getClientPOs(
+        tenantId: number,
+        manager?: EntityManager
+    ): Promise<ClientPurchaseOrder[]> {
+        if (!this.clientPoRepo) {
+            throw new Error(
+                'ClientPurchaseOrderService repository not initialized. Call init() first.'
+            );
+        }
 
+        const repo = manager
+            ? manager.getRepository(ClientPurchaseOrder)
+            : this.clientPoRepo;
 
-//============================================================================================================================================
-        async createClientPurchaseOrder(
-    createDto: CreateClientPurchaseOrderDto,
+        // Extracts all requisitions under the active multi-tenant workspace context safely
+        const orders = await repo.find({ 
+            where: { tenantId }, 
+            relations: { items: true } 
+        });
+      
+        return orders;
+    }
+
+    /**
+     * Records bare material tracking entries without altering live inventory balances.
+     */
+    async createClientPurchaseOrder(
+    dto: CreateClientPoDto,
     manager?: EntityManager
-): Promise<CreatedClientPurchaseOrderResponse> {
-    console.log('createDto at first..............', createDto);
-    
-    const isExternalTransaction = !!manager;
-    const txManager = isExternalTransaction ? manager! : AppDataSource.manager;
+): Promise<ClientPurchaseOrder> {
+    const isExternalTx = !!manager;
+    const txManager = isExternalTx ? manager! : AppDataSource.manager;
     let queryRunner: any = null;
 
     try {
-        if (!isExternalTransaction) {
+        if (!isExternalTx) {
             queryRunner = AppDataSource.createQueryRunner();
             await queryRunner.connect();
             await queryRunner.startTransaction();
         }
 
-        const activeManager = isExternalTransaction ? txManager : queryRunner.manager;
+        const activeManager = isExternalTx ? txManager : queryRunner.manager;
 
-        const poRepo = activeManager.getRepository(ClientPurchaseOrder);
-        const poiRepo = activeManager.getRepository(ClientPurchaseOrderItem);
+        const cpoRepo = activeManager.getRepository(ClientPurchaseOrder);
+        const cpoiRepo = activeManager.getRepository(ClientPurchaseOrderItem);
         const productRepo = activeManager.getRepository(Product);
         const variantRepo = activeManager.getRepository(ProductVariant);
 
-        let targetOrder: ClientPurchaseOrder;
+        // 1. Generate Sequenced Client PO tracking string safely
+        const generatedNumber = await this.generateInternalSequenceNumber(activeManager);
 
-        // Check if the clientClientPurchase order already exists under this tenant
-        let existingPo = await poRepo.findOne({ 
-            where: { 
-                tenantId: createDto.tenantId, 
-                poNumber: createDto.poNumber,
-                //vendorId: createDto.vendorId
-            } 
+        // 2. Map structural parent fields, forcing initial status to DRAFT
+              // 2. Map structural parent fields, forcing initial status to DRAFT
+        const parentOrder = cpoRepo.create({
+            tenantId: dto.tenantId,
+            clientId: dto.clientId,
+            siteId: dto.siteId || null, // 🚀 FIXED: Assigns your incoming siteId tracking value here!
+            clientPoNumber: generatedNumber,
+            poDate: new Date(),
+            requestedDeliveryDate: dto.requestedDeliveryDate || null,
+            status: POStatus.DRAFT, 
+            totalAmount: 0.00, 
+            clientNotes: dto.clientNotes || '',
+            internalNotes: `Generated by site workflow automation routing.`
         });
-        
-        // --- ENRICH & VALIDATE LINE ITEMS (WITH AUTOMATED UOM FALLBACK) ---
+
+
+        const savedParent = await cpoRepo.save(parentOrder);
         const enrichedItems: ClientPurchaseOrderItem[] = [];
-        
-        for (const itemInput of (createDto.items || [])) {
-            const poi = new ClientPurchaseOrderItem();
-            poi.quantity = Number(itemInput.quantity || 0);
-            poi.finalPrice = Number(itemInput.unitPrice || itemInput.price || 0.00);
 
-            let chosenUom = itemInput.clientClientPurchaseUom?.trim();
+        // 3. Process material records and snapshot string templates
+                // 3. Process material records and snapshot string templates
+        for (const itemInput of dto.items) {
+            const lineItem = cpoiRepo.create();
+            lineItem.clientPurchaseOrderId = savedParent.id;
+            lineItem.clientPurchaseOrder = savedParent;
+            lineItem.quantity = Number(itemInput.quantity || 1);
+            lineItem.finalPrice = 0.00; 
 
-            // Pathway A: Flat Product
+            let chosenUom = itemInput.purchaseUom?.trim();
+
+            // Pathway A: Flat Sanitary Product Template
             if (itemInput.productId && !itemInput.productVariantId) {
-                const product = await productRepo.findOne({ 
-                    where: { id: itemInput.productId, tenantId: createDto.tenantId } 
+                const product = await productRepo.findOne({
+                    where: { id: itemInput.productId, tenantId: dto.tenantId }
                 });
-                if (!product) throw new Error(`Product ID ${itemInput.productId} not found.`);
+                if (!product) throw new Error(`Material Product ID ${itemInput.productId} not found.`);
 
-                // AUTOMATION FALLBACK RULE: Fallback to master default if payload is empty
                 if (!chosenUom) {
-                    chosenUom = product.defaultClientPurchaseUom || product.baseUom;
+                    chosenUom = product.defaultPurchaseUom || product.baseUom || 'PCS';
                 }
 
-                poi.productId = product.id;
-                poi.productVariantId = null; 
-                poi.prodName = product.prodName;
-                poi.sku = product.sku;
-                (poi as any).clientClientPurchaseUom = chosenUom; // Attach tracking descriptor string dynamically
+                lineItem.productId = product.id;
+                lineItem.productVariantId = null;
+                lineItem.prodName = product.prodName;
+                lineItem.sku = product.sku;
+                lineItem.purchaseUom = chosenUom;
 
-            // Pathway B: Variant Template
+            // Pathway B: Variant Sanitary Product Template
             } else if (itemInput.productVariantId && !itemInput.productId) {
                 const variant = await variantRepo.findOne({
                     where: { id: itemInput.productVariantId },
                     relations: ['productTemplate']
                 });
-                if (!variant || variant.productTemplate.tenantId !== createDto.tenantId) {
-                    throw new Error(`Variant ID ${itemInput.productVariantId} not found.`);
+                if (!variant || variant.productTemplate.tenantId !== dto.tenantId) {
+                    throw new Error(`Material Variant ID ${itemInput.productVariantId} not found.`);
                 }
 
-                // AUTOMATION FALLBACK RULE: Pull down default configurations from parent series template
                 if (!chosenUom) {
-                    chosenUom = variant.productTemplate.defaultClientPurchaseUom || variant.productTemplate.baseUom;
+                    chosenUom = variant.productTemplate.defaultPurchaseUom || variant.productTemplate.baseUom || 'PCS';
                 }
 
-                poi.productId = null;
-                poi.productVariantId = variant.id;
-                
                 const sizeStr = variant.size ? ` (${variant.size})` : '';
                 const finishStr = variant.finish ? ` - ${variant.finish}` : '';
-                poi.prodName = `${variant.productTemplate.prodName}${sizeStr}${finishStr}`;
-                poi.sku = variant.sku;
-                (poi as any).clientClientPurchaseUom = chosenUom;
 
+                lineItem.productId = null;
+                lineItem.productVariantId = variant.id;
+                lineItem.prodName = `${variant.productTemplate.prodName}${sizeStr}${finishStr}`;
+                lineItem.sku = variant.sku;
+                lineItem.purchaseUom = chosenUom;
+
+            // 🚀 Pathway C: Fallback for Custom Text Strings (e.g. Free-Text Items like 'MOP1')
             } else {
-                throw new Error("Invalid clientClientPurchase item format. Provide exactly one: productId OR productVariantId.");
+                lineItem.productId = null;
+                lineItem.productVariantId = null;
+                // Use the string name passed down from the router payload mapping layers
+                lineItem.prodName = (itemInput as any).prodName || 'Free-text Product Entry';
+                lineItem.sku = (itemInput as any).sku || null;
+                lineItem.purchaseUom = chosenUom || 'PCS';
             }
 
-            enrichedItems.push(poi);
+            enrichedItems.push(lineItem);
         }
 
-        // --- EXECUTE WRITE OPERATIONS ---
-        if (existingPo) {
-            console.log(`Found existing ClientPurchase Order: ${existingPo.poNumber}, performing update.`);
-            
-            const oldItems = await poiRepo.find({ where: { clientClientPurchaseOrderId: existingPo.id } });
-            await poiRepo.delete({ clientClientPurchaseOrderId: existingPo.id });
 
-            const { poNumber, ...updateData } = createDto;
-            poRepo.merge(existingPo, updateData);  
-            existingPo.items = enrichedItems;
-            targetOrder = await poRepo.save(existingPo);
+        // 4. Persist child lines cleanly
+        await cpoiRepo.save(enrichedItems);
+        savedParent.items = enrichedItems;
 
-            // Re-runs adjustments utilizing safe calculated fallbacks
-            await this.adjustClientPurchaseStockDelta(activeManager, createDto.tenantId, oldItems, enrichedItems);
-            
-        } else {
-            console.log('Generating autonumbering...');
-            const generatedPONumber = await this.generateClientPurchaseOrderNumber(activeManager, 'STANDARD');
-            createDto.poNumber = generatedPONumber;
-
-            console.log(`Creating fresh ClientPurchase Order: ${createDto.poNumber}`);
-            const newPO = poRepo.create(createDto);
-            newPO.items = enrichedItems;
-            
-            targetOrder = await poRepo.save(newPO);
-
-            // Direct stock increment applying standard conversions
-            await this.incrementProductStock(activeManager, createDto.tenantId, enrichedItems);
-        }
-
-        if (!isExternalTransaction && queryRunner) {
+        if (!isExternalTx && queryRunner) {
             await queryRunner.commitTransaction();
         }
 
-        return { clientClientPurchaseOrder: targetOrder };
+        // Break serialization infinite loop recursion paths
+        if (savedParent.items) {
+            for (const item of savedParent.items) {
+                delete (item as any).clientPurchaseOrder;
+            }
+        }
+console.log('saving data.........................');
+
+        return savedParent;
 
     } catch (error) {
-        if (!isExternalTransaction && queryRunner) {
-            await queryRunner.rollbackTransaction();
-        }
-        console.error('Error in createClientPurchaseOrder:', error);
+        if (!isExternalTx && queryRunner) await queryRunner.rollbackTransaction();
         throw error;
     } finally {
-        if (!isExternalTransaction && queryRunner) {
-            await queryRunner.release();
-        }
+        if (!isExternalTx && queryRunner) await queryRunner.release();
     }
 }
-//============================================================================================================================================
-
-
-//============================================================================================================================================
-private async adjustClientPurchaseStockDelta(
-    txManager: EntityManager,
+/**
+ * Strict PUT/PATCH Action: Manages modifications, item purging, and state mutations
+ * like transitioning from DRAFT to PENDING_APPROVAL.
+ */
+async updateClientPurchaseOrder(
+    id: number,
     tenantId: number,
-    oldItems: ClientPurchaseOrderItem[],
-    newItems: ClientPurchaseOrderItem[]
-): Promise<void> {
-    const productRepo = txManager.getRepository(Product);
-    const variantRepo = txManager.getRepository(ProductVariant);
+    updateDto: Partial<CreateClientPoDto> & { status?: POStatus },
+    manager?: EntityManager
+): Promise<ClientPurchaseOrder> {
+    console.log('m in updateClientPurchaseOrder....................................');
+    
+    const isExternalTx = !!manager;
+    const txManager = isExternalTx ? manager! : AppDataSource.manager;
+    let queryRunner: any = null;
 
-    // Key: "entityId_uom", Value: Total Quantity converted into Base Inventory Tracking Units
-    const oldFlatMap = new Map<string, number>();
-    const oldVariantMap = new Map<string, number>();
+    // Isolate enrichedItems here so it can be re-assigned safely after merging header fields
+    let enrichedItems: ClientPurchaseOrderItem[] = [];
 
-    const buildItemKey = (id: number, uom: string) => `${id}_${uom.toLowerCase().trim()}`;
-
-    // 1. Calculate historical stock units previously added to stock
-    for (const item of oldItems) {
-        const pid = item.productId ? Number(item.productId) : null;
-        const vid = item.productVariantId ? Number(item.productVariantId) : null;
-        const oldQty = Number(item.quantity || 0);
-        if ((!pid && !vid) || oldQty === 0) continue;
-
-        // Fetch product's intrinsic base unit
-        let inventoryTrackingUom = 'PCS';
-        if (pid) {
-            const prod = await productRepo.findOne({ where: { id: pid }, select: ['baseUom'] }); // 🌟 Updated to baseUom
-            if (prod) inventoryTrackingUom = prod.baseUom;
-        } else if (vid) {
-            const variant = await variantRepo.findOne({ where: { id: vid }, select: ['baseUom'] }); // 🌟 Updated to baseUom
-            if (variant) inventoryTrackingUom = variant.baseUom;
+    try {
+        if (!isExternalTx) {
+            queryRunner = AppDataSource.createQueryRunner();
+            await queryRunner.connect();
+            await queryRunner.startTransaction();
         }
 
-        let factor = 1.0000;
-        const incomingOldUom = item.purchaseUom || inventoryTrackingUom;
+        const activeManager = isExternalTx ? txManager : queryRunner.manager;
 
-        if (incomingOldUom.toLowerCase() !== inventoryTrackingUom.toLowerCase()) {
-            factor = await this.getConversionFactor(txManager, tenantId, pid, vid, incomingOldUom);
+        const cpoRepo = activeManager.getRepository(ClientPurchaseOrder);
+        const cpoiRepo = activeManager.getRepository(ClientPurchaseOrderItem);
+        const productRepo = activeManager.getRepository(Product);
+        const variantRepo = activeManager.getRepository(ProductVariant);
+
+        // 🔒 Multi-Tenant Boundary Check
+        const existingPo = await cpoRepo.findOne({ where: { id, tenantId } });
+        if (!existingPo) throw new Error("Client Purchase Order record not found or unauthorized.");
+
+        // 🛠️ State Machine Guardrail
+        if (existingPo.status !== POStatus.DRAFT) {
+            throw new Error(`Cannot modify a Client Purchase Order with status: ${existingPo.status}`);
         }
 
-        const oldSaleUnitsQty = oldQty * factor;
-        const compoundKey = buildItemKey(pid || vid!, incomingOldUom);
+        // 📑 Handle incoming items if updating contents during Draft phase
+        if (updateDto.items && updateDto.items.length > 0) {
+            // Delete old items first to cleanly regenerate lines
+            await cpoiRepo.delete({ clientPurchaseOrderId: existingPo.id });
 
-        if (pid) {
-            const currentQty = oldFlatMap.get(compoundKey) || 0;
-            oldFlatMap.set(compoundKey, currentQty + oldSaleUnitsQty);
-        } else if (vid) {
-            const currentQty = oldVariantMap.get(compoundKey) || 0;
-            oldVariantMap.set(compoundKey, currentQty + oldSaleUnitsQty);
-        }
-    }
+            for (const itemInput of updateDto.items) {
+                const lineItem = cpoiRepo.create();
+                lineItem.clientPurchaseOrderId = existingPo.id;
+                lineItem.clientPurchaseOrder = existingPo;
+                lineItem.quantity = Number(itemInput.quantity || 1);
+                lineItem.finalPrice = 0.00;
 
-    // 2. Loop through the new items and apply delta adjustments
-    for (const newItem of newItems) {
-        const pid = newItem.productId ? Number(newItem.productId) : null;
-        const vid = newItem.productVariantId ? Number(newItem.productVariantId) : null;
-        const newQty = Number(newItem.quantity || 0);
-        if ((!pid && !vid) || newQty === 0) continue;
+                let chosenUom = itemInput.purchaseUom?.trim();
 
-        // Fetch product's intrinsic base unit
-        let inventoryTrackingUom = 'PCS';
-        if (pid) {
-            const prod = await productRepo.findOne({ where: { id: pid }, select: ['baseUom'] }); // 🌟 Updated to baseUom
-            if (prod) inventoryTrackingUom = prod.baseUom;
-        } else if (vid) {
-            const variant = await variantRepo.findOne({ where: { id: vid }, select: ['baseUom'] }); // 🌟 Updated to baseUom
-            if (variant) inventoryTrackingUom = variant.baseUom;
-        }
+                if (itemInput.productId && !itemInput.productVariantId) {
+                    const product = await productRepo.findOne({ where: { id: itemInput.productId, tenantId } });
+                    if (!product) throw new Error(`Material Product ID ${itemInput.productId} not found.`);
+                    if (!chosenUom) chosenUom = product.defaultPurchaseUom || product.baseUom || 'PCS';
+                    
+                    lineItem.productId = product.id;
+                    lineItem.productVariantId = null;
+                    console.log('here ', product.prodName, '.............is to update');
+                    lineItem.prodName = product.prodName;
+                    lineItem.sku = product.sku;
+                    lineItem.purchaseUom = chosenUom;
 
-        let factor = 1.0000;
-        const incomingNewUom = newItem.purchaseUom || inventoryTrackingUom;
+                } else if (itemInput.productVariantId && !itemInput.productId) {
+                    const variant = await variantRepo.findOne({ where: { id: itemInput.productVariantId }, relations: ['productTemplate'] });
+                    if (!variant || variant.productTemplate.tenantId !== tenantId) throw new Error(`Material Variant ID ${itemInput.productVariantId} not found.`);
+                    if (!chosenUom) chosenUom = variant.productTemplate.defaultPurchaseUom || variant.productTemplate.baseUom || 'PCS';
 
-        if (incomingNewUom.toLowerCase() !== inventoryTrackingUom.toLowerCase()) {
-            factor = await this.getConversionFactor(txManager, tenantId, pid, vid, incomingNewUom);
-        }
+                    const sizeStr = variant.size ? ` (${variant.size})` : '';
+                    const finishStr = variant.finish ? ` - ${variant.finish}` : '';
 
-        const newSaleUnitsQty = newQty * factor;
-        const currentCompoundKey = buildItemKey(pid || vid!, incomingNewUom);
-
-        // --- TRACK FLAT PRODUCTS ---
-        if (pid) {
-            const oldSaleUnitsQty = oldFlatMap.get(currentCompoundKey) || 0;
-            const diff = newSaleUnitsQty - oldSaleUnitsQty;
-
-            if (diff > 0) {
-                console.log(`Product ID ${pid}: Increasing clientClientPurchase stock delta by +${diff} ${inventoryTrackingUom}.`);
-                await productRepo.increment({ id: pid }, 'currentstock', diff);
-            } else if (diff < 0) {
-                console.log(`Product ID ${pid}: Decreasing clientClientPurchase stock delta by ${diff} ${inventoryTrackingUom}.`);
-                await productRepo.decrement({ id: pid }, 'currentstock', Math.abs(diff));
+                    lineItem.productId = null;
+                    lineItem.productVariantId = variant.id;
+                    lineItem.prodName = `${variant.productTemplate.prodName}${sizeStr}${finishStr}`;
+                    lineItem.sku = variant.sku;
+                    lineItem.purchaseUom = chosenUom;
+                }
+                enrichedItems.push(lineItem);
             }
+            console.log('saving enrichedItems:', enrichedItems);
             
-            oldFlatMap.delete(currentCompoundKey);
+            await cpoiRepo.save(enrichedItems);
+            existingPo.items = enrichedItems;
+        }
 
-        // --- TRACK PRODUCT VARIANTS ---
-        } else if (vid) {
-            const oldSaleUnitsQty = oldVariantMap.get(currentCompoundKey) || 0;
-            const diff = newSaleUnitsQty - oldSaleUnitsQty;
+        // 🔄 Apply header updates and safely mutate the status machine string
+        // 🚨 FIX: Extract and completely ignore raw 'items' from the payload destructuring
+        const { 
+            id: payloadId, 
+            tenantId: payloadTenantId, 
+            clientPoNumber, 
+            items: rawItems, // 👈 Stripped out here
+            ...updatableFields 
+        } = updateDto;
+        
+        // Merges only non-item header fields (clientId, siteId, clientNotes, etc.)
+        cpoRepo.merge(existingPo, updatableFields);
 
-            if (diff > 0) {
-                console.log(`Variant ID ${vid}: Increasing clientClientPurchase stock delta by +${diff} ${inventoryTrackingUom}.`);
-                await variantRepo.increment({ id: vid }, 'currentstock', diff);
-            } else if (diff < 0) {
-                console.log(`Variant ID ${vid}: Decreasing clientClientPurchase stock delta by ${diff} ${inventoryTrackingUom}.`);
-                await variantRepo.decrement({ id: vid }, 'currentstock', Math.abs(diff));
+        // 🚨 FIX: Re-bind enriched entities if they were updated in this execution
+        if (enrichedItems.length > 0) {
+            existingPo.items = enrichedItems;
+        }
+
+        // If supervisor requested submission, switch status now
+        if (updateDto.status === POStatus.PENDING_APPROVAL) {
+            // Validation step: Prevent submitting an empty PO for approval
+            const finalItemCount = await cpoiRepo.count({ where: { clientPurchaseOrderId: existingPo.id } });
+            if (finalItemCount === 0 && (!existingPo.items || existingPo.items.length === 0)) {
+                throw new Error("Cannot submit an empty Purchase Order for approval.");
             }
-            
-            oldVariantMap.delete(currentCompoundKey);
+            existingPo.status = POStatus.PENDING_APPROVAL;
+            existingPo.internalNotes += ` | Submitted for approval on ${new Date().toISOString()}`;
         }
-    }
 
-    // 3. Subtract remaining items completely removed from the payload
-    for (const [flatKey, removedSaleQty] of oldFlatMap.entries()) {
-        if (removedSaleQty > 0) {
-            const flatId = Number(flatKey.split('_')[0]);
-            console.log(`Product ID ${flatId} removed from PO line item. Reverting -${removedSaleQty} stock units.`);
-            await productRepo.decrement({ id: flatId }, 'currentstock', removedSaleQty);
-        }
-    }
+        const targetOrder = await cpoRepo.save(existingPo);
 
-    for (const [variantKey, removedSaleQty] of oldVariantMap.entries()) {
-        if (removedSaleQty > 0) {
-            const variantId = Number(variantKey.split('_')[0]);
-            console.log(`Variant ID ${variantId} removed from PO line item. Reverting -${removedSaleQty} stock units.`);
-            await variantRepo.decrement({ id: variantId }, 'currentstock', removedSaleQty);
+        if (!isExternalTx && queryRunner) {
+            await queryRunner.commitTransaction();
         }
+
+        if (targetOrder.items) {
+            for (const item of targetOrder.items) {
+                delete (item as any).clientPurchaseOrder;
+            }
+        }
+
+        return targetOrder;
+
+    } catch (error) {
+        if (!isExternalTx && queryRunner) await queryRunner.rollbackTransaction();
+        throw error;
+    } finally {
+        if (!isExternalTx && queryRunner) await queryRunner.release();
     }
 }
 
 
-//============================================================================================================================================
 
+    /**
+     * Builds sequential tracking strings using a pessimistic database row lock.
+     */
+    private async generateInternalSequenceNumber(transactionalEntityManager: EntityManager): Promise<string> {
+        const now = new Date();
+        const yearMonth = `${now.getFullYear().toString().slice(-2)}${(now.getMonth() + 1).toString().padStart(2, '0')}`;
+        const docType = "CLIENT_REQ_PO";
 
+        let sequence = await transactionalEntityManager
+            .getRepository(DocumentSequence)
+            .createQueryBuilder("seq")
+            .setLock("pessimistic_write")
+            .where("seq.documentType = :docType AND seq.prefixYearMonth = :yearMonth", { docType, yearMonth })
+            .getOne();
 
-//============================================================================================================================================
-// FIX 3: Rewritten to split inventory between Product vs ProductVariant tables
-private async incrementProductStock(
-    txManager: EntityManager,
-    tenantId: number,
-    items: ClientPurchaseOrderItem[]
-): Promise<void> {
-    const productRepo = txManager.getRepository(Product);
-    const variantRepo = txManager.getRepository(ProductVariant);
+        let nextValue: number;
 
-    for (const it of items) {
-        const clientClientPurchaseQty = Number(it.quantity || 0);
-        if (clientClientPurchaseQty === 0) continue;
-
-        let inventoryTrackingUom = 'PCS';
-        let repoToUpdate: typeof productRepo | typeof variantRepo;
-        let lookupCriteria: { id: number };
-
-        // 1. Fetch the target record to read its exact tracking unit (baseUom)
-        if (it.productId) {
-            const product = await productRepo.findOne({ 
-                where: { id: it.productId }, 
-                select: ['id', 'baseUom'] // 🌟 Updated from stockUom to baseUom
-            });
-            if (!product) throw new Error(`Product ID ${it.productId} not found.`);
-            
-            inventoryTrackingUom = product.baseUom;
-            repoToUpdate = productRepo;
-            lookupCriteria = { id: it.productId };
-        } else if (it.productVariantId) {
-            const variant = await variantRepo.findOne({ 
-                where: { id: it.productVariantId }, 
-                select: ['id', 'baseUom'] // 🌟 Updated from stockUom to baseUom
-            });
-            if (!variant) throw new Error(`Variant ID ${it.productVariantId} not found.`);
-            
-            inventoryTrackingUom = variant.baseUom;
-            repoToUpdate = variantRepo;
-            lookupCriteria = { id: it.productVariantId };
+        if (!sequence) {
+            nextValue = 100001;
+            const newSequence = new DocumentSequence();
+            newSequence.documentType = docType;
+            newSequence.prefixYearMonth = yearMonth;
+            newSequence.currentValue = nextValue;
+            await transactionalEntityManager.save(DocumentSequence, newSequence);
         } else {
-            continue; // Skip if item references neither product nor variant
+            nextValue = sequence.currentValue + 1;
+            sequence.currentValue = nextValue;
+            await transactionalEntityManager.save(DocumentSequence, sequence);
         }
 
-        // 2. Resolve conversion factor based on unit matching
-        let factor = 1.0000;
-        const incomingUom = it.purchaseUom || inventoryTrackingUom;
-
-        if (incomingUom.toLowerCase() !== inventoryTrackingUom.toLowerCase()) {
-            factor = await this.getConversionFactor(
-                txManager, 
-                tenantId, 
-                it.productId, 
-                it.productVariantId, 
-                incomingUom
-            );
-        }
-
-        // 3. Compute target quantities and increment inventory balance
-        const targetStockQty = clientClientPurchaseQty * factor;
-
-        console.log(
-            `Incrementing Stock [ID: ${lookupCriteria.id}]: Adding +${targetStockQty} ${inventoryTrackingUom} ` +
-            `(Converted from ${clientClientPurchaseQty} "${incomingUom}" via factor ${factor})`
-        );
-
-        await repoToUpdate.increment(lookupCriteria, 'currentstock', targetStockQty);
+        return `CPO-${yearMonth}-${nextValue}`;
     }
 }
 
-//============================================================================================================================================
-
-
-
-//============================================================================================================================================
-private async getConversionFactor(
-    txManager: EntityManager,
-    tenantId: number,
-    productId: number | null,
-    productVariantId: number | null,
-    clientClientPurchaseUom?: string
-): Promise<number> {
-    // If no specific unit is passed, assume a 1:1 base unit calculation fallback
-    if (!clientClientPurchaseUom || clientClientPurchaseUom.trim() === '') {
-        return 1.0000;
-    }
-
-    const conversionRepo = txManager.getRepository(ProductUomConversion);
-    
-    // Look up the conversion rule strictly isolated by tenant and product type
-    const conversion = await conversionRepo.findOne({
-        where: {
-            tenantId: tenantId,
-            productId: productId ?? undefined,          // TypeORM ignores undefined properties in where clauses
-            productVariantId: productVariantId ?? undefined,
-            purchaseUom: clientClientPurchaseUom.trim()
-        }
-    });
-
-    if (conversion) {
-        return Number(conversion.conversionFactor);
-    }
-
-    // Dynamic Log Warning: Help developers track down missing setups in the ERP backend
-    console.warn(
-        `[UOM Warning] No conversion rule found for Tenant: ${tenantId}, ` +
-        `Product: ${productId || 'N/A'}, Variant: ${productVariantId || 'N/A'}, ` +
-        `UOM: "${clientClientPurchaseUom}". Defaulting to factor 1.0000.`
-    );
-
-    return 1.0000;
-}
-//============================================================================================================================================
-
-
-
-
-//============================================================================================================================================
-      /* ---------------------------------------------------------
-         GET SINLGE PO FOR TENANT – unchanged
-         --------------------------------------------------------- */
-      async getClientPO(
-        tenantId: number,poId:number,
-        manager?: EntityManager
-      ): Promise<ClientPurchaseOrder[]> {
-        if (!this.clientClientPurchaseRepository) {
-          throw new Error(
-            'ClientPurchaseService repository not initialized. Call init() first.'
-          );
-        }
-    
-        const repo = manager
-          ? manager.getRepository(ClientPurchaseOrder)
-          : this.clientClientPurchaseRepository;
-    
-        const pos = await repo.find({ where: { tenantId , id:poId } ,relations:{items:true} });
-      
-        return pos;
-      }
-      //============================================================================================================================================
-
-       
-//============================================================================================================================================
-      /* ---------------------------------------------------------
-         GET ALL POs FOR TENANT – unchanged
-         --------------------------------------------------------- */
-      async getClientPOs(
-        tenantId: number,
-        manager?: EntityManager
-      ): Promise<ClientPurchaseOrder[]> {
-        if (!this.clientClientPurchaseRepository) {
-          throw new Error(
-            'ClientPurchaseService repository not initialized. Call init() first.'
-          );
-        }
-    
-        const repo = manager
-          ? manager.getRepository(ClientPurchaseOrder)
-          : this.clientClientPurchaseRepository;
-    
-        const pos = await repo.find({ where: { tenantId } ,relations:{items:true} });
-      
-        return pos;
-      }
-      //============================================================================================================================================
-
-
-
-
-//============================================================================================================================================
-          public async generateClientPurchaseOrderNumber(
-          transactionalEntityManager: EntityManager, 
-          channelCode: string = "W"
-      ): Promise<string> {
-          console.log('--- START: generateClientPurchaseOrderNumber ---');
-          
-          try {
-              const now = new Date();
-              const yearMonth = `${now.getFullYear().toString().slice(-2)}${(now.getMonth() + 1).toString().padStart(2, '0')}`;
-              const docType = "ClientPurchase_ORDER";
-              
-              console.log(`Searching sequence for DocType: ${docType}, YearMonth: ${yearMonth}`);
-      
-              // 1. Fetch sequence entry with an exclusive row lock
-              console.log('Executing database query with pessimistic_write lock...');
-              let sequence = await transactionalEntityManager
-                  .getRepository(DocumentSequence)
-                  .createQueryBuilder("seq")
-                  .setLock("pessimistic_write") 
-                  .where("seq.documentType = :docType AND seq.prefixYearMonth = :yearMonth", { docType, yearMonth })
-                  .getOne();
-              
-              console.log('Database query finished. Sequence found:', !!sequence);
-      
-              let nextValue: number;
-      
-              if (!sequence) {
-                  nextValue = 100001;
-                  console.log(`No sequence found. Initializing new row with value: ${nextValue}`);
-                  
-                  const newSequence = new DocumentSequence();
-                  newSequence.documentType = docType;
-                  newSequence.prefixYearMonth = yearMonth;
-                  newSequence.currentValue = nextValue;
-      
-                  await transactionalEntityManager.save(DocumentSequence, newSequence);
-                  console.log('New sequence record saved successfully.');
-              } else {
-                  nextValue = sequence.currentValue + 1;
-                  console.log(`Sequence found. Incrementing value to: ${nextValue}`);
-                  sequence.currentValue = nextValue;
-                  
-                  await transactionalEntityManager.save(DocumentSequence, sequence);
-                  console.log('Existing sequence record updated successfully.');
-              }
-      
-              const finalPO = `PO-${yearMonth}-${channelCode.toUpperCase()}-${nextValue}`;
-              console.log(`--- END: Generated PO Number successfully: ${finalPO} ---`);
-              return finalPO;
-      
-          } catch (error:any) {
-              console.error('--- ERROR in generateClientClientPurchaseOrderNumber ---');
-              console.error('Message:', error.message);
-              console.error('Stack Trace:', error.stack);
-              // Rethrow the error so the outer database transaction knows to ROLLBACK
-              throw error; 
-          }
-      }
-      //============================================================================================================================================
-
-    
-//============================================================================================================================================
-      //for dealing units--------------------------------------------------------------------
-      async fetchTenantRulesMatrix(
-  tenantId: number,
-  productId: number | null,
-  productVariantId: number | null
-): Promise<any> {
-  console.log(`Processing UOM layout for Tenant: ${tenantId}. Product: ${productId}, Variant: ${productVariantId}`);
-
-  let activeBaseUom = 'PCS'; 
-  let conversionRules: ProductUomConversion[] = [];
-
-  // --- CASE A: TENANT USES VARIANT PRODUCT MODELS ---
-  if (  productVariantId ) {
-    // 1. Fetch conversion rules array using your dedicated custom UOM Conversion service
-    // 🌟 FIX: Call the service getter directly, provide arguments, and look up by productVariantId
-    conversionRules = await getProductUomConversionRepository()
-      .getProductUomConversion(tenantId,null, productVariantId);
-
-    // 2. Extract base unit tracking upwards through the variant template service
-    // 🌟 FIX: Await the response from your service lookup method
-    const variantRecord = await getProductVariantRepository()
-      .getProductVariant(tenantId, productVariantId!);
-      
-    if (variantRecord?.productTemplate) {
-      activeBaseUom = variantRecord.productTemplate.baseUom;
-    }
-  } 
-  // --- CASE B: TENANT USES FLAT PRODUCT MODELS ---
-  else if (productId) {
-    // 1. Fetch conversions matching this specific Flat Product ID
-    // 🌟 FIX: Await the custom conversion matrix array using productId context
-    conversionRules = await getProductUomConversionRepository()
-      .getProductUomConversion(tenantId, productId,null);
-
-    // 2. Extract base unit configuration directly from your product service
-    // 🌟 FIX: Brought inside the conditional block and properly awaited to prevent execution race conditions
-    const productRecord = await getProductRepository()
-      .getProduct(tenantId, productId);
-    
-    if (productRecord) {
-      activeBaseUom = productRecord.baseUom;
-    }
-  }
-
-  // --- STEP 3: CONSOLIDATE & UNIFY AVAILABLE SELECTION UNITS ---
- // --- STEP 3: CONSOLIDATE & UNIFY AVAILABLE PURCHASE UNITS ---
-const structuredUnits = conversionRules.map(rule => ({
-  label: `${rule.purchaseUom} (x${Number(rule.conversionFactor).toFixed(2)})`,
-  value: rule.purchaseUom,
-  factor: Number(rule.conversionFactor),
-  targetSaleUom: rule.saleUom
-}));
-
-// 🌟 FIX: Filter the mapped array to ensure 'value' (e.g., 'BOX') is unique
-const uniqueClientPurchaseUnits = structuredUnits.filter((unit, index, self) =>
-  index === self.findIndex((u) => u.value.toLowerCase() === unit.value.toLowerCase())
-);
-
-const hasBaseUnit = uniqueClientPurchaseUnits.some(u => u.value.toLowerCase() === activeBaseUom.toLowerCase());
-
-if (!hasBaseUnit) {
-  uniqueClientPurchaseUnits.unshift({
-    label: `${activeBaseUom} (Baseline)`,
-    value: activeBaseUom,
-    factor: 1.0000,
-    targetSaleUom: activeBaseUom
-  });
-}
-
-return {
-  baseInventoryUom: activeBaseUom,
-  availableClientPurchaseUnits: uniqueClientPurchaseUnits // Returns a distinct, clean array
-};
-
-}
-
- //end for dealing with units------------------------
-//===========================================================================================
-
-
-    }
-
-export default ClientPurchaseService
+export default ClientPurchaseOrderService

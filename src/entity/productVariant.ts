@@ -21,7 +21,7 @@ export class ProductVariant {
     productTemplateId!: number;
 
     // Many-to-One connection mapping child configurations securely back up to Master Template
-    @ManyToOne(() => ProductTemplate, (template) => template.variants, { onDelete: 'CASCADE' })
+    @ManyToOne(() => ProductTemplate, (template) => template.variants, { onDelete: 'NO ACTION' })
     @JoinColumn({ name: "productTemplateId" })
     productTemplate!: ProductTemplate;
 

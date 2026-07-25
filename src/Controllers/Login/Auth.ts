@@ -12,6 +12,7 @@ declare global {
         siteId: number;
         clientId: number;
         tenantId: number;
+        roleName: string;
       };
       id?: {
         username: string;
@@ -30,10 +31,11 @@ export const auth = (req: Request, res: Response, next: NextFunction) => {
       // to allow with invalid pasword inside userservice : if (!!isPasswordValid) { retrun null } return user
       
       // if u will forgive here by request for contains '/api', u will not get req.user while saving
-      //(req.originalUrl.includes('/api/') )||
+     //(req.originalUrl.includes('/api/') )||
         (req.originalUrl === '/api/login' && req.method === 'POST') ||
+        (req.originalUrl.includes('/api/token') && req.method === 'POST') ||
         (req.originalUrl === '/api/signup' && req.method === 'POST') ||
-        (req.originalUrl.includes('/api/Device/') && req.method === 'GET')
+        (req.originalUrl.includes('/api/Device/') && req.method === 'GET')  
     ) {
         return next();
     }
@@ -50,10 +52,12 @@ export const auth = (req: Request, res: Response, next: NextFunction) => {
     try {
         const verified = jwt.verify(token, ACCESS_TOKEN_SECRET) as any;
         
+        
+
         // 💡 3. Hydrate all structural context into req.user directly from JWT payload
         req.user = { 
             id: verified.userId, 
-            siteId: verified.siteId,
+            siteId: verified.siteId,roleName:verified.roleName,
             clientId: verified.clientId, // 👈 Extracted safely from token
             tenantId: verified.tenantId   // 👈 Extracted safely from token
         }; 

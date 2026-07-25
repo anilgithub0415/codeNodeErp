@@ -1,23 +1,18 @@
 import { Router, Request, Response } from 'express';
-import { getVendorRepository} from '../../dependencies'
-import PriceCalculationService from '../../services/PriceCalculationService';
-import { AppDataSource } from '../../../data-source';
+import { getVendorRepository } from '../../dependencies';
 
-
-interface CreateVendorRequestBody{
-    tenantId:number,
-    vendorName:string,
-    description:string
-    
+interface CreateVendorRequestBody {
+    tenantId: number;
+    vendorName: string;
+    description: string;
 }
+
 const router = Router();
-// Middleware to ensure settingsService is available (optional, but good for clarity)
-// Or rely on the fact that dependencies.ts ensures it at startup
+
+// Middleware to ensure VendorService is available
 router.use((req, res, next) => {
-    
     try {
-        const vendorService = getVendorRepository(); // Attempt to get the service
-      
+        getVendorRepository(); 
         next();
     } catch (error: any) {
         console.error('VendorService not initialized when requested:', error.message);
@@ -25,84 +20,91 @@ router.use((req, res, next) => {
     }
 }); 
 
-
-
-
-    router.route('/:tenantId/:id')
-    .get(async (req: Request, res: Response) => {
-        try {
-            
-            
-            var tenantId= parseInt( req.params.tenantId as string);        
-            var prodId=parseInt(req.params.id as string);
-            const vendorService = getVendorRepository(); 
-            
+// ==========================================
+// GET: RETRIEVE A SPECIFIC VENDOR
+// ==========================================
+router.route('/:tenantId/:id').get(async (req: Request, res: Response) => {
+    try {
+        const tenantId = parseInt(req.params.tenantId, 10);        
+        const prodId = parseInt(req.params.id, 10);
+        const vendorService = getVendorRepository(); 
         
-            const aVendor = await vendorService.getVendor(tenantId,prodId);
-            res.status(200).json(aVendor);
-        } catch (error: any) {
-            console.error('Failed to retrieve a vendor:', error.message || error);
-            res.status(500).json({ "message": "Failed to retrieve a vendor: " + error.message });
+        const aVendor = await vendorService.getVendor(tenantId, prodId);
+        return res.status(200).json(aVendor);
+    } catch (error: any) {
+        console.error('Failed to retrieve a vendor:', error.message || error);
+        return res.status(500).json({ "message": "Failed to retrieve a vendor: " + error.message });
+    }
+});
+
+// ==========================================
+// GET: LIST ALL VENDORS UNDER A TENANT
+// ==========================================
+router.route('/:tenantId').get(async (req: Request, res: Response) => {
+    try {
+        console.log('..............................................................hitting vendor/1');
+        const vendorService = getVendorRepository(); 
+        const tenantId = parseInt(req.params.tenantId, 10);
+        
+        const vendors = await vendorService.getVendors(tenantId);
+        return res.status(200).json(vendors);
+    } catch (error: any) {
+        console.error('Failed to retrieve vendors:', error.message || error);
+        return res.status(500).json({ "message": "Failed to retrieve vendors: " + error.message });
+    }
+});
+
+// ==========================================
+// POST: REGISTER A NEW VENDOR
+// ==========================================
+router.route('').post(async (req: Request<{}, {}, CreateVendorRequestBody>, res: Response) => {
+    try {
+        const vendorService = getVendorRepository();
+
+        if (!req.body.vendorName) {
+           return res.status(400).json({ message: 'Vendor name is required' });
         }
-    });
 
-    router.route('/:tenantId')
-    .get(async (req: Request, res: Response) => {
-        try {
-            
-            console.log('vendor cntr giving vendors');
-        
-            
-            const vendorService = getVendorRepository(); // <--- Get the singleton instance from dependencies.ts
-            var tenantId=parseInt(req.params.tenantId);
-                     
-        
-        
-            const vendors = await vendorService.getVendors(tenantId!);
-            // In a multi-tenant app, this should usually be filtered by the requesting vendor's tenantId.
-            // Example: const vendors = await vendorService.getVendorsByTenant(req.tenantId);
-            //var vendors2=vendors.filter(usr=>roles?.includes(usr.role.rolename))
-            res.status(200).json(vendors);
-        } catch (error: any) {
-            console.error('Failed to retrieve vendors:', error.message || error);
-            res.status(500).json({ "message": "Failed to retrieve vendors: " + error.message });
+        const secureVendorPayload = {
+            ...req.body,
+            tenantId: req.user.tenantId,       // Lock data namespace context 
+            createdByUserId: req.user.id        // Audit log identification stamp
+        };
+
+        const vendor = await vendorService.createVendorClean(secureVendorPayload);
+        return res.status(201).json(vendor);    // ✅ 201 Created Status
+    } catch (error: any) {
+        console.error('Vendor creation failed:', error.message || error);
+        return res.status(400).json({ 'message': 'Vendor creation failed: ' + error.message }); 
+    }
+});
+
+// ==========================================
+// PUT: MODIFY AN EXISTING VENDOR
+// ==========================================
+router.route('/:id').put(async (req: Request, res: Response) => {
+    try {
+        const vendorService = getVendorRepository();
+        const targetVendorId = parseInt(req.params.id, 10);
+
+        if (isNaN(targetVendorId)) {
+            return res.status(400).json({ message: 'Invalid Vendor identification ID path format parameter.' });
         }
-    });
 
-router.route('')
-    .post(async (req: Request<{}, {}, CreateVendorRequestBody>, res: Response) => {
-        try {
-            const vendorService = getVendorRepository();
+        const loggedInTenantId = req.user.tenantId;
+        const { id, tenantId, ...updatableFields } = req.body;
 
-            // 1. Basic validation
-            if (!req.body.vendorName) {
-               console.log('Basic validation fail: vendorName missing');
-               return res.status(400).json({ message: 'Vendor name is required' });
-            }
+        const updatedVendor = await vendorService.updateVendor(
+            targetVendorId, 
+            loggedInTenantId, 
+            updatableFields
+        );
 
-            // 2. EXTRACT FROM DECODED JWT (Enforces backend-level authority)
-            const loggedInTenantId = req.user.tenantId; 
-            const loggedInUserId = req.user.id; // Or req.user.userId depending on your token payload
+        return res.status(200).json(updatedVendor); // ✅ 200 OK Status
+    } catch (error: any) {
+        console.error('Vendor update failed:', error.message || error);
+        return res.status(400).json({ 'message': 'Vendor update failed: ' + error.message });
+    }
+});
 
-            // 3. OVERWRITE FRONTEND INJECTIONS FOR BULLETPROOF SECURITY
-            const secureVendorPayload = {
-                ...req.body,
-                tenantId: loggedInTenantId,       // Force token tenant isolation
-                createdByUserId: loggedInUserId    // Automatically stamp creating user
-            };
-
-            console.log('Hitting secure vendor post processing...');
-            console.log(secureVendorPayload);
-
-            // 4. Pass the sanitized payload to your service layer
-            const vendor = await vendorService.createVendor(secureVendorPayload);
-
-            res.status(201).json(vendor);
-        } catch (error: any) {
-            console.error('Vendor creation failed:', error.message || error);
-            res.status(400).json({ 'message': 'Vendor creation failed: ' + error.message });
-        }
-    });
-
- 
 export default router;

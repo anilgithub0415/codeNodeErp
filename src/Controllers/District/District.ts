@@ -51,7 +51,7 @@ router.use((req, res, next) => {
     .get(async (req: Request, res: Response) => {
         try {
             
-            console.log('district cntr giving districts');
+          
         
             
             const districtService = getDistrictRepository(); // <--- Get the singleton instance from dependencies.ts

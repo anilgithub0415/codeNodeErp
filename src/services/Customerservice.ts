@@ -46,8 +46,37 @@ class CustomerService{
             console.log("CustomerService repositories initialized.");
         }
 
-        //we are not allowing duplicate(repeat) customername in tenant
+        // Inside your service classprivate 
         private async ensureNoDuplicate(
+  tenantId: number, 
+  customerName: string, 
+  transactionalRepo: Repository<Customer>
+): Promise<void> {
+
+  // 1️⃣ Strict Application Guard Rails
+  if (!tenantId || !customerName) {
+    throw new Error("Validation Failed: tenantId and customerName are required parameters.");
+  }
+
+  console.log('checking alexists:',customerName);
+  
+  // 2️⃣ Use Query Builder to stop TypeORM from returning the first record on undefined keys
+  const existingCustomer = await transactionalRepo
+    .createQueryBuilder("customer")
+    .where("customer.tenantId = :tenantId", { tenantId })
+    .andWhere("customer.customerName = :customerName", { customerName: customerName.trim() })
+    .getOne(); // 💡 Safe method that returns null if no rows exactly match parameters
+
+  // 3️⃣ Exact Property Proof Check
+  if (existingCustomer) {
+    throw new Error(`The customer name '${customerName}' already exists inside this tenant context.`);
+  }
+}
+
+
+
+        //we are not allowing duplicate(repeat) customername in tenant
+        private async ensureNoDuplicatePreserve(
         tenantId: number,
         customerName: string,
         custRepo: Repository<Customer>
@@ -61,24 +90,12 @@ class CustomerService{
             );
         }
         }
-  /**
- * Synchronises the child collection of sites for a given customer.
- *
- *  • New DTOs (no `id`) → create new Site rows.
- *  • Existing DTOs (have `id`) → update the matching rows.
- *  • Any Site that exists in the DB but is **not** present in the DTO
- *    array will be removed (cascade delete works if `onDelete: 'CASCADE'` is set).
- *
- * @param customer   The parent Customer entity (already persisted, has an id).
- * @param orgDtos    Array of DTOs received from the client.
- * @param orgRepo    Repository for the Site entity.
- * @param manager    EntityManager that belongs to the current transaction.
- *
- * @returns The list of Site entities that are now attached to the customer.
- */
-private async syncSites(
+
+        
+private async syncSites_2(
   customer: Customer,
   orgDtos: SiteDto[],
+  tenantId: number, // 🔒 Injected verified security parameter boundary
   orgRepo: Repository<Site>,
   manager: EntityManager
 ): Promise<Site[]> {
@@ -96,86 +113,37 @@ private async syncSites(
   existingOrgs.forEach(site => existingMap.set(site.id, site));
 
   const result: Site[] = [];
-
-  console.log('syncing orgs',orgDtos);
-  
+  console.log('Syncing org site models:', orgDtos);
 
   // -------------------------------------------------
   // 3️⃣ Iterate over the incoming DTOs
   // -------------------------------------------------
   for (const dto of orgDtos) {
-                  //find category -----------------------------------
-                  // const category = await manager
-                  //   .getRepository(CustomerCategory)
-                  //   .findOne({ where: { customerCategory: dto.customerCategoryId } });
-
-                  // if (!category) {
-                  //   throw new Error(
-                  //     `CustomerCategory  ${dto.customerCategoryId} not found`
-                  //   );
-                  // } 
-                  //end find category------------------------------------------------
-
+    
     // ----- UPDATE path (dto has an id that matches an existing row) -----
     if (dto.id && existingMap.has(dto.id)) {
-      const site = existingMap.get(dto.id)!; // guaranteed to exist
-      // Copy only the fields that belong to the Site entity.
-      // (If you have extra fields in the DTO, filter them out here.)
-        // Update organisation fields, including the correct foreign‑key property for CustomerCategory
-        Object.assign(site, {
-          siteName: dto.siteName,
-          contactPersonName: dto.contactPersonName,
-        
-        });
-/*  mobileNumber: dto.mobileNumber,
-          EmailId: dto.EmailId,
-          city: dto.city,
-          Remarks: dto.Remarks,
-          // Use the proper property name matching the entity definition
-          customerCategoryId: category, */
-      // If the category changed we need to fetch the new CustomerCategory entity.
+      const site = existingMap.get(dto.id)!; 
 
+      // Update structural fields safely using the verified method parameters
+      Object.assign(site, {
+        siteName: dto.siteName,
+        siteContactPerson: dto.siteContactPerson,
+        customer: customer, // 🌟 FIX: Binds the Client relation to avoid 'Cannot insert NULL into ClientId'
+        tenantId: tenantId  // 🌟 FIX: Replaces the broken 'ptenantId' reference safely
+      });
 
-      // if (dto.customerCategoryId) {
-      //   const category = await manager
-      //     .getRepository(CustomerCategory)
-      //     .findOne({ where: { customerCategory: dto.customerCategoryId } });
-
-      //   if (!category) {
-      //     throw new Error(
-      //       `CustomerCategory  ${dto.customerCategoryId} not found`
-      //     );
-      //   } 
-      //   (site as any).customerCategory = category; // assign relation
-      // }
-
-      await manager.save(site); // persists updates
+      await manager.save(site); 
       result.push(site);
-      existingMap.delete(dto.id); // mark as processed → will not be deleted
-    } else {
-      // ----- CREATE path (new organisation) -----
-      // Resolve the CustomerCategory relation (required for the FK)
-      // const category = await manager
-      //   .getRepository(CustomerCategory)
-      //   .findOne({ where: { customerCategory: dto.customerCategoryId } });
-
-      // if (!category) {
-      //   throw new Error(
-      //     `CustomerCategory id ${dto.customerCategoryId} not found`
-      //   );
-      // }
-/*mobileNumber: dto.mobileNumber,
-        EmailId: dto.EmailId,
-        city: dto.city,
-        Remarks: dto.Remarks,
-        customer,               // set the back‑reference (FK to Customer)
-        customerCategory: category // category // set the relation to CustomerCategory
-   */
+      existingMap.delete(dto.id); 
+    } 
+    // ----- CREATE path (new organisation) -----
+    else {
       const newOrg = orgRepo.create({
         siteName: dto.siteName,
-        
-        contactPersonName: dto.contactPersonName,
-            });
+        siteContactPerson: dto.siteContactPerson,
+        customer: customer, // 🌟 FIX: Automatically writes the parent ClientId parameter column
+        tenantId: tenantId  // 🌟 FIX: Overrides incoming DTO values with verified sandbox integers
+      });
 
       await manager.save(newOrg);
       result.push(newOrg);
@@ -185,16 +153,157 @@ private async syncSites(
   // -------------------------------------------------
   // 4️⃣ DELETE sites that were removed on the client side
   // -------------------------------------------------
+  // -------------------------------------------------
+  // 4️⃣ DELETE sites that were removed on the client side
+  // -------------------------------------------------
   const toDelete = Array.from(existingMap.values());
   if (toDelete.length) {
+    console.log(`Purging ${toDelete.length} child site records and clearing constraints...`);
+
+    // 🌟 FIX STEP A: Gather all unique IDs from the sites being dropped
+    const siteIdsToDelete = toDelete.map(site => site.id);
+
+    // 🌟 FIX STEP B: Direct-delete dependent rows out of UserTenantContext table first
+    // This cleans up the foreign key blockers so SQL Server allows the main delete to finish
+    await manager.createQueryBuilder()
+      .delete()
+      .from('UserTenantContext')
+      // Adjust column name below if the link column is named 'siteId' or 'clientId' instead of 'userId'
+      .where('siteId IN (:...ids)', { ids: siteIdsToDelete }) 
+      .execute();
+
+    // 🌟 FIX STEP C: Now the parent deletion will process cleanly without triggering Error 547
     await manager.remove(toDelete);
   }
+
 
   // -------------------------------------------------
   // 5️⃣ Return the final collection (now in sync with the DTO)
   // -------------------------------------------------
   return result;
 }
+
+
+
+  /**
+ * Synchronises the child collection of sites for a given customer.
+ *
+ *  • New DTOs (no `id`) → create new Site rows.
+ *  • Existing DTOs (have `id`) → update the matching rows.
+ *  • Any Site that exists in the DB but is **not** present in the DTO
+ *    array will be removed (cascade delete works if `onDelete: 'CASCADE'` is set).
+ *
+ * @param customer   The parent Customer entity (already persisted, has an id).
+ * @param orgDtos    Array of DTOs received from the client.
+ * @param orgRepo    Repository for the Site entity.
+ * @param manager    EntityManager that belongs to the current transaction.
+ *
+ * @returns The list of Site entities that are now attached to the customer.
+ */
+// Inside your service class (e.g., CustomerService)
+// Ensure siteDtos is typed as an array of partial objects
+async syncSites(
+  customer: Customer,
+  siteDtos: Partial<Site>[], 
+  tenantId: number,
+  orgRepo: Repository<Site>,
+  em: EntityManager
+): Promise<Site[]> {
+  const updatedSites: Site[] = [];
+
+  for (const singleSiteDto of siteDtos) { 
+    let site: Site | null = null;
+    const siteId = singleSiteDto.id ? Number(singleSiteDto.id) : null;
+
+    if (siteId && siteId > 0) {
+      site = await orgRepo.findOneBy({ id: siteId, tenantId });
+      if (!site) throw new Error(`Site with ID ${siteId} not found under tenant context.`);
+      
+      Object.assign(site, singleSiteDto);
+    } else {
+      // 🌟 FIX: Explicitly inject tenantId directly into the factory instantiation properties block
+      site = orgRepo.create({
+        ...singleSiteDto,
+        tenantId: tenantId // Guarantees tenant context mapping is built immediately
+      }); 
+    }
+
+    // 🌟 RE-ENFORCE: Hard bindings applied to entity properties prior to execution pipeline emission 
+    site.tenantId = tenantId; 
+    site.clientId = customer.id; 
+    site.customer = customer;    
+
+    const savedSite = await em.save(Site, site);
+    updatedSites.push(savedSite);
+  }
+
+  return updatedSites;
+}
+
+
+
+
+
+
+private async syncSites_preserved(
+  customer: Customer,   // 🌟 Contains the true parent database clientId (customer.id)
+  orgDtos: SiteDto[],
+  tenantId: number,     // 🔒 Multi-tenant isolation parameter
+  orgRepo: Repository<Site>,
+  manager: EntityManager
+): Promise<Site[]> {
+  // 1️⃣ Load the sites that already belong to this customer
+  const existingOrgs = await orgRepo.find({
+    where: { customer: { id: customer.id } },
+  });
+
+  // 2️⃣ Build a map for quick lookups
+  const existingMap = new Map<number, Site>();
+  existingOrgs.forEach(site => existingMap.set(site.id, site));
+
+  const result: Site[] = [];
+
+  // 3️⃣ Iterate over incoming payloads
+  for (const dto of orgDtos) {
+    
+    // ----- UPDATE path (Modifying an existing row) -----
+    if (dto.id && existingMap.has(dto.id)) {
+      const site = existingMap.get(dto.id)!; 
+
+      Object.assign(site, {
+        siteName: dto.siteName,
+        siteContactPerson: dto.siteContactPerson,
+        customer: customer, // 🌟 FIX: Sets the parent relationship (writes to ClientId column)
+        tenantId: tenantId  // 🌟 FIX: Sets multi-tenant tracking safely
+      });
+
+      await manager.save(site); 
+      result.push(site);
+      existingMap.delete(dto.id); 
+    } 
+    // ----- CREATE path (Inserting a brand new row) -----
+    else {
+      const newOrg = orgRepo.create({
+        siteName: dto.siteName,
+        siteContactPerson: dto.siteContactPerson,
+        customer: customer, // 🌟 FIX: Binds the new site to the active parent customer record
+        tenantId: tenantId  // 🌟 FIX: Prevents tenant parameter leaks
+      });
+
+      await manager.save(newOrg);
+      result.push(newOrg);
+    }
+  }
+
+  // 4️⃣ DELETE sites dropped by the UI
+  const toDelete = Array.from(existingMap.values());
+  if (toDelete.length) {
+    await manager.remove(toDelete);
+  }
+
+  return result;
+}
+
 
 
   /* -----------------------------------------------------------------
@@ -220,6 +329,9 @@ private async syncSites(
   dto: CreateCustomerDto,
   manager?: EntityManager
 ): Promise<Customer> {
+
+  console.log('....................................method:createCustomer................................');
+  
   const { runner: queryRunner, ownsRunner } = this.getQueryRunner(manager);
 
   if (ownsRunner) {
@@ -268,7 +380,7 @@ private async syncSites(
         customerName: dto.customerName,
         clientStatus: dto.clientStatus,
         leadSource: dto.leadSource,
-        mobileNumber: dto.mobileNumber,
+        commercialContactPhone: dto.commercialContactPhone,
         EmailId: dto.EmailId,
         city: dto.city,
         creditDays: dto.creditDays,
@@ -277,7 +389,7 @@ private async syncSites(
         customerCategory: fetchedCategory || null // 👈 Directly updates or clears out old categories
       });
 
-      const syncedOrgs = await this.syncSites(customer, dto.sites || [], orgRepo, em);
+      const syncedOrgs = await this.syncSites(customer, dto.sites || [],dto.tenantId, orgRepo, em);
       await em.save(customer);customer.sites = syncedOrgs;
 
         const updatedCustomer = await custRepo.findOne({
@@ -299,7 +411,7 @@ return updatedCustomer || customer;
         customerName: dto.customerName,
         clientStatus: dto.clientStatus,
         leadSource: dto.leadSource,
-        mobileNumber: dto.mobileNumber,
+        commercialContactPhone: dto.commercialContactPhone,
         EmailId: dto.EmailId,
         city: dto.city,
         creditDays: dto.creditDays,
@@ -314,7 +426,7 @@ return updatedCustomer || customer;
         (dto.sites || []).map(async (orgDto: any) => {
           return orgRepo.create({
             siteName: orgDto.siteName,
-            contactPersonName: orgDto.contactPersonName,
+            siteContactPerson: orgDto.siteContactPerson,
             customer: customer!
           });
         })
@@ -351,7 +463,9 @@ return updatedCustomer || customer;
 async createCustomerClean(
   dto: CreateCustomerDto,
   manager?: EntityManager
-): Promise<Customer> {
+): Promise<Customer> { 
+
+  console.log('....................................method:createCustomerClean................................');
   const { runner: queryRunner, ownsRunner } = this.getQueryRunner(manager);
 
   if (ownsRunner) {
@@ -379,14 +493,18 @@ async createCustomerClean(
       fetchedCategory = category;
     }
 
-    await this.ensureNoDuplicate(cleanDto.tenantId, cleanDto.customerName, custRepo);
+    // Inside your createCustomerClean method:
+await this.ensureNoDuplicate(cleanDto.tenantId, cleanDto.customerName, custRepo);
+
+ 
+
 
     const customer = custRepo.create({
       tenantId: cleanDto.tenantId,
       customerName: cleanDto.customerName,
       clientStatus: cleanDto.clientStatus || 'NewLead',
       leadSource: cleanDto.leadSource,
-      mobileNumber: cleanDto.mobileNumber,
+      commercialContactPhone: cleanDto.commercialContactPhone,
       EmailId: cleanDto.EmailId,
       city: cleanDto.city,
       creditDays: cleanDto.creditDays,
@@ -395,20 +513,25 @@ async createCustomerClean(
       customerCategory: fetchedCategory
     });
     
+   // Inside your createCustomerClean method:
+
     await em.save(customer);
 
     const sites = await Promise.all(
       (cleanDto.sites || []).map(async (orgDto: any) => {
         return orgRepo.create({
           siteName: orgDto.siteName,
-          contactPersonName: orgDto.contactPersonName,
-          customer: customer
+          siteContactPerson: orgDto.siteContactPerson,
+          customer: customer,
+          // 🌟 FIX: Explicitly bind the mandatory tenant identity parameter here
+          tenantId: cleanDto.tenantId 
         });
       })
     );
 
-    await em.save(sites);
+    await em.save(sites); // SQL Server handles this cleanly now!
     customer.sites = sites;
+
 
     if (ownsRunner) {
       await queryRunner.commitTransaction();
@@ -441,6 +564,8 @@ async updateCustomer(
   dto: Partial<CreateCustomerDto>,
   manager?: EntityManager
 ): Promise<Customer> {
+
+  console.log('....................................method:updateCustomer................................');
   const { runner: queryRunner, ownsRunner } = this.getQueryRunner(manager);
 
   if (ownsRunner) {
@@ -479,6 +604,7 @@ async updateCustomer(
     }
 
     // Strip tracking parameters out of incoming client body contexts
+    // Strip tracking parameters out of incoming client body contexts
     const { id: pId, tenantId: pTenantId, sites: pSites, ...updatableFields } = dto;
 
     Object.assign(customer, {
@@ -486,9 +612,13 @@ async updateCustomer(
       customerCategory: fetchedCategory || customer.customerCategory
     });
 
-    // Invoke your pre-built array synchronization module to handle cascading delta updates/removals
-    const syncedOrgs = await this.syncSites(customer, dto.sites || [], orgRepo, em);
+    // 🌟 FIX 1: Explicitly persist the customer root entity changes FIRST
     await em.save(customer);
+
+    // 🌟 FIX 2: Explicitly pass the resolved parent ID inside your child loop array
+    const syncedOrgs = await this.syncSites(customer, dto.sites || [], tenantId, orgRepo, em);
+
+    // Rebind the updated structural reference array context
     customer.sites = syncedOrgs;
 
     if (ownsRunner) {
@@ -533,22 +663,28 @@ async updateCustomer(
      GET One CUSTOMER FOR TENANT Customer – unchanged
      --------------------------------------------------------- */
   async getCustomer(
-    tenantId: number,customerId:number,
-    manager?: EntityManager
-  ): Promise<Customer[]> {
-    if (!this.customerRepository) {
-      throw new Error(
-        'CustomerService repository not initialized. Call init() first.'
-      );
-    }
-    const repo = manager
-      ? manager.getRepository(Customer)
-      : this.customerRepository;
-
-    //const customers = await repo.find({ where: { tenantId } ,relations:{sites:{customerCategory:true}} });
-  const customers = await repo.find({ where: { tenantId, id:customerId },relations:['sites']  });
-    return customers;
+  tenantId: number, 
+  customerId: number,
+  manager?: EntityManager
+): Promise<Customer | null> { // 💡 FIX: Return single object type or null
+  if (!this.customerRepository) {
+    throw new Error(
+      'CustomerService repository not initialized. Call init() first.'
+    );
   }
+  const repo = manager
+    ? manager.getRepository(Customer)
+    : this.customerRepository;
+
+  // 💡 FIX: Replaced .find() with .findOne() to pull a single database record
+  const customer = await repo.findOne({ 
+    where: { tenantId, id: customerId },
+    relations: ['sites']  
+  });
+  
+  return customer;
+}
+
 
 
   /* ---------------------------------------------------------

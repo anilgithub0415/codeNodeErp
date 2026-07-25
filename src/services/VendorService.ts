@@ -1,84 +1,59 @@
-
 import { EntityManager, FindOptionsWhere, Not, Repository } from 'typeorm';
 import { Vendor } from '../entity/Vendor';
-
-
-
 import { AppDataSource } from '../../data-source'; 
 
-interface CreateVendorDto{
-    id?:number;
-    tenantId:number;
-    vendorName:string;
+export interface CreateVendorDto {
+    id?: number;
+    tenantId: number;
+    vendorName: string;
     description: string;
-    [key:string]:any;
+    [key: string]: any;
 }
 
 export interface CreatedVendorResponse {
     vendor: Vendor;
-  
 }
 
-export class VendorService{
- private vendorRepository!: Repository<Vendor>;
-     /**
-         * Initializes the VendorService with its TypeORM repository instances.
-         * This MUST be called AFTER AppDataSource.initialize() has completed.
-         * @param vendorRepo The TypeORM Repository instance for Vendor.
-         * @param tenantRepo The TypeORM Repository instance for Tenant (if VendorService needs it).
-         */
-        async init(vendorRepo: Repository<Vendor>): Promise<void> {
-            this.vendorRepository = vendorRepo;
-                console.log("VendorService repository initialized.");       
-        }
-
-
-        async getVendor(
-            ptenantId:number,   pProdId:number,        
-            manager?: EntityManager
-        ): Promise<Vendor> {
-console.log('hitting url vendors');
-             if (!this.vendorRepository) {
-                        throw new Error("VendorService repository not initialized. Call init() first.");
-                    }
-
-                   
-                    
-                    const vendorRepository = manager ? manager.getRepository(Vendor) : this.vendorRepository;
-                    const ps= await vendorRepository.findOne({where:{tenantId:ptenantId , id:pProdId}}); // Use find() to get all 
-                 
-                    
-                    return ps!; 
-                }
-
-
-        async getVendors(
-            ptenantId:number,           
-            manager?: EntityManager
-        ): Promise<Vendor[]> {
-console.log('hitting url vendors');
-             if (!this.vendorRepository) {
-                        throw new Error("VendorService repository not initialized. Call init() first.");
-                    }
-
-                    console.log('ptenantId:',ptenantId);
-                    
-                    const vendorRepository = manager ? manager.getRepository(Vendor) : this.vendorRepository;
-                    const ps= await vendorRepository.find({where:{tenantId:ptenantId}}); // Use find() to get all 
-                    console.log('vendors count:',ps.length);
-                    
-                    return ps;
-                }
-
+export class VendorService {
+    private vendorRepository!: Repository<Vendor>;
 
     /**
-     * Creates a new global Vendor, links them to a Person, and establishes their initial context
-     * within a specified tenant and role.
-     * This method now also atomically creates a role-specific profile (e.g., FacultyProfile).
-     *
-     * @param createDto Data for creating the vendor and their initial context.
-     * @param manager Optional EntityManager for transactional operations.
-     * @returns The created Vendor entity along with its initial context.
+     * Initializes the VendorService with its TypeORM repository instances.
+     * This MUST be called AFTER AppDataSource.initialize() has completed.
+     */
+    async init(vendorRepo: Repository<Vendor>): Promise<void> {
+        this.vendorRepository = vendorRepo;
+        console.log("VendorService repository initialized.");       
+    }
+
+    async getVendor(
+        ptenantId: number, 
+        pProdId: number,        
+        manager?: EntityManager
+    ): Promise<Vendor> {
+        if (!this.vendorRepository) {
+            throw new Error("VendorService repository not initialized. Call init() first.");
+        }
+        
+        const vendorRepository = manager ? manager.getRepository(Vendor) : this.vendorRepository;
+        const ps = await vendorRepository.findOne({ where: { tenantId: ptenantId , id: pProdId } }); 
+        return ps!; 
+    }
+
+    async getVendors(
+        ptenantId: number,           
+        manager?: EntityManager
+    ): Promise<Vendor[]> {
+        if (!this.vendorRepository) {
+            throw new Error("VendorService repository not initialized. Call init() first.");
+        }
+        
+        const vendorRepository = manager ? manager.getRepository(Vendor) : this.vendorRepository;
+        const ps = await vendorRepository.find({ where: { tenantId: ptenantId } }); 
+        return ps;
+    }
+    /**
+     * Legacy/Upsert Strategy: Creates or Updates Vendor records atomically using a lookup check.
      */
     async createVendor(
         createDto: CreateVendorDto,
@@ -94,64 +69,41 @@ console.log('hitting url vendors');
                 shouldReleaseQueryRunner = true;
             }
 
-          
             const vendorRepo = queryRunner!.manager.getRepository(Vendor);
-                    
-
-            
-
-            // 3. Create or Find Vendor (existing logic)
             let newORexistingvendor: Vendor;
           
-                          const { id, tenantId, ...uniqueIdentifiers } = createDto;
-                          let queryCondition: FindOptionsWhere<Vendor> = { tenantId };
-                          if (createDto.id) {
-                              queryCondition.id = createDto.id;
-                          } else {
-                               Object.assign(queryCondition, uniqueIdentifiers);
-                          }
-                          // FIX: Find by ID so you can safely update the districtName property
-                          let aVendor = await vendorRepo.findOne({ 
-                              where: queryCondition
-                          });
-                  
-          
-            if (aVendor) {
-                console.log(`found vendor with name: ${createDto.prodName}`);
-              
-                
-                 Object.assign(aVendor, createDto);  newORexistingvendor =aVendor;
-                console.log('updating:',aVendor);
-
-                await vendorRepo.save(aVendor); 
+            const { id, tenantId, ...uniqueIdentifiers } = createDto;
+            let queryCondition: FindOptionsWhere<Vendor> = { tenantId };
+            
+            if (createDto.id) {
+                queryCondition.id = createDto.id;
             } else {
-             
-               
-                let newVendor = vendorRepo.create(
-                    createDto                   
-                );
-           
-                newORexistingvendor = newVendor;
-                   await vendorRepo.save(newVendor);  
+                Object.assign(queryCondition, uniqueIdentifiers);
             }
 
-
-
-           
+            let aVendor = await vendorRepo.findOne({ where: queryCondition });
+                  
+            if (aVendor) {
+                Object.assign(aVendor, createDto);  
+                newORexistingvendor = aVendor;
+                await vendorRepo.save(aVendor); 
+            } else {
+                let newVendor = vendorRepo.create(createDto);
+                newORexistingvendor = newVendor;
+                await vendorRepo.save(newVendor);  
+            }
 
             if (shouldReleaseQueryRunner) {
                 await queryRunner!.commitTransaction();
             }
 
-          return { vendor: newORexistingvendor };
-       
-            
+            return { vendor: newORexistingvendor };
 
         } catch (error) {
             if (shouldReleaseQueryRunner) {
                 await queryRunner!.rollbackTransaction();
             }
-            console.error('Error in createVendorAndContext:', error);
+            console.error('Error in createVendor:', error);
             throw error;
         } finally {
             if (shouldReleaseQueryRunner) {
@@ -159,6 +111,59 @@ console.log('hitting url vendors');
             }
         }
     }
+
+    /**
+     * Strict POST Action: Creates a brand new, unique Vendor instance record.
+     */
+    async createVendorClean(
+        createDto: CreateVendorDto,
+        manager?: EntityManager
+    ): Promise<Vendor> {
+        if (!this.vendorRepository) {
+            throw new Error("VendorService repository not initialized. Call init() first.");
+        }
+
+        const vendorRepo = manager ? manager.getRepository(Vendor) : this.vendorRepository;
+
+        // Completely strip any user-supplied IDs to eliminate sequence overwrite risks
+        const { id, ...cleanCreatePayload } = createDto;
+
+        const newVendor = vendorRepo.create(cleanCreatePayload);
+        console.log(`[VendorService] Generating unique vendor instance context for: ${cleanCreatePayload.vendorName}`);
+        return await vendorRepo.save(newVendor);
     }
-           
-export default VendorService
+
+    /**
+     * Strict PUT Action: Overwrites an existing vendor profile safely after enforcing tenant validation.
+     */
+    async updateVendor(
+        id: number,
+        tenantId: number,
+        updateDto: Partial<CreateVendorDto>,
+        manager?: EntityManager
+    ): Promise<Vendor> {
+        if (!this.vendorRepository) {
+            throw new Error("VendorService repository not initialized. Call init() first.");
+        }
+
+        const vendorRepo = manager ? manager.getRepository(Vendor) : this.vendorRepository;
+
+        // 🔒 Security Boundary: Confirm resource ownership within active session tenant namespace
+        const existingVendor = await vendorRepo.findOne({ where: { id, tenantId } });
+
+        if (!existingVendor) {
+            throw new Error("Vendor record not found or unauthorized cross-tenant resource modification attempted.");
+        }
+
+        // Erase structural tracking fields out of incoming change payload
+        const { id: payloadId, tenantId: payloadTenantId, ...updatableFields } = updateDto;
+
+        // Apply mutation payload context cleanly onto the tracked entity instance 
+        Object.assign(existingVendor, updatableFields);
+
+        console.log(`[VendorService] Saving updated structural variables for Vendor ID: ${id}`);
+        return await vendorRepo.save(existingVendor);
+    }
+}
+
+export default VendorService;

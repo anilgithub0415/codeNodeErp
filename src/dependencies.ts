@@ -1,5 +1,6 @@
 // src/dependencies.ts
 import { AppDataSource } from '../data-source';
+
 //added 
 import { Repository, EntityManager } from 'typeorm';
 
@@ -11,13 +12,13 @@ import c from './services/ConfigService';
 
 
 
-import { Settings } from './entity/Settings'; 
+import { SecuritySettings } from './entity/SecuritySettings'; 
 import {Config} from './entity/Config';
 import {Config_AppName} from './entity/Config_Appname';
 
 import { User } from './entity/User'; import {Product} from './entity/Product'
 import { RefreshToken } from './entity/RefreshToken';
-import { SubscriptionPlanLookup } from './entity/SubscriptionPlanLookup';
+
 import { UserRoleLookup } from './entity/UserRoleLookup';
 
 
@@ -50,7 +51,7 @@ import { PurchaseOrder } from './entity/PurchaseOrder';
 import CustomerCategoryService from './services/CustomerCategoryService';
 import { CustomerCategory } from './entity/CustomerCategory';
 import { Site } from './entity/Site';
-import LeadSourceService from './services/LeadSourceService';
+//import LeadSourceService from './services/LeadSourceService';
 import { Leadsource } from './entity/LeadSource';
 import CityService from './services/CityService';
 import { City } from './entity/city';
@@ -61,6 +62,7 @@ import { DeliveryChallanService } from './services/DeliveryChallanService';
 import { DeliveryChallan } from './entity/DeliveryChallan';
 import HSNService from './services/HSNservice';
 import { HsnTaxRule } from './entity/HsnTaxRule';
+import { SubscriptionPlanLookup } from './entity/SubscriptionPlanLookup';
 import SiteService from './services/SiteService';
 
 import { ClientPurchaseOrder } from './entity/ClientPurchaseOrder';
@@ -72,7 +74,29 @@ import User_PreferenceService from './services/User_PrefernceService';
 import { UserPreferences } from './entity/user_preferences';
 import DistrictService from './services/DistrictService';
 import { District } from './entity/District';
-import ClientPurchaseService from './services/ClientPurchaseService';
+import {ClientPurchaseOrderService} from './services/ClientPurchaseService';
+import { ClientRequirementService } from './services/ClientRequirementService';
+import { ClientRequirement } from './entity/ClientRequirement';
+import { QuotationService } from './services/QuotationService';
+import { Quotation } from './entity/Quotation';
+import LeadsourceService from './services/LeadsourceService';
+import SubscriptionPlanLookupService from './services/SubscriptionService';
+import TenantService_New from './services/TenantService_New';
+import { ProductCategoryService } from './services/ProductCategoryService';
+import { ProductCategory } from './entity/ProductCategory';
+import TenantTypeLookupService from './services/TenantTypeLookupService';
+import PermissionService from './services/PermissionService';
+import { Permission } from './entity/Permission';
+import RolePermissionService from './services/RolePermissionService';
+import { RolePermission } from './entity/RolePermission';
+import { UserRoleService } from './services/UserRoleService';
+import LineDiscountService from './services/LineDiscountService';
+import { LineDiscount } from './entity/LineDiscount';
+import DiscountTypeService from './services/DiscountTypeService';
+import { DiscountType } from './entity/DiscountType';
+import InteractionService from './services/InteractionService';
+import { Interaction } from './entity/Interaction';
+//import LeadsourceService from './services/LeadsourceService';
 
 
 
@@ -87,17 +111,29 @@ import ClientPurchaseService from './services/ClientPurchaseService';
 // Declare instances that will be populated AFTER initialization
 
 
-let userRepositoryInstance: UserService; 
-let productRepositoryInstance: ProductService; let hsnTaxRuleRepositoryInstance:HSNService;
+let userRepositoryInstance: UserService; let permissionRepositoryInstance:PermissionService;
+let userRoleRepositoryInstance:UserRoleService;
+let rolePermissionRepositoryInstance:RolePermissionService;
+let productRepositoryInstance: ProductService; let productCategoryRepositoryInstance:ProductCategoryService;
+let hsnTaxRuleRepositoryInstance:HSNService;
 let productTemplateRepositoryInstance:ProductTemplateService;
 let productVariantRepositoryInstance:ProductVariantService;
-let purchaseOrderRepositoryInstance: PurchaseService; let salesOrderRepositoryInstance:SalesService
-let clientPurchaseOrderRepository:ClientPurchaseService;
+let purchaseOrderRepositoryInstance: PurchaseService; let salesOrderRepositoryInstance:SalesService;
+let clientRequirementRepositoryInstance:ClientRequirementService;
+let quotationRepositoryInstance:QuotationService;
+let interactionRepositoryInstance:InteractionService;
+let clientPurchaseOrderRepository:ClientPurchaseOrderService;
 let deliveryChallanRepositoryInstance:DeliveryChallanService;
 
 let vendorRepositoryInstance:VendorService; let cityRepositoryInstance:CityService;
 let districtRepositoryInstance:DistrictService;
+
+let lineDiscountRepositoryInstance:LineDiscountService; let discountTypeRepositoryInstance:DiscountTypeService;
+
 let hsnRepositoryInstance:HSNService;
+let subscriptionplanRepositoryInstance:SubscriptionPlanLookupService;
+let tenantTypeRepositoryInstance:TenantTypeLookupService;
+let leadsourceRepositoryInstance:LeadsourceService;
  let refreshTokenRepositoryInstance: RefreshTokenService;
 let settingsServiceInstance: SettingsService; 
 let configServiceInstance:ConfigService; 
@@ -109,13 +145,15 @@ let configAppNameServiceInstance:ConfigAppNameService
 
 
 
-let tenantServiceInstance: TenantService; let tenantCustomScriptsInstance:Tenant_custom_scriptsService;
+let tenantServiceInstance: TenantService; let tenantServiceInstance_New:TenantService_New
+
+let tenantCustomScriptsInstance:Tenant_custom_scriptsService;
 let tenantFormServiceInstance :TenantFormService;
 let tenantStrategyServiceInstance: TenantStrategyService; 
 let customerServiceInstance: CustomerService; let siteServiceInstance:SiteService;
 let productUOMconversionServiceInstance:ProductUomConversionService
 let customerCategoryServiceInstance: CustomerCategoryService;
-let leadSourceServiceInstance:LeadSourceService;  
+let leadSourceServiceInstance:LeadsourceService;  
 
 
 
@@ -146,6 +184,29 @@ export async function initializeDependencies(): Promise<void> {
     // refreshTokenRepositoryInstance = new RefreshTokenRepository();
     console.log("UserRepository and RefreshTokenRepository instances created.");
 
+    
+    userRoleRepositoryInstance = new UserRoleService();
+      // Pass the actual TypeORM repository instance to the service's init method
+      await userRoleRepositoryInstance.init(AppDataSource.getRepository(UserRoleLookup));
+    // refreshTokenRepositoryInstance = new RefreshTokenRepository();
+    console.log("UserRoleRepository and RefreshTokenRepository instances created.");
+
+
+
+    permissionRepositoryInstance = new PermissionService();
+      // Pass the actual TypeORM repository instance to the service's init method
+      await permissionRepositoryInstance.init(AppDataSource.getRepository(Permission));
+    // refreshTokenRepositoryInstance = new RefreshTokenRepository();
+    console.log("PermissionRepository  instances created.");
+
+    //
+    rolePermissionRepositoryInstance = new RolePermissionService();
+      // Pass the actual TypeORM repository instance to the service's init method
+      await rolePermissionRepositoryInstance.init(AppDataSource.getRepository(RolePermission));
+    // refreshTokenRepositoryInstance = new RefreshTokenRepository();
+    console.log("RolePermissionRepository  instances created.");
+
+
 
 
     productRepositoryInstance = new ProductService();
@@ -153,6 +214,14 @@ export async function initializeDependencies(): Promise<void> {
       await productRepositoryInstance.init(AppDataSource.getRepository(Product));
 
     console.log("ProductRepository  instances created.");
+
+    //
+    productCategoryRepositoryInstance = new ProductCategoryService();
+      // Pass the actual TypeORM repository instance to the service's init method
+      await productCategoryRepositoryInstance.init(AppDataSource.getRepository(ProductCategory));
+
+    console.log("ProductCategoryRepository  instances created.");
+
 
     hsnTaxRuleRepositoryInstance=new HSNService();
       // Pass the actual TypeORM repository instance to the service's init method
@@ -181,9 +250,30 @@ export async function initializeDependencies(): Promise<void> {
 
     console.log("PurchaseOrderRepository  instances created.");
 
+    //clientRequirementRepositoryInstance
+
+    clientRequirementRepositoryInstance = new ClientRequirementService();
+      // Pass the actual TypeORM repository instance to the service's init method
+      await clientRequirementRepositoryInstance.init(AppDataSource.getRepository(ClientRequirement)    );
+
+    console.log("ClientRequirementRepository  instances created.");
+
+    //
+quotationRepositoryInstance = new QuotationService();
+      // Pass the actual TypeORM repository instance to the service's init method
+      await quotationRepositoryInstance.init(AppDataSource.getRepository(Quotation)    );
+
+    console.log("QuotationRepository  instances created.");
+
+    interactionRepositoryInstance = new InteractionService();
+      // Pass the actual TypeORM repository instance to the service's init method
+      await interactionRepositoryInstance.init(AppDataSource.getRepository(Interaction)    );
+
+    console.log("InteractionRepository  instances created.");
+
 
     
-    clientPurchaseOrderRepository = new ClientPurchaseService();
+    clientPurchaseOrderRepository = new ClientPurchaseOrderService();
       // Pass the actual TypeORM repository instance to the service's init method
       await clientPurchaseOrderRepository.init(AppDataSource.getRepository(ClientPurchaseOrder));
 
@@ -217,6 +307,28 @@ deliveryChallanRepositoryInstance = new DeliveryChallanService();
 
     console.log("HSNRepository  instances created.");
 
+//
+ subscriptionplanRepositoryInstance = new SubscriptionPlanLookupService();
+      // Pass the actual TypeORM repository instance to the service's init method
+      await subscriptionplanRepositoryInstance.init(AppDataSource.getRepository(SubscriptionPlanLookup));
+
+    console.log("SubscriptionplanRepository  instances created.");
+
+//ttype
+ tenantTypeRepositoryInstance = new TenantTypeLookupService();
+      // Pass the actual TypeORM repository instance to the service's init method
+      await tenantTypeRepositoryInstance.init(AppDataSource.getRepository(TenantTypeLookup));
+
+    console.log("TenantTypeRepository  instances created.");
+
+
+ leadsourceRepositoryInstance = new LeadsourceService();
+      // Pass the actual TypeORM repository instance to the service's init method
+      await leadsourceRepositoryInstance.init(AppDataSource.getRepository(Leadsource));
+
+    console.log("LeadSourceRepository  instances created.");
+
+
       cityRepositoryInstance = new CityService();
       // Pass the actual TypeORM repository instance to the service's init method
       await cityRepositoryInstance.init(AppDataSource.getRepository(City));
@@ -231,6 +343,19 @@ deliveryChallanRepositoryInstance = new DeliveryChallanService();
     console.log("DistrictRepository  instances created.");
 
 
+lineDiscountRepositoryInstance = new LineDiscountService();
+      // Pass the actual TypeORM repository instance to the service's init method
+      await lineDiscountRepositoryInstance.init(AppDataSource.getRepository(LineDiscount));
+
+    console.log("LineDiscountRepository  instances created.");
+
+discountTypeRepositoryInstance = new DiscountTypeService();
+      // Pass the actual TypeORM repository instance to the service's init method
+      await discountTypeRepositoryInstance.init(AppDataSource.getRepository(DiscountType));
+
+    console.log("DiscountTypeRepository  instances created.");
+
+
     refreshTokenRepositoryInstance = new RefreshTokenService();
     // Pass the actual TypeORM repository instance to the service's init method
     await refreshTokenRepositoryInstance.init(AppDataSource.getRepository(RefreshToken));
@@ -243,7 +368,7 @@ deliveryChallanRepositoryInstance = new DeliveryChallanService();
     // to ensure it gets the repository after DataSource is ready.
     settingsServiceInstance = new SettingsService();
     // Pass the actual TypeORM repository instance to the service's init method
-    await settingsServiceInstance.init(AppDataSource.getRepository(Settings));
+    await settingsServiceInstance.init(AppDataSource.getRepository(SecuritySettings));
     await settingsServiceInstance.ensureDefaultSettings(); // Ensure default settings exist and are loaded
     console.log("SettingsService initialized and default settings ensured.");
 
@@ -291,10 +416,17 @@ deliveryChallanRepositoryInstance = new DeliveryChallanService();
     await tenantServiceInstance.init(AppDataSource.getRepository(Tenant),AppDataSource.getRepository(TenantTypeLookup),AppDataSource.getRepository(SubscriptionPlanLookup));
     console.log("tenantServiceInstance initialized");
     
+    //tenantServiceInstance_New -- dummy
+    tenantServiceInstance_New = new TenantService_New();
+    // Pass the actual TypeORM repository instance to the service's init method
+    await tenantServiceInstance_New.init(AppDataSource.getRepository(Tenant));
+    console.log("tenantServiceInstance_New initialized");
+    
+
     tenantFormServiceInstance = new TenantFormService();
     // Pass the actual TypeORM repository instance to the service's init method
     await tenantFormServiceInstance.init(AppDataSource.getRepository(TenantFormConfigs));
-    console.log("tenantServiceInstance initialized");
+    console.log("tenantFormServiceInstance initialized");
     
 
     tenantCustomScriptsInstance = new Tenant_custom_scriptsService();
@@ -331,7 +463,7 @@ deliveryChallanRepositoryInstance = new DeliveryChallanService();
     await customerCategoryServiceInstance.init(AppDataSource.getRepository(CustomerCategory));
     console.log("customerCategoryServiceInstance initialized");
      
-    leadSourceServiceInstance = new LeadSourceService();
+    leadSourceServiceInstance = new LeadsourceService();
     // Pass the actual TypeORM repository instance to the service's init method
     await leadSourceServiceInstance.init(AppDataSource.getRepository(Leadsource));
     console.log("leadSourceServiceInstance initialized");
@@ -350,6 +482,28 @@ export function getUserRepository(): UserService {
     return userRepositoryInstance;
 }
 
+export function getUserRoleRepository(): UserRoleService {
+    if (!userRoleRepositoryInstance) {
+        throw new Error("UserRoleRepository not initialized. Call initializeDependencies() first.");
+    }
+    return userRoleRepositoryInstance;
+}
+
+//
+export function getPermissionRepository(): PermissionService {
+    if (!permissionRepositoryInstance) {
+        throw new Error("PermissionRepository not initialized. Call initializeDependencies() first.");
+    }
+    return permissionRepositoryInstance;
+}
+
+export function getRolePermissionRepository(): RolePermissionService {
+    if (!rolePermissionRepositoryInstance) {
+        throw new Error("RolePermissionRepository not initialized. Call initializeDependencies() first.");
+    }
+    return rolePermissionRepositoryInstance;
+}
+
 
 export function getProductRepository(): ProductService {
     if (!productRepositoryInstance) {
@@ -357,6 +511,16 @@ export function getProductRepository(): ProductService {
     }
     return productRepositoryInstance;
 }
+
+
+export function getProductCategoryRepository(): ProductCategoryService {
+    if (!productCategoryRepositoryInstance) {
+        throw new Error("ProductCategoryRepository not initialized. Call initializeDependencies() first.");
+    }
+    return productCategoryRepositoryInstance;
+}
+
+
 //with variant
 export function getProductTemplateRepository(): ProductTemplateService {
     if (!productTemplateRepositoryInstance) {
@@ -387,8 +551,31 @@ export function getPurchaseOrderRepository(): PurchaseService {
     return purchaseOrderRepositoryInstance;
 }
 
+export function getClientRequirementRepository(): ClientRequirementService {
+    if (!clientRequirementRepositoryInstance) {
+        throw new Error("ClientRequirementRepository not initialized. Call initializeDependencies() first.");
+    }
+    return clientRequirementRepositoryInstance;
+}
+//quotationRepository
 
-export function getClientPurchaseOrderRepository(): ClientPurchaseService {
+
+export function getQuotationRepository(): QuotationService {
+    if (!quotationRepositoryInstance) {
+        throw new Error("QuotationRepository not initialized. Call initializeDependencies() first.");
+    }
+    return quotationRepositoryInstance;
+}
+
+export function getInteractionRepository(): InteractionService {
+    if (!interactionRepositoryInstance) {
+        throw new Error("InteractionRepository not initialized. Call initializeDependencies() first.");
+    }
+    return interactionRepositoryInstance;
+}
+
+
+export function getClientPurchaseOrderRepository(): ClientPurchaseOrderService {
     if (!clientPurchaseOrderRepository) {
         throw new Error("clientPurchaseOrderRepository not initialized. Call initializeDependencies() first.");
     }
@@ -423,6 +610,27 @@ export function getHSNRepository(): HSNService {
     return hsnRepositoryInstance;
 }
 
+export function getSubscriptionPlanLookupRepository(): SubscriptionPlanLookupService {
+    if (!subscriptionplanRepositoryInstance) {
+        throw new Error("HSNRepository not initialized. Call initializeDependencies() first.");
+    }
+    return subscriptionplanRepositoryInstance;
+}
+
+//ttype
+export function getTenantTypeRepository(): TenantTypeLookupService {
+    if (!tenantTypeRepositoryInstance) {
+        throw new Error("HSNRepository not initialized. Call initializeDependencies() first.");
+    }
+    return tenantTypeRepositoryInstance;
+}
+export function getLeadsourceRepository(): LeadsourceService{
+    if (!leadsourceRepositoryInstance) {
+        throw new Error("LeadsourceRepository not initialized. Call initializeDependencies() first.");
+    }
+    return leadsourceRepositoryInstance;
+}
+
 
 export function getCityRepository(): CityService {
     if (!cityRepositoryInstance) {
@@ -436,6 +644,20 @@ export function getDistrictRepository(): DistrictService {
         throw new Error("DistrictRepository not initialized. Call initializeDependencies() first.");
     }
     return districtRepositoryInstance;
+}
+
+export function getLineDiscountRepository(): LineDiscountService {
+    if (!lineDiscountRepositoryInstance) {
+        throw new Error("LineDiscountRepository not initialized. Call initializeDependencies() first.");
+    }
+    return lineDiscountRepositoryInstance;
+}
+//
+export function getDiscountTypeRepository(): DiscountTypeService {
+    if (!discountTypeRepositoryInstance) {
+        throw new Error("DiscountTypeRepository not initialized. Call initializeDependencies() first.");
+    }
+    return discountTypeRepositoryInstance;
 }
 
 
@@ -462,7 +684,7 @@ export function getRefreshTokenRepository(): RefreshTokenService {
     return refreshTokenRepositoryInstance;
 }
 
-export function getSettingsServiceRepository(): SettingsService {
+export function getSeuritySettingsServiceRepository(): SettingsService {
     if (!settingsServiceInstance) {
         throw new Error("SettingsService not initialized. Call initializeDependencies() first.");
     }
@@ -497,6 +719,14 @@ export function getTenantServiceRepository(): TenantService {
         throw new Error("TenantService not initialized. Call initializeDependencies() first.");
     }
     return tenantServiceInstance;
+} 
+
+//getTenantRepository_New - dummy
+export function getTenantRepository_New(): TenantService_New {
+    if (!tenantServiceInstance_New) {
+        throw new Error("TenantService not initialized. Call initializeDependencies() first.");
+    }
+    return tenantServiceInstance_New;
 } 
 
 
@@ -548,7 +778,7 @@ export function getCustomerCategoryServiceRepository(): CustomerCategoryService 
     }
     return customerCategoryServiceInstance;
 } 
-export function getLeadSourceServiceRepository(): LeadSourceService {
+export function getLeadSourceServiceRepository(): LeadsourceService {
     if (!leadSourceServiceInstance) {
         throw new Error("LeadSourceServiceInstance not initialized. Call initializeDependencies() first.");
     }

@@ -37,7 +37,7 @@ export class CityService{
             ptenantId:number,   pId:number,        
             manager?: EntityManager
         ): Promise<City> {
-console.log('hitting url citys');
+
              if (!this.cityRepository) {
                         throw new Error("CityService repository not initialized. Call init() first.");
                     }
@@ -56,16 +56,15 @@ console.log('hitting url citys');
             ptenantId:number,           
             manager?: EntityManager
         ): Promise<City[]> {
-console.log('hitting url citys');
+
              if (!this.cityRepository) {
                         throw new Error("CityService repository not initialized. Call init() first.");
                     }
 
-                    console.log('ptenantId:',ptenantId);
-                    
+                                        
                     const cityRepository = manager ? manager.getRepository(City) : this.cityRepository;
                     const ps= await cityRepository.find({where:{tenantId:ptenantId}}); // Use find() to get all 
-                    console.log('citys count:',ps.length);
+                    
                     
                     return ps;
                 }
@@ -112,8 +111,7 @@ console.log('hitting url citys');
         
 
         if (aCity) {
-            console.log(`Found existing city ID: ${createDto.id}. Updating fields.`);
-            
+                     
             
             const updateData = {
                 ...createDto,

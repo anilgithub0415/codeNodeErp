@@ -36,13 +36,11 @@ export class ProductUomConversionService{
             ptenantId:number,  pProductId:number|null,    pProductVariantId:number|null,
             manager?: EntityManager
         ): Promise<ProductUomConversion[]> {
-console.log('hitting url ProductUomConversions');
+
              if (!this.ProductUomConversionRepository) {
                         throw new Error("ProductUomConversionService repository not initialized. Call init() first.");
                     }
-console.log('this is being called with pid:',pProductVariantId);
-
-                   
+                
                     
                     const ProductUomConversionRepository = manager ? manager.getRepository(ProductUomConversion) : this.ProductUomConversionRepository;
                     var  ps; 
@@ -62,7 +60,7 @@ console.log('this is being called with pid:',pProductVariantId);
             ptenantId:number,   pProductId:number,    pProductVariantId:number,    
             manager?: EntityManager
         ): Promise<ProductUomConversion[]> {
-console.log('hitting url ProductUomConversions');
+
              if (!this.ProductUomConversionRepository) {
                         throw new Error("ProductUomConversionService repository not initialized. Call init() first.");
                     }

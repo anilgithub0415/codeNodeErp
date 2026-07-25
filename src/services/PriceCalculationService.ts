@@ -22,6 +22,7 @@ private hookBroker =new HookBroker();
             console.log('find category of customer:',customer);
             
              const customerCategory=customer?.customerCategoryId;
+console.log('found customerCategory :',customerCategory,' of custid:',customerId);
 
              return await this.getProductFinalPrice(tenantId,customerCategory!,p);
 
