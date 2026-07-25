@@ -1,19 +1,19 @@
 import { Router, Request, Response } from 'express';
 // Import the specific getter for SettingsService
-import { getSettingsServiceRepository } from '../../dependencies'; // Corrected getter name
+import { getSeuritySettingsServiceRepository } from '../../dependencies'; // Corrected getter name
 
 import { globalEvents } from '../../Special/ConstantsNEnums';
 const eventemitter = require('../../Special/notifier'); // Still CommonJS for now
 
 const router = Router();
 
-// Middleware to ensure settingsService is available (optional, but good for clarity)
+// Middleware to ensure securitySettingsService is available (optional, but good for clarity)
 // Or rely on the fact that dependencies.ts ensures it at startup
 router.use((req, res, next) => {
     // In a real app, you'd probably have an Auth middleware before this
     // to check if the user is an admin for accessing settings.
     try {
-        const settingsService = getSettingsServiceRepository(); // Attempt to get the service
+        const securitySettingsService = getSeuritySettingsServiceRepository(); // Attempt to get the service
         // You could attach it to res.locals or req for later use if desired,
         // but directly calling the getter in each route is also fine.
         next();
@@ -28,8 +28,8 @@ router.use((req, res, next) => {
 router.get('/', async (req: Request, res: Response) => {
     // Implement authentication/authorization here!
     try {
-        const settingsService = getSettingsServiceRepository(); // Get the singleton instance
-        const currentSettings = settingsService.getSettings(); // Get the cached settings
+        const securitySettingsService = getSeuritySettingsServiceRepository(); // Get the singleton instance
+        const currentSettings = securitySettingsService.getSettings(); // Get the cached settings
         res.status(200).json(currentSettings);
     } catch (error: any) {
         console.error('Failed to retrieve settings:', error.message || error);
@@ -42,7 +42,7 @@ router.get('/', async (req: Request, res: Response) => {
 router.put('/', async (req: Request, res: Response) => {
     // Implement authentication/authorization here to ensure only authorized admins can call this!
     try {
-        const settingsService = getSettingsServiceRepository(); // Get the singleton instance
+        const securitySettingsService = getSeuritySettingsServiceRepository(); // Get the singleton instance
 
         // Ensure these properties exist and are numbers before passing
         const newAccessTokenLifetime =parseInt( req.body.accessTokenLifetime); // Renamed from newAccessTokenLifetime for consistency
@@ -55,8 +55,8 @@ console.log('req.body.accessTokenLifetime:'+req.body.accessTokenLifetime);
         }
 
         // Call the saveSettings method on the singleton instance
-        //await settingsService.saveSettings(newAccessTokenLifetime, newRefreshTokenLifetime);
-        await settingsService.saveSettings(req.body);
+        //await securitySettingsService.saveSettings(newAccessTokenLifetime, newRefreshTokenLifetime);
+        await securitySettingsService.saveSettings(req.body);
 
         // Emit event to notify other parts of the app (like SettingsService's own constructor)
         eventemitter.emit(globalEvents.accessTokenExpiryChanged);

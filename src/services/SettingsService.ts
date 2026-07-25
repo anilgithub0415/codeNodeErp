@@ -1,6 +1,6 @@
 // src/services/SettingsService_1.ts
 import { Repository } from 'typeorm'; // Import Repository directly
-import { Settings } from '../entity/Settings'; // Import your Settings entity
+import { SecuritySettings } from '../entity/SecuritySettings'; // Import your Settings entity
 import { globalEvents } from '../Special/ConstantsNEnums'; // Ensure this path is correct
 import { BackendGlobalsettingsDto } from '../dto/settings.dto';
 const eventemitter = require('../Special/notifier'); // Assuming CommonJS for now
@@ -12,9 +12,9 @@ export interface AppSettings {
     // Add other settings here if needed
 }
 
-class SettingsService {
+class SecuritySettingsService {
     // This will be set by the init method, after AppDataSource is ready
-    private settingsRepository!: Repository<Settings>;
+    private settingsRepository!: Repository<SecuritySettings>;
     
     private currentSettings: AppSettings = {
         accessTokenLifetime: 3600,   // Default: 1 hour
@@ -37,7 +37,7 @@ class SettingsService {
      * This MUST be called AFTER AppDataSource.initialize() has completed.
      * @param repo The TypeORM Repository instance for Settings.
      */
-    async init(repo: Repository<Settings>): Promise<void> {
+    async init(repo: Repository<SecuritySettings>): Promise<void> {
         this.settingsRepository = repo;
         console.log("SettingsService repository initialized.");
     }
@@ -63,7 +63,7 @@ class SettingsService {
             if (!dbSettings) {
                 // 2. If no settings record found, create one with default values
                 console.log('No global settings found in DB. Creating default settings record...');
-                dbSettings = new Settings(); // Create an instance of the Settings entity
+                dbSettings = new SecuritySettings(); // Create an instance of the Settings entity
                 dbSettings.settingKey = SETTINGS_KEY;
                 dbSettings.accessTokenLifetime = this.currentSettings.accessTokenLifetime; // Use initial class defaults
                 dbSettings.refreshTokenLifetime = this.currentSettings.refreshTokenLifetime; // Use initial class defaults
@@ -105,7 +105,7 @@ class SettingsService {
      * Saves updated settings to the database and reloads the in-memory cache.
      * Use this method when an admin explicitly updates settings via an API.
      */
-     public async saveSettings(data:BackendGlobalsettingsDto): Promise<Settings> {
+     public async saveSettings(data:BackendGlobalsettingsDto): Promise<SecuritySettings> {
         if (!this.settingsRepository) {
             throw new Error("SettingsService has not been initialized. Call init() first.");
         }
@@ -116,7 +116,7 @@ class SettingsService {
             if (!dbSettings) {
                 // If it doesn't exist, ensureDefaultSettings should have handled it.
                 // But in case of direct save without prior load, create it.
-                dbSettings = new Settings();
+                dbSettings = new SecuritySettings();
                 dbSettings.settingKey = SETTINGS_KEY;
             }
 
@@ -140,4 +140,4 @@ class SettingsService {
     }
 }
 
-export default SettingsService; // Export the class, not an instance
+export default SecuritySettingsService; // Export the class, not an instance

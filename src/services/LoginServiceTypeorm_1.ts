@@ -5,7 +5,7 @@ import { RefreshToken } from '../entity/RefreshToken';
 import { User } from '../entity/User';
 
 // Import getters from the central dependencies file
-import { getUserRepository, getRefreshTokenRepository, getSettingsServiceRepository } from '../dependencies';
+import { getUserRepository, getRefreshTokenRepository, getSeuritySettingsServiceRepository } from '../dependencies';
 import { CreateUserDto } from '../dto/CreateUser.dto';
 import { UserRoleLookup } from '../entity/UserRoleLookup';
 import { AppDataSource } from '../../data-source';
@@ -28,7 +28,7 @@ const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI!; // This must be th
 
 // Define the structure for a single available context
 interface AvailableContext {
-    tenantId: string;
+    tenantId: number;
     tenantName: string; // Include tenant name for display
     roleName: string;
     permissions: string[];
@@ -38,7 +38,7 @@ interface AvailableContext {
 interface ContextSpecificJwtPayload {
     userId: number;
     userName: string;
-    tenantId: string;
+    tenantId: number;
     roleName: string;
     permissions: string[];
     // Other standard JWT claims (iat, exp) are added by jwt.sign
@@ -48,10 +48,13 @@ interface JwtPayload {
     // role: UserRoleLookup;// string;//changed enum to lookup
     // exp?: number;
     // userId?: number;
-    // tenantId:string;
+    // 
     // permissions: string[]; 
     userId: number;
     userName: string;
+    siteId?:number;
+    clientId?:number;tenantId:number;
+    roleName: string;
     // This initial token will contain all available contexts
     availableContexts: AvailableContext[];
     // Other standard JWT claims (iat, exp) are added by jwt.sign
@@ -62,11 +65,13 @@ interface LoginResponse {
     access_token: string;
     refresh_token: string;
     userId: number;
+    siteId:number; clientId:number;
     availableContexts: AvailableContext[];
     expires_in: number; //earlier was AccessToken_expiresIn
-    tenantId:string;
+    tenantId:number;
     tenantType:string;
     roleName:string;
+    permissions:any[]
 }
 
 // Define the return type of the generateAuthTokens function
@@ -84,7 +89,7 @@ interface RefreshAccessTokenResponse {
     access_token: string;
     newRefreshToken?: string;
     userId: number;
-    tenantId: string;
+    tenantId: number;
     roleName: string;
     permissions: string[];
     AccessToken_expiresIn: number;
@@ -124,7 +129,7 @@ interface RefreshAccessTokenResponse {
 //     // Get service instances (these are the global ones from dependencies.ts)
 //     const userService = getUserRepository(); // This returns UserService instance
 //     const refreshTokenService = getRefreshTokenRepository(); // This returns RefreshTokenService instance
-//     const settingsService = getSettingsServiceRepository(); // This returns SettingsService instance
+//     const securitySettingsService = getSeuritySettingsServiceRepository(); // This returns SettingsService instance
 //     const userRoleLookupRepo = manager ? manager.getRepository(UserRoleLookup) : AppDataSource.getRepository(UserRoleLookup); // Get repo directly for UserRoleLookup
 
 //     try {
@@ -170,8 +175,8 @@ interface RefreshAccessTokenResponse {
 //             permissions: userPermissions
 //         };
         
-//         const currentAccessTokenLifetime = settingsService.getSettings().accessTokenLifetime;
-//         const currentRefreshTokenLifetime = settingsService.getSettings().refreshTokenLifetime;
+//         const currentAccessTokenLifetime = securitySettingsService.getSettings().accessTokenLifetime;
+//         const currentRefreshTokenLifetime = securitySettingsService.getSettings().refreshTokenLifetime;
         
 //         console.log('.................................... going to jwt sign............for newUser.id:', newUser_confirmed.id);
         
@@ -212,12 +217,12 @@ interface RefreshAccessTokenResponse {
                                 //<!--newUser: User-->
 const generateAuthTokens = async (newUser: any, deviceInfo: string = '', manager?: EntityManager,  initialContext?: any): Promise<GenerateAuthTokensResponse> => 
 {
-    //console.log('......................... m in generateAuthTokens newUser:', newUser.id);
+    console.log('......................... m in generateAuthTokens newUser:', newUser.id);
     
     // Get service instances (these are the global ones from dependencies.ts)
     const userService = getUserRepository(); // This returns UserService instance
     const refreshTokenService = getRefreshTokenRepository(); // This returns RefreshTokenService instance
-    const settingsService = getSettingsServiceRepository(); // This returns SettingsService instance
+    const securitySettingsService = getSeuritySettingsServiceRepository(); // This returns SettingsService instance
     const userTenantContextRepo = manager ? manager.getRepository(UserTenantContext) : AppDataSource.getRepository(UserTenantContext);
 
     try {
@@ -261,10 +266,10 @@ const generateAuthTokens = async (newUser: any, deviceInfo: string = '', manager
         // 2. Map UserTenantContexts to AvailableContext DTOs
         var availableContexts: AvailableContext[] = userContexts.map(context => ({
             tenantId: context.tenantId,
-            tenantName: context.tenant.tenantName, // Assuming tenant name is available on the loaded tenant object
-            tenantType:context.tenant.tenantType,
+            tenantName: context.user.tenant!.tenantName, // Assuming tenant name is available on the loaded tenant object
+            tenantType:context.user.tenant!.tenantType,
             roleName: context.roleName,
-            permissions: context.role.permissions ? context.role.permissions.map(p => p.permissionName) : []
+            permissions: context.role.rolePermissions ? context.role.rolePermissions.map(p => p.permissionName) : [] //here was error .permissions
         }));
      
 
@@ -279,15 +284,16 @@ const generateAuthTokens = async (newUser: any, deviceInfo: string = '', manager
 
         // 3. Create JWT Payload
         const payload: JwtPayload = {
-            userName: newUser_confirmed.userName,
-            userId: newUser_confirmed.id,
+            userName: newUser_confirmed.userName, roleName:'Client',
+            userId: newUser_confirmed.id, tenantId:newUser_confirmed.tenantId!,          
             availableContexts:  availableContexts// Include all contexts in the initial token
         };
         
-        const currentAccessTokenLifetime = settingsService.getSettings().accessTokenLifetime;
-        const currentRefreshTokenLifetime = settingsService.getSettings().refreshTokenLifetime;
+        const currentAccessTokenLifetime = securitySettingsService.getSettings().accessTokenLifetime;
+        const currentRefreshTokenLifetime = securitySettingsService.getSettings().refreshTokenLifetime;
         
         console.log('.................................... going to jwt sign............for newUser.id:', newUser_confirmed.id,'now availableContexts.length is:',availableContexts.length,' payload passed:',payload);
+        console.log('...............................currentAccessTokenLifetime:',currentAccessTokenLifetime);
         
         // 4. Generate Access Token
         const accessToken = jwt.sign(payload, ACCESS_TOKEN_SECRET, { expiresIn: currentAccessTokenLifetime });
@@ -334,7 +340,7 @@ const generateAuthTokens = async (newUser: any, deviceInfo: string = '', manager
                 
 //                     const userRepo = getUserRepository();
 //                     const refreshTokenRepo = getRefreshTokenRepository();
-//                     const settingsService = getSettingsServiceRepository();
+//                     const securitySettingsService = getSeuritySettingsServiceRepository();
                  
 //                     try {
                         
@@ -380,8 +386,8 @@ const generateAuthTokens = async (newUser: any, deviceInfo: string = '', manager
 //                                     tenantId: newUser.tenantId, //added confirm it
 //                                     permissions: userPermissions 
 //                                 };
-//                                 const currentAccessTokenLifetime = settingsService.getSettings().accessTokenLifetime; // Use accessTokenLifetime
-//                                 const currentRefreshTokenLifetime = settingsService.getSettings().refreshTokenLifetime; // Use refreshTokenLifetime
+//                                 const currentAccessTokenLifetime = securitySettingsService.getSettings().accessTokenLifetime; // Use accessTokenLifetime
+//                                 const currentRefreshTokenLifetime = securitySettingsService.getSettings().refreshTokenLifetime; // Use refreshTokenLifetime
 //             console.log('.................................... going to jwt sign............for  newUser.id:', newUser.id);
             
 
@@ -447,7 +453,7 @@ const generateAuthTokens = async (newUser: any, deviceInfo: string = '', manager
 //     // Get instances from the dependency getters
 //     const userRepo = getUserRepository();
 //     const refreshTokenRepo = getRefreshTokenRepository();
-//     const settingsService = getSettingsServiceRepository();
+//     const securitySettingsService = getSeuritySettingsServiceRepository();
 
 //     try {
 //         console.log('credentials.userName:', credentials.userName,'pwd:',credentials.password);
@@ -487,8 +493,8 @@ const generateAuthTokens = async (newUser: any, deviceInfo: string = '', manager
 //             permissions:userPermissions
 //         };
 
-//         const currentAccessTokenLifetime = settingsService.getSettings().accessTokenLifetime; // Use accessTokenLifetime
-//         const currentRefreshTokenLifetime = settingsService.getSettings().refreshTokenLifetime; // Use refreshTokenLifetime
+//         const currentAccessTokenLifetime = securitySettingsService.getSettings().accessTokenLifetime; // Use accessTokenLifetime
+//         const currentRefreshTokenLifetime = securitySettingsService.getSettings().refreshTokenLifetime; // Use refreshTokenLifetime
 
 //         console.log('Current Access Token Lifetime:', currentAccessTokenLifetime, 'seconds');
 //         console.log('Current Refresh Token Lifetime:', currentRefreshTokenLifetime, 'seconds');
@@ -522,11 +528,12 @@ const generateAuthTokens = async (newUser: any, deviceInfo: string = '', manager
 // };
 
 // --- MODIFIED Login function ---
-const Login = async (credentials: { userName: string; password: string; }, deviceInfo: string): Promise<LoginResponse> => {
+const Login_preserve = async (credentials: { userName: string; password: string; }, deviceInfo: string): Promise<LoginResponse> => 
+    {
     // Get instances from the dependency getters
     const userService = getUserRepository(); // Use the UserService instance
     const refreshTokenRepo = getRefreshTokenRepository();
-    const settingsService = getSettingsServiceRepository();
+    const securitySettingsService = getSeuritySettingsServiceRepository();
     const userTenantContextRepo = AppDataSource.getRepository(UserTenantContext); // Get UserTenantContext repository
 
     try {
@@ -541,17 +548,29 @@ const Login = async (credentials: { userName: string; password: string; }, devic
         if (typeof authenticatedUser.id === 'undefined') {
             throw new Error('Authenticated user missing ID.');
         }
-
+console.log('m here......................................................................................................');
         // 2. Invalidate any existing refresh token for this user on this device
         await refreshTokenRepo.deleteExistingTokenForDevice(authenticatedUser.id, deviceInfo);
-        console.log(`Any previous refresh token for user ${authenticatedUser.userName} on device ${deviceInfo} has been invalidated.`);
+                
 
         // 3. Fetch all active UserTenantContexts for this authenticated User
         // Eager load role and its permissions, and tenant for display name
-        const userContexts = await userTenantContextRepo.find({
-            where: { userId: authenticatedUser.id, isActiveInContext: true },
-            relations: ['tenant', 'role', 'role.permissions'] // Load tenant, role, and role's permissions
-        });
+        
+                
+            const userContexts = await userTenantContextRepo.createQueryBuilder('utc')
+            .leftJoinAndSelect('utc.user', 'user')
+            .leftJoinAndSelect('user.tenant', 'tenant')
+            .leftJoinAndSelect('utc.role', 'role')
+            // EXPLICIT FIX: Jointure to fetch the permissions array nested inside the role
+            .leftJoinAndSelect('role.rolePermissions', 'rolePermissions') //here was error for .permissions
+            .addSelect(['tenant.tenantId', 'tenant.tenantName'])
+            .where('utc.userId = :id', { id: authenticatedUser.id })
+            .getMany();
+
+            //querybuilder
+                
+
+console.log('m here.....................................................................................................2.');
 
         if (userContexts.length === 0) {
             throw new Error(`No active contexts found for user ${authenticatedUser.userName}. Please contact support.`);
@@ -561,20 +580,25 @@ const Login = async (credentials: { userName: string; password: string; }, devic
         const availableContexts: AvailableContext[] = userContexts.map(context => ({
             userId:context.userId,//added
             tenantId: context.tenantId,
-            tenantName: context.tenant.tenantName, // Assuming tenant name is available on the loaded tenant object
+            tenantName: context.user.tenant!.tenantName, // Assuming tenant name is available on the loaded tenant object
             roleName: context.roleName,
-            permissions: context.role.permissions ? context.role.permissions.map(p => p.permissionName) : []
+            permissions: context.role.rolePermissions ? context.role.rolePermissions.map(p => p.permissionName) : [] //here was error for .permissions
         }));
 
+        
+        
         // 5. Create JWT Payload
         const payload: JwtPayload = {
             userName: authenticatedUser.userName,
             userId: authenticatedUser.id,
+            siteId:authenticatedUser.siteId!,
+            clientId:authenticatedUser.clientId!,tenantId:authenticatedUser.tenantId!,
+            roleName:'Client',
             availableContexts: availableContexts // Include all contexts in the initial token
         };
 
-        const currentAccessTokenLifetime = settingsService.getSettings().accessTokenLifetime;
-        const currentRefreshTokenLifetime = settingsService.getSettings().refreshTokenLifetime;
+        const currentAccessTokenLifetime = securitySettingsService.getSettings().accessTokenLifetime;
+        const currentRefreshTokenLifetime = securitySettingsService.getSettings().refreshTokenLifetime;
 
         console.log('Current Access Token Lifetime:', currentAccessTokenLifetime, 'seconds');
         console.log('Current Refresh Token Lifetime:', currentRefreshTokenLifetime, 'seconds');
@@ -598,17 +622,22 @@ const Login = async (credentials: { userName: string; password: string; }, devic
         console.log(`Login successful for user ${authenticatedUser.userName}. Generated access and refresh tokens.`);
 
 
+
         // 8. Return the response
         return {
             access_token: accessToken,
             refresh_token: refreshTokenString,
-            userId: authenticatedUser.id,
+            userId: authenticatedUser.id, 
+            siteId: authenticatedUser.siteId!, 
+            clientId: authenticatedUser.clientId!, 
             availableContexts: availableContexts, // Return the contexts to the frontend
             expires_in : currentAccessTokenLifetime //earlier was AccessToken_expiresIn
             ,tenantId: availableContexts[0]!.tenantId,
           //  tenantName:  availableContexts![0].tenant.tenantName, // Make sure tenant relation is loaded
             tenantType: 'INSTITUTE',//availableContexts![0].t.tenant.tenantTypeName, //pending- hardcoded
-            roleName: 'Coordinator'// availableContexts![0]!.roleName, //pending-hardcode
+            roleName: 'Coordinator',// availableContexts![0]!.roleName, //pending-hardcode
+            permissions:availableContexts![0]!.permissions
+           // permissions:['ClientPO.Approve','ClientPO.Reject']
         };
 
     } catch (error: any) {
@@ -617,12 +646,119 @@ const Login = async (credentials: { userName: string; password: string; }, devic
     }
 }
 
+//modified Log method on:22Jul 2002
+const Login = async (credentials: { userName: string; password: string; }, deviceInfo: string): Promise<LoginResponse> => {
+    const userService = getUserRepository();
+    const refreshTokenRepo = getRefreshTokenRepository();
+    const securitySettingsService = getSeuritySettingsServiceRepository();
+    const userTenantContextRepo = AppDataSource.getRepository(UserTenantContext);
+
+    try {
+        console.log('Attempting login verification for userName:', credentials.userName);
+        
+        // 1. Authenticate global user profile info first
+        const authenticatedUser = await userService.Authenticate(credentials.userName, credentials.password);
+        if (!authenticatedUser || typeof authenticatedUser.id === 'undefined') {
+            throw new Error('Invalid credentials');
+        }
+console.log('..............m here...............1');
+
+        // Convert user ID cleanly to a number to fix the TypeScript assignment error
+        const verifiedUserId = Number(authenticatedUser.id);
+
+        // 2. Clear existing tokens for this specific device FIRST to free locks
+        await refreshTokenRepo.deleteExistingTokenForDevice(verifiedUserId, deviceInfo);
+
+
+console.log('..............m here...............2');
+
+
+        // 3. Fetch active tenant/role contexts for this authenticated User
+        const userContexts = await userTenantContextRepo.createQueryBuilder('utc')
+            .leftJoinAndSelect('utc.user', 'user')
+            .leftJoinAndSelect('user.tenant', 'tenant')
+            .leftJoinAndSelect('utc.role', 'role')
+            .leftJoinAndSelect('role.rolePermissions', 'rolePermissions')
+            .addSelect(['tenant.tenantId', 'tenant.tenantName'])
+            .where('utc.userId = :id', { id: verifiedUserId })
+            .getMany();
+
+        // 4. Map entities to AvailableContext DTOs safely
+        const availableContexts: AvailableContext[] = userContexts.map(context => ({
+            userId: context.userId,
+            tenantId: context.tenantId,
+            tenantName: context.user?.tenant?.tenantName || 'Unknown Tenant',
+            roleName: context.roleName,
+            permissions: context.role?.rolePermissions ? context.role.rolePermissions.map(p => p.permissionName) : []
+        }));
+console.log('..............m here...............3');
+
+        // Extracted variables with array index fix applied
+        const defaultTenantId = availableContexts.length > 0 ? availableContexts[0].tenantId : authenticatedUser.tenantId || 0;
+        const defaultPermissions = availableContexts.length > 0 ? availableContexts[0].permissions : [];
+
+        // 5. Construct token payload
+        const payload: JwtPayload = {
+            userName: authenticatedUser.userName,
+            userId: verifiedUserId,
+            siteId: authenticatedUser.siteId!,
+            clientId: authenticatedUser.clientId!,
+            tenantId: authenticatedUser.tenantId!,
+            roleName: 'Client',
+            availableContexts: availableContexts
+        };
+console.log('..............m here...............4');
+
+        const currentAccessTokenLifetime = securitySettingsService.getSettings().accessTokenLifetime;
+        const currentRefreshTokenLifetime = securitySettingsService.getSettings().refreshTokenLifetime;
+
+        // 6. Sign JWT token
+        const accessToken = jwt.sign(payload, ACCESS_TOKEN_SECRET, { expiresIn: currentAccessTokenLifetime });
+
+        // 7. Save structural refresh identity token values
+        const refreshTokenString = uuidv4();
+        const expiresAt = new Date(Date.now() + currentRefreshTokenLifetime * 1000);
+
+        const newRefreshToken = new RefreshToken();
+        newRefreshToken.token = refreshTokenString;
+        newRefreshToken.userId = verifiedUserId;
+        newRefreshToken.expiresAt = expiresAt;
+        newRefreshToken.deviceInfo = deviceInfo;
+
+        await refreshTokenRepo.save(newRefreshToken);
+        
+        console.log(`Login completely validated for user ${authenticatedUser.userName}.`);
+
+        // 8. Return payload securely
+        return {
+            access_token: accessToken,
+            refresh_token: refreshTokenString,
+            userId: verifiedUserId, 
+            siteId: authenticatedUser.siteId!, 
+            clientId: authenticatedUser.clientId!, 
+            availableContexts: availableContexts,
+            expires_in: currentAccessTokenLifetime,
+            tenantId: defaultTenantId, 
+            tenantType: 'INSTITUTE', 
+            roleName: 'Coordinator',
+            permissions: defaultPermissions
+        };
+
+    } catch (error: any) {
+        console.error('Core validation error caught during Login process:', error.message || error);
+        throw error;
+    }
+};
+
+
+
+
 // --- RefreshAccessToken function ---//changed enum to lookup
 // const RefreshAccessToken = async (refreshToken: string, userId: number): Promise<{ accessToken: string; newRefreshToken?: string; role: UserRoleLookup; userId: number }> => 
 // {
 //     const userRepo = getUserRepository();
 //     const refreshTokenRepo = getRefreshTokenRepository();
-//     const settingsService = getSettingsServiceRepository();
+//     const securitySettingsService = getSeuritySettingsServiceRepository();
 
 //     try {
 //         const storedToken = await refreshTokenRepo.findByToken(refreshToken);
@@ -665,10 +801,10 @@ const Login = async (credentials: { userName: string; password: string; }, devic
 //             permissions:userPermissions
 //         };
 
-//         const currentAccessTokenLifetime = settingsService.getSettings().accessTokenLifetime;
+//         const currentAccessTokenLifetime = securitySettingsService.getSettings().accessTokenLifetime;
 //         const accessToken = jwt.sign(payload, ACCESS_TOKEN_SECRET, { expiresIn: currentAccessTokenLifetime });
 
-//         const currentRefreshTokenLifetime = settingsService.getSettings().refreshTokenLifetime;
+//         const currentRefreshTokenLifetime = securitySettingsService.getSettings().refreshTokenLifetime;
 //         const newRefreshTokenString = uuidv4();
 //         const newExpiresAt = new Date(Date.now() + currentRefreshTokenLifetime * 1000);
 
@@ -698,12 +834,12 @@ const Login = async (credentials: { userName: string; password: string; }, devic
 const RefreshAccessToken = async (
     refreshToken: string,
     userId: number,
-    tenantId: string, // REQUIRED: The tenant ID of the context to refresh
+    tenantId: number, // REQUIRED: The tenant ID of the context to refresh
     roleName: string // REQUIRED: The role name of the context to refresh
 ): Promise<RefreshAccessTokenResponse> => {
     const userService = getUserRepository();
     const refreshTokenRepo = getRefreshTokenRepository();
-    const settingsService = getSettingsServiceRepository();
+    const securitySettingsService = getSeuritySettingsServiceRepository();
     const userTenantContextRepo = AppDataSource.getRepository(UserTenantContext);
 
     try {
@@ -743,8 +879,8 @@ const RefreshAccessToken = async (
             throw new Error(`Invalid or inactive context requested for refresh: Tenant ${tenantId}, Role ${roleName}.`);
         }
 
-        // 5. Extract permission names for the selected context
-        const userPermissions = userContext.role.permissions ? userContext.role.permissions.map(p => p.permissionName) : [];
+        // 5. Extract permission names for the selected context, here was error .permissions
+        const userPermissions = userContext.role.rolePermissions ? userContext.role.rolePermissions.map(p => p.permissionName) : [];
 
         // 6. Create JWT Payload for the context-specific access token
         const payload: ContextSpecificJwtPayload = {
@@ -755,11 +891,11 @@ const RefreshAccessToken = async (
             permissions: userPermissions
         };
 
-        const currentAccessTokenLifetime = settingsService.getSettings().accessTokenLifetime;
+        const currentAccessTokenLifetime = securitySettingsService.getSettings().accessTokenLifetime;
         const accessToken = jwt.sign(payload, ACCESS_TOKEN_SECRET, { expiresIn: currentAccessTokenLifetime });
 
         // 7. Generate and Save a new Refresh Token (optional, but good practice for rotation)
-        const currentRefreshTokenLifetime = settingsService.getSettings().refreshTokenLifetime;
+        const currentRefreshTokenLifetime = securitySettingsService.getSettings().refreshTokenLifetime;
         const newRefreshTokenString = uuidv4();
         const newExpiresAt = new Date(Date.now() + currentRefreshTokenLifetime * 1000);
 
@@ -804,7 +940,7 @@ const Logout = async (refreshTokenData: { refreshToken: string }): Promise<void>
 // const LoginWithGoogle = async (code: string, deviceInfo: string): Promise<{ access_token: string; refresh_token: string; role: string; userId: number }> => {
 //     const userRepo = getUserRepository();
 //     const refreshTokenRepo = getRefreshTokenRepository();
-//     const settingsService = getSettingsService();
+//     const securitySettingsService = getSettingsService();
 
 //     try {
 //         console.log('Exchanging Google authorization code for tokens...');
@@ -869,8 +1005,8 @@ const Logout = async (refreshTokenData: { refreshToken: string }): Promise<void>
 //             userId: user.id
 //         };
 
-//         const currentAccessTokenLifetime = settingsService.getSettings().accessTokenLifetime;
-//         const currentRefreshTokenLifetime = settingsService.getSettings().refreshTokenLifetime;
+//         const currentAccessTokenLifetime = securitySettingsService.getSettings().accessTokenLifetime;
+//         const currentRefreshTokenLifetime = securitySettingsService.getSettings().refreshTokenLifetime;
 
 //         const accessToken = jwt.sign(appPayload, ACCESS_TOKEN_SECRET, { expiresIn: currentAccessTokenLifetime });
 

@@ -28,10 +28,13 @@ router.use((req, res, next) => {
 router.route('')
 .get(async (req:Request,res:Response)=>{
     try{
+        console.log('config route called.......');
+        
    
       const configService = getConfigServiceRepository(); // Get the singleton instance
         const currentConfig =await configService.getConfig(); // Get the cached config
-              
+           console.log('currentConfig:',currentConfig);
+           
         res.status(200).json(currentConfig);
     }
     catch(error:any){

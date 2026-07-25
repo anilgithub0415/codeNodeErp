@@ -1,9 +1,9 @@
-import { Settings } from "./Settings";
+import { SecuritySettings } from "./SecuritySettings";
 
 export interface SettingsRepositoryInterface {
-    save(Settings: Settings): Promise<Settings>;
-    getById(id: string): Promise<Settings | undefined>;
-    getAll(): Promise<Settings[]>;
+    save(Settings: SecuritySettings): Promise<SecuritySettings>;
+    getById(id: string): Promise<SecuritySettings | undefined>;
+    getAll(): Promise<SecuritySettings[]>;
   }
   
  

@@ -1,10 +1,10 @@
-// src/entity/Settings.ts
+// src/entity/SecuritySettings.ts
 import { Entity, PrimaryColumn, Column } from 'typeorm';
 
 // This class defines the structure of your 'Settings' table in the database.
 // It is designed to hold a single row of global application settings.
-@Entity({ name: 'Settings' }) // You can customize the table name if 'Settings' isn't suitable, e.g., 'ApplicationSettings'
-export class Settings {
+@Entity({ name: 'SecuritySettings' }) // You can customize the table name if 'Settings' isn't suitable, e.g., 'ApplicationSettings'
+export class SecuritySettings {
 
     // Primary Key for a Single Record Table:
     // We use @PrimaryColumn() for a non-generated primary key.

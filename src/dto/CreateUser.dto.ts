@@ -23,7 +23,7 @@ export interface RegisterAndSubscribeDto {
 }
 
 export interface CreateUserDto {
-    tenantId:string;
+    tenantId:number;
     userName: string; // Email
     displayName:string;
     password: string;
@@ -38,6 +38,6 @@ export interface CreateUserDto {
 export type UpdateUserDTO = Partial<Omit<User, 'id' | 'createdAt' | 'updatedAt' | 'refreshTokens' | 'tenant'>> & {
       password?: string;
       roleNameInContext?:string;
-      activeTenantId?:string;
+      activeTenantId?:number;
       
 };

@@ -42,10 +42,10 @@ router.route('/:id/ptenantId/:ptenantId')
    
     .get(async (req: Request, res: Response) => {
         try {
-            
+            var tenantId=parseInt(req.params.ptenantId);
             
             const tenantService = getTenantServiceRepository(); // Get the singleton instance
-            const tenants = await tenantService.getTenants(req.params.ptenantId);
+            const tenants = await tenantService.getTenants(tenantId);
             res.status(200).json(tenants); // 200 OK for successful GET
         } catch (error: any) {
             console.error('Failed to retrieve tenants:', error.message || error);
@@ -98,8 +98,9 @@ router.route('')
 router.route('/:id')
     .get(async (req: Request, res: Response) => {
         try {
+            const id=parseInt(req.params.id);
             const tenantService = getTenantServiceRepository(); // Get the singleton instance
-            const tenant = await tenantService.getTenant(req.params.id);
+            const tenant = await tenantService.getTenant(id);
             if (tenant) {
                 res.status(200).json(tenant);
             } else {
@@ -111,7 +112,7 @@ router.route('/:id')
         }
     }) 
   
-    .put(async (req: Request<{ id: string }, {}, BackendCreateTenantDto>, res: Response) => { // Type params and body
+    .put(async (req: Request<{ id: number }, {}, BackendCreateTenantDto>, res: Response) => { // Type params and body
         const id = req.params.id;
         // No need for if(!id) throw new Error, Express handles missing params in routes with :id
         try {

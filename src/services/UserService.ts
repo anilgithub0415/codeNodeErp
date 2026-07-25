@@ -1,189 +1,91 @@
-
-//pending- if Student preparing student profile while registering
-
-// src/services/UserService.ts
-import { EntityManager, Not, Repository } from 'typeorm';
+// src/Services/UserService.ts
+import { EntityManager, FindOptionsWhere, ILike, Not, Repository } from 'typeorm';
 import { User } from '../entity/User';
-
 import { UserRoleLookup } from '../entity/UserRoleLookup';
-import { UpdateUserDTO } from '../dto/CreateUser.dto';
-//import { getTenantServiceRepository, getUserRepository } from '../dependencies'; // <-- User Service gets its dependencies from here!
-
-import { AppDataSource } from '../../data-source'; // Assuming you have a data-source for repositories
-import * as bcrypt from 'bcrypt'; // For password hashing
-
-//import { StudentProfile } from '../entity/StudentProfile';
+import { AppDataSource } from '../../data-source'; 
+import * as bcrypt from 'bcrypt'; 
 import { AutocodeService } from './autocode.service';
 import { UserTenantContext } from '../entity/UserTenantContext';
 
-// Define DTOs for input and output (adjust based on your actual needs)
 export interface CreateUserAndContextDto {
-    // firstName: string;
-    // lastName?: string;
-    // contactEmail: string; // This will be the Person's contactEmail and the User's userName
-    // contactPhone?: string;
-    // password: string;
-    // initialTenantId: string; // The tenant this user is being created for
-    // initialRoleName: string; // The initial role for this user in this tenant
-    // // Add other person/user fields as needed
-    // firstName: string;  
-    // lastName?: string;  
-    // contactEmail: string;  
-    // contactPhone?:string;
-   // initialTenantId: string;  
-    initialRoleName: string;//earlier UserRoleLookup;  
-    deviceInfo : string;
+    initialRoleName: string;  
+    deviceInfo: string;
     userName: string;
     password: string;
     displayName?: string;
-    //role: UserRoleLookup;//userRole;//changed
-  //  tenantId: string; // Tenant ID is crucial for user creation now
     googleId?: string;
-    createdByUserId?:number;
-
-    //for faculty user
-    faculty_department?:string;
-    faculty_designation?:string;
+    createdByUserId?: number;
+    faculty_department?: string;
+    faculty_designation?: string;
 }
 
-// You might want to return the created User and its initial context info
 export interface CreatedUserResponse {
     user: User;
     initialContext: UserTenantContext;
-    
+    verificationToken?: string;
     password?: string;
-  
 }
 
-// You will likely need a DTO for user creation if you don't use the full entity
-interface CreateUserInternalDTO {
-    userName: string;  
-    password?: string;
-    displayName?: string;
-    role?: UserRoleLookup;//userRole;
-    tenantId: string;
-    googleId?: string;
-    CreatedByUserId?:number;
-    personId?:number;
+interface CreateUserDto {
+    id?: number;
+    tenantId: number;
+    clientId?: number | null; 
+    siteId?: number | null;   
+    userName: string;
+    userAbbrevation?: string;
+    assignedRoles?: string[]; // 👈 Changed from string to string array structure
+    [key: string]: any;
 }
 
-// // And your UserUpdateDTO (as discussed previously)
-// type UserUpdateDTO = Partial<Omit<User, 'id' | 'createdAt' | 'updatedAt' | 'refreshTokens' | 'tenant'>> & {
-//     role:string;
-//     password?: string;
-// };
-
-// Extend the User interface/type for frontend consumption
 interface UserWithRole extends User {
-    roleNameInContext?: string; // Add a new property to hold the role name
-    faculty_department?: string|null; // Add this
-    faculty_designation?: string|null; // Add this
-  }
+    assignedRoles?: string[]; // 👈 Replaced old roleNameInContext parameter reference
+    faculty_department?: string | null; 
+    faculty_designation?: string | null; 
+}
 
-  
 export class UserService {
     private autocodeService!: AutocodeService;
     private userRepository!: Repository<User>;
-   
-    // You might also need the TenantRepository here if UserService directly links tenants on user creation
     private userRoleLookupRepository!: Repository<UserRoleLookup>;
-    private userTenantContextRepository!:Repository<UserTenantContext>;
-  
+    private userTenantContextRepository!: Repository<UserTenantContext>;
 
     constructor() {
-        // Constructor is lean, repositories will be set via init
-
         this.autocodeService = new AutocodeService();
     }
 
-    /**
-     * Initializes the UserService with its TypeORM repository instances.
-     * This MUST be called AFTER AppDataSource.initialize() has completed.
-     * @param userRepo The TypeORM Repository instance for User.
-     * @param tenantRepo The TypeORM Repository instance for Tenant (if UserService needs it).
-     */
-    async init(userRepo: Repository<User>,  userRoleLookupRepo:Repository<UserRoleLookup>): Promise<void> {
+    async init(
+        userRepo: Repository<User>,  
+        userRoleLookupRepo: Repository<UserRoleLookup>, 
+        userTenantContRepo: Repository<UserTenantContext>
+    ): Promise<void> {
         this.userRepository = userRepo;
-      
+        this.userTenantContextRepository = userTenantContRepo;
         this.userRoleLookupRepository = userRoleLookupRepo;
-      
-        
     }
 
-    
-    // Authenticate = async (userName: string, password: string): Promise<User | undefined> => {
-    //     console.log('Authenticating............................................',userName,password);
-        
-    //     try {
-    //         // Find user by userName
-    //         const user = await this.userRepository.findOne({
-    //             where: { userName: userName }
-    //         });
-
-    //         if (user) { 
-            
-    //             // Compare the provided password with the stored *hashed* password
-    //             const passwordMatch =  await bcrypt.compare(password, user.password??'');
-
-    //             if (passwordMatch) {
-    //                const updUser={ ...user, password:''};
-    //                return updUser;
-    //             }
-    //         }
-    //         return undefined; // User not found or password didn't match
-    //     } catch (error: any) {
-    //         console.error('Error authenticating user:', error);
-    //         throw error;
-    //     }
-    // };
-
-    
     async Authenticate(userName: string, passwordPlain: string, manager?: EntityManager): Promise<User | null> {
+      
+        console.log('................................start.....................');
+        
         const userRepo = manager ? manager.getRepository(User) : this.userRepository;
+     
+        
+        const user = await userRepo.findOne({ where: { userName: userName } });
+  console.log('!user?y/n:',!user);
+   console.log('ispassword null?y/n:',!user?.password);
+  
+        if (!user || !user.password) return null; 
 
-        const user = await userRepo.findOne({
-            where: { userName: userName },
-          //  relations: ['person'] // Load person data if needed for display/initial setup
-        });
+        const isPasswordValid = await bcrypt.compare(passwordPlain, user.password); 
+        if (!!isPasswordValid) return null; // for a while exempted wrong password
 
-        if (!user || !user.password) {
-            return null; // User not found or no password set
-        }
 
-        // Compare the provided password with the hashed password in the database
-        const isPasswordValid = await bcrypt.compare(passwordPlain, user.password);
-
-        if (!!isPasswordValid) { // for a while we allowed invalid password
-            return null; // Invalid password
-        }
-
-        return user; // Authentication successful
-    }
-      /**
-     * Hashes a plain text password.
-     * @param plainPassword The password in plain text.
-     * @returns The hashed password.
-     */
-      private async hashPassword(plainPassword: string): Promise<string> {
-        // Generate a salt (recommended to use 10-12 rounds for good balance of security and performance)
-        const saltRounds = 10;
-        const hashedPassword = await bcrypt.hash(plainPassword, saltRounds);
-        return hashedPassword;
+        return user; 
     }
 
-    /**
-     * Compares a plain text password with a hashed password.
-     * @param plainPassword The password in plain text.
-     * @param hashedPassword The hashed password from the database.
-     * @returns True if passwords match, false otherwise.
-     */
-    private async comparePassword(plainPassword: string, hashedPassword: string): Promise<boolean> {
-        return await bcrypt.compare(plainPassword, hashedPassword);
+    private async hashPassword(plainPassword: string): Promise<string> {
+        return await bcrypt.hash(plainPassword, 10);
     }
-
-
-
-
 
     /**
      * Creates a new global User, links them to a Person, and establishes their initial context
@@ -272,294 +174,359 @@ export class UserService {
             }
         }
     }
-    //---------------------------------------------------------------------------------------------------------------------------------
+    async getUser(ptenantId: number, pId: number, manager?: EntityManager): Promise<User> {
+        const repo = manager ? manager.getRepository(User) : this.userRepository;
+        const user = await repo.findOne({ where: { tenantId: ptenantId, id: pId } }); 
+        return user!; 
+    }
+
+    async getUsersSimple(ptenantId: number, manager?: EntityManager): Promise<any[]> {
+    const repo = manager ? manager.getRepository(User) : this.userRepository;
+    
+    const rawUsers = await repo.createQueryBuilder('user')
+        .leftJoin(
+            UserTenantContext, 
+            'context', 
+            'context.userId = user.id AND context.tenantId = :ptenantId', 
+            { ptenantId }
+        )
+        // 1. Maintain your primary tenant isolation filter
+        .where('user.tenantId = :ptenantId', { ptenantId })
+        
+        // 💡 2. ADDITION: Exclude any users that hold a 'SuperAdmin' context or role matching string
+        // This stops them from being listed if they are linked to the tenant context space.
+        .andWhere((qb) => {
+            const subQuery = qb
+                .subQuery()
+                .select('utc.userId')
+                .from(UserTenantContext, 'utc')
+                .where('utc.roleName = :adminRole', { adminRole: 'SuperAdmin' })
+                .getQuery();
+            return 'user.id NOT IN ' + subQuery;
+        })
+        .select([
+            'user.id as id',
+            'user.tenantId as tenantId', 
+            'user.userName as userName',
+            'user.displayName as displayName',
+            'user.clientId as clientId',
+            'user.siteId as siteId',
+            'context.roleName as roleName' 
+        ])
+        .getRawMany();
+
+    const userMap = new Map<number, any>();
+    for (const row of rawUsers) {
+        if (!userMap.has(row.id)) {
+            userMap.set(row.id, {
+                id: row.id,
+                tenantId: row.tenantId,
+                userName: row.userName,
+                displayName: row.displayName,
+                clientId: row.clientId,
+                siteId: row.siteId,
+                assignedRoles: [] 
+            });
+        }
+        if (row.roleName) {
+            userMap.get(row.id).assignedRoles.push(row.roleName); 
+        }
+    }
+    return Array.from(userMap.values());
+}
+
 
     /**
-     * Updates an existing user.
-     * @param id The ID of the user to update.
-     * @param updateData The partial data to update.
-     * @returns The updated User entity, or undefined if not found.
+     * Creates a core User instance and loops through the array of roles,
+     * generating an active mapping entry for each one inside UserTenantContext.
      */
-    async updateUser(id: number, updateData: UpdateUserDTO
-        ,manager?: EntityManager): Promise<User | undefined> {//UserUpdateDTO
+    async createUserClean(createDto: CreateUserDto, manager?: EntityManager): Promise<User> {
+           console.log('posting new user..........:',createDto);
+        const queryRunner = manager ? manager.queryRunner : AppDataSource.createQueryRunner();
+        let shouldReleaseQueryRunner = false;
 
-            console.log('updating........................user:',updateData);
+        try {
+            if (!manager) {
+                await queryRunner!.connect();
+                await queryRunner!.startTransaction();
+                shouldReleaseQueryRunner = true;
+            }
+
+         // 👈 1️⃣ CRITICAL: Import ILike helper at top of file
+
+// ... inside createUserClean method:
+
+const transUserRepo = queryRunner!.manager.getRepository(User);
+const transContextRepo = queryRunner!.manager.getRepository(UserTenantContext);
+
+// 2️⃣ Use ILike to catch case-insensitive variations like 'Atul' or 'ATUL'
+const duplicateCheck = await transUserRepo.findOne({ 
+    where: { 
+        tenantId: createDto.tenantId, 
+        userName: ILike(createDto.userName.trim()) 
+    } 
+});
+
+if (duplicateCheck) {
+    throw new Error(`aaaThe username '${createDto.userName}' already exists inside this tenant context.`);
+}
+
+
+            if (duplicateCheck) {
+                
+                throw new Error(`aaaThe username '${createDto.userName}' already exists inside this tenant context.`);
+            }
+
+            const { id, assignedRoles, ...cleanPayload } = createDto;
+            console.log('check1 ...............................................');
             
-        if (!this.userRepository) {
-            throw new Error("UserService repository not initialized. Call init() first.");
-        }
-       
-        const userToUpdate = await this.userRepository.findOne({ where: { id: id } });
-        if (!userToUpdate) {
-            return undefined;
-        }
-        const userRepository = manager ? manager.getRepository(User) : this.userRepository;
-        // Handle password update separately
-        if (updateData.password !== undefined) {
-            // Check if the new password is provided and not empty
-            if (updateData.password.trim() !== '') {
-                userToUpdate.password = await this.hashPassword(updateData.password); // <--- HASH NEW PASSWORD HERE
+            if (cleanPayload.password) {
+                cleanPayload.password = await this.hashPassword(cleanPayload.password);
             }
-            delete updateData.password; // Remove from DTO to prevent Object.assign from overwriting
-        }
-        Object.assign(userToUpdate, updateData); // Apply other updates
+console.log('check2 ...............................................');
+         //   const { id, assignedRoles, ...cleanPayload } = createDto;
 
-console.log('m assigning role:',updateData.roleNameInContext,'  for id:',id,' and tenantid:',updateData.activeTenantId);
+// Force tenantId to stay an explicit integer number 
+const tenantId = Number(createDto.tenantId);
 
-        //---usertenatcontext-updating----------------------------------------------------------------------------------
-        const userContextToUpdate = await this.userTenantContextRepository.findOne({
-            where: {
-                userId: id,
-                tenantId: updateData.activeTenantId
-            }})
-        if (!userContextToUpdate) {
-            return undefined;
-        }
-        const userContestRepository = manager ? manager.getRepository(UserTenantContext) : this.userTenantContextRepository;
-        // Handle password update separately
-        if (updateData.roleNameInContext !== undefined) {
-            // Check if the rolename is provided and not empty
-            if (updateData.roleNameInContext.trim() !== '') {
-                userContextToUpdate.roleName = updateData.roleNameInContext; // <--- HASH NEW PASSWORD HERE
+const newUserInstance = transUserRepo.create({
+    ...cleanPayload,
+    tenantId: Number(createDto.tenantId), // 👈 Explicitly bind this column
+    clientId: createDto.clientId || null,
+    siteId: createDto.siteId || null,
+    isActive: true,
+});
+
+// If you have a relational array property on your User model (e.g., contexts) 
+// that triggers a cascade save, map the data directly inside the instance:
+// If you have a relational array property on your User model (e.g., contexts) 
+// that triggers a cascade save, map the data directly inside the instance:
+if (assignedRoles && Array.isArray(assignedRoles)) {
+    
+    // 1️⃣ Dedup roles array to eliminate duplicate record payloads completely
+    const uniqueRoles = [...new Set(assignedRoles)];
+
+    (newUserInstance as any).contexts = uniqueRoles.map(roleName => ({
+        tenantId: tenantId, 
+        roleName: roleName,
+        isActiveInContext: true,
+        // 2️⃣ If UserTenantContext links via username instead of userId, map it here:
+        userName: cleanPayload.userName 
+    }));
+}
+
+
+const savedUser = await transUserRepo.save(newUserInstance);
+
+
+            if (shouldReleaseQueryRunner) {
+                await queryRunner!.commitTransaction();
             }
-            // Remove from DTO to prevent Object.assign from overwriting
+            return savedUser;
+
+        } catch (error) {
+            console.log(error);
+            
+            if (shouldReleaseQueryRunner) await queryRunner!.rollbackTransaction();
+            throw error;
+        } finally {
+            if (shouldReleaseQueryRunner) await queryRunner!.release();
         }
-        Object.assign(userContextToUpdate, updateData); // Apply other updates
+    }
+    /**
+     * Complete transactional implementation of updateUser supporting array-based role updates.
+     */
+        /**
+     * Complete transactional implementation of updateUser supporting array-based role updates.
+     * Fixed to accurately sync and wipe roles if an empty array [] is passed from Frontend.
+     */
+    async updateUser(id: number, tenantId: number, updateDto: Partial<CreateUserDto>, manager?: EntityManager): Promise<User> {
         
-        await userContestRepository.save(userContextToUpdate)
-        //--------------------------------------------------------------------------------------
+        const queryRunner = manager ? manager.queryRunner : AppDataSource.createQueryRunner();
+        let shouldReleaseQueryRunner = false;
 
+        try {
+            if (!manager) {
+                await queryRunner!.connect();
+                await queryRunner!.startTransaction();
+                shouldReleaseQueryRunner = true;
+            }
 
+            const transUserRepo = queryRunner!.manager.getRepository(User);
+            const transContextRepo = queryRunner!.manager.getRepository(UserTenantContext);
 
-        return await userRepository.save(userToUpdate);
+            // 1. Verify existence and protect tenant boundaries
+            const existingUser = await transUserRepo.findOne({ where: { id, tenantId } });
+            if (!existingUser) {
+                throw new Error("User record not found or cross-tenant modification violation detected.");
+            }
+
+            // 2. Destructure inputs cleanly
+            const { 
+                id: payloadId, tenantId: payloadTenantId, tenant, site, client, 
+                createdAt, updatedAt, assignedRoles, roleNameInContext, ...updatableFields 
+            } = updateDto;
+
+            // 3. Process secure password hashing safely
+            if (updatableFields.password !== undefined) {
+                if (updatableFields.password.trim() !== '') {
+                    existingUser.password = await this.hashPassword(updatableFields.password);
+                }
+                delete updatableFields.password;
+            }
+
+            // 4. Clean out undefined fields to prevent accidental property overrides
+            Object.keys(updatableFields).forEach(key => {
+                if (updatableFields[key] === undefined) delete updatableFields[key];
+            });
+
+            // 5. Update and commit core user metadata properties
+            Object.assign(existingUser, updatableFields);
+            const savedUser = await transUserRepo.save(existingUser);
+
+            // 6. Normalize roles array targeting both modern array payload configurations and legacy fallbacks
+            let targetRolesArray: string[] | null = null;
+            
+            if (assignedRoles !== undefined && Array.isArray(assignedRoles)) {
+                targetRolesArray = assignedRoles; // Catches multi-select array (even if empty [])
+            } else if (roleNameInContext) {
+                targetRolesArray = [roleNameInContext]; // Legacy fallback string scalar path
+            }
+
+            // 7. Atomic Database Sync Strategy (Wipe and Rewrite)
+           // 7. Atomic Database Sync Strategy (Wipe and Rewrite)
+if (targetRolesArray !== null) {
+    // Always clear out previous assignments under this specific tenant profile workspace context
+    await transContextRepo.delete({ userId: id, tenantId: tenantId });
+ 
+    if (targetRolesArray.length > 0) {
+        // Construct the bulk raw rows array
+        const contextRowsToInsert = targetRolesArray.map(roleName => ({
+            userId: id,
+            tenantId: tenantId,
+            roleName: roleName,
+            isActiveInContext: true
+        }));
+
+        // Execute as a single atomic bulk SQL INSERT statement
+        await queryRunner!.manager
+            .createQueryBuilder()
+            .insert()
+            .into(UserTenantContext)
+            .values(contextRowsToInsert)
+            .execute();
+    }
+}
+
+            if (shouldReleaseQueryRunner) await queryRunner!.commitTransaction();
+            return savedUser;
+
+        } catch (error) {
+            if (shouldReleaseQueryRunner) await queryRunner!.rollbackTransaction(); console.log('error for roles saving:',error);
+            
+            throw error;
+        } finally {
+            if (shouldReleaseQueryRunner) await queryRunner!.release();
+        }
     }
 
+
     /**
-     * Retrieves a user by ID.
-     * @param id The ID of the user.
-     * @returns The User entity, or undefined if not found.
+     * Contextual target migration legacy route sync wrapper tracking updated structures.
      */
-    // async getById(id: number): Promise<User | undefined> {
-    //     if (!this.userRepository) {
-    //         throw new Error("UserService repository not initialized. Call init() first.");
-    //     }
-    //     var auser= await this.userRepository.findOne({ where: { id: id } });
-    //     if(auser){
-    //          return auser;
-    //     }
-    //     return undefined
-    // }
+    async updateUserContextual(id: number, updateData: any, manager?: EntityManager): Promise<User | undefined> {
+        const tenantId = updateData.activeTenantId;
+        return this.updateUser(id, tenantId, updateData, manager);
+    }
 
-
-    async getById(id: number
-        ,manager?: EntityManager): Promise<User | undefined> {
-        if (!this.userRepository) {
-            throw new Error("UserService repository not initialized. Call init() first.");
-        }
-        const userRepository = manager ? manager.getRepository(User) : this.userRepository;
-        // MODIFIED: Use the 'relations' option to eager load the 'tenant' relationship
-        var auser = await userRepository.findOne({
-            where: { id: id }
-            ,relations:['userTenantContexts'] //added for studentprofile
-           // ,            relations: ['tenant'] // This tells TypeORM to join and load the related Tenant entity
+    async getById(id: number, manager?: EntityManager): Promise<User | undefined> {
+        const repo = manager ? manager.getRepository(User) : this.userRepository;
+        const auser = await repo.findOne({
+            where: { id },
+            relations: ['userTenantContexts'] 
         });
-
-        if (auser) {
-            // If the user is found and tenant relation is loaded,
-            // 'auser.tenant' will now contain the Tenant object,
-            // from which you can access auser.tenant.tenantType.
-            return auser;
-        }
-        return undefined;
+        return auser || undefined;
     }
     
     /**
-     * Retrieves all users (for the current tenant context - assuming this will be filtered later).
-     * @returns An array of User entities.
-     */
-    // //ptenantId:string,
-    // async getUsers(paramcondition?:string
-    //     ,manager?: EntityManager): Promise<User[]> {
-    //     if (!this.userRepository) {
-    //         throw new Error("UserService repository not initialized. Call init() first.");
-    //     }
-
-    //     const userRepository = manager ? manager.getRepository(User) : this.userRepository;
-
-    //     if (paramcondition === 'onlystudents') {
-        
-    //         // Step 1: Await the role lookup to get the actual UserRoleLookup entity
-    //         const studentRole = await this.userRoleLookupRepository.findOne({
-    //             where: {
-    //                 // Assuming 'rolefortenanttype' is a column in UserRoleLookup
-    //                 // that indicates which tenant type this role is primarily for.
-    //                 // If 'rolename' itself is unique and sufficient, you can simplify.
-    //                 // Based on your entities, UserRoleLookup only has 'rolename'.
-    //                 // So, you likely want to query by 'rolename' directly.
-    //                 rolename: 'Student' // Use the actual rolename string
-    //             }
-    //         });
-
-
-    //         if (!studentRole) {
-    //             // Handle case where 'Student' role is not found in lookup table
-    //             console.warn("Student role not found in UserRoleLookup table.");
-    //             return []; // Or throw an error, depending on desired behavior
-    //         }
-
-    //         // Step 2: Use the resolved 'studentRole' entity object in the 'where' clause
-    //         return await userRepository.find()
-    //         // {
-    //         //     where: {
-    //         //         //tenantId: ptenantId,
-    //         //         role: studentRole // Assign the actual UserRoleLookup entity object
-    //         //     }
-    //         // });
-    //     }
-
-    //     // Default case: retrieve all users for the given tenantId
-    //     return await userRepository.find();//{ where: { tenantId: ptenantId } }
-    // }
-     /**
-     * Retrieves User entities based on tenant ID and optionally filters by roles.
-     * In this model, 'users' are global login accounts. Filtering by roles means
-     * finding users who have a specific role within a specific tenant context.
-     *
-     * @param tenantId The ID of the tenant to filter users for. MANDATORY.
-     * @param roles An optional array of role names (strings) to filter by.
-     * @param manager Optional EntityManager for transactional operations.
-     * @returns A promise that resolves to an array of User entities.
-     */
-    //Logic: extended User type by additional property: roleNameInContext
-    //logic contra tag:roleNameInContext extra field
+     * Hydrates legacy arrays grouping parallel contextual target role identifiers.
+     */async getUsers(activeTenantId: number, roles?: string[], manager?: EntityManager): Promise<any[]> {
+    console.log('getUsers.......................');
     
-async getUsers(
-    activeTenantId: string,
-    roles?: string[],
-    manager?: EntityManager
-): Promise<UserWithRole[]> {
-    const userTenantContextRepo = manager ? manager.getRepository(UserTenantContext) : this.userTenantContextRepository;
+    const repo = manager ? manager.getRepository(UserTenantContext) : this.userTenantContextRepository;
+    
+    if (!roles || roles.length === 0) return [];
 
-    const queryBuilder = userTenantContextRepo.createQueryBuilder('utc')
+    const userContexts = await repo.createQueryBuilder('utc')
         .leftJoinAndSelect('utc.user', 'user')
         .leftJoinAndSelect('utc.role', 'role')
-        // Correct join path: start from 'user' and go through 'person'
-        //.leftJoinAndSelect('user.person', 'person') // First join to the Person entity
-        .leftJoinAndSelect('person.facultyProfile', 'facultyProfile'); // Then join to the FacultyProfile entity
-
-    queryBuilder
+        .leftJoinAndSelect('user.customer', 'customer') // Joins customer relation from user
+        .leftJoinAndSelect('user.site', 'site')         // Joins site relation from user
         .where('utc.isActiveInContext = :isActive', { isActive: true })
-        .andWhere('utc.tenantId = :activeTenantId', { activeTenantId });
+        .andWhere('utc.tenantId = :activeTenantId', { activeTenantId })
+        .andWhere('utc.roleName IN (:...roles)', { roles })
+        .getMany();
 
-    if (roles && roles.length > 0) {
-        queryBuilder.andWhere('utc.roleName IN (:...roles)', { roles: roles });
-    } else {
-        return [];
-    }
-
-    const userContexts = await queryBuilder.getMany();
-
-    const uniqueUsersWithRoles: UserWithRole[] = [];
-    const userIdsSeen = new Set<number>();
+    const userMap = new Map<number, any>();
 
     for (const context of userContexts) {
-        if (context.user && !userIdsSeen.has(context.user.id)) {
-            // The path to the faculty profile is now context.user.person.facultyProfile
-           // const facultyProfile = context.user.person?.facultyProfile;
-
-            const userWithRole: UserWithRole = {
-                ...context.user,
-                roleNameInContext: context.role ? context.role.rolename : undefined,
-                // Access the properties through the correct path
-             //  faculty_department: facultyProfile ? facultyProfile.department : undefined,
-             //  faculty_designation: facultyProfile ? facultyProfile.designation : undefined,
-            };
-
-            uniqueUsersWithRoles.push(userWithRole);
-            userIdsSeen.add(context.user.id);
+        if (context.user) {
+            if (!userMap.has(context.user.id)) {
+                userMap.set(context.user.id, {
+                    ...context.user,
+                    assignedRoles: [],
+                    clientId: context.user.clientId, 
+                    siteId: context.user.siteId,
+                    // Extracts joined relational fields safely with optional chaining
+                    clientName: context.user.client?.customerName || null,
+                    siteName: context.user.site?.siteName || null
+                });
+            }
+            if (context.role) {
+                // Keep rolename casing exactly as your database configuration dictates (rolename vs roleName)
+                userMap.get(context.user.id).assignedRoles.push(context.role.rolename || context.role.rolename);
+            }
         }
     }
-
-    return uniqueUsersWithRoles;
+    return Array.from(userMap.values());
 }
-    
-    
-    /**
-     * Retrieves a single User by their global ID.
-     * @param userId The global ID of the User.
-     * @param manager Optional EntityManager.
-     * @returns A promise that resolves to the User entity or null if not found.
-     */
+
+   
+
+
     async getUserById(userId: number, manager?: EntityManager): Promise<User | null> {
-        const userRepo = manager ? manager.getRepository(User) : this.userRepository;
-     
-        
-        
-        return await userRepo.findOne({
-            where: { id: userId },
-          // relations: ['person'] // Load the associated Person data if needed
-        });
+        const repo = manager ? manager.getRepository(User) : this.userRepository;
+        return await repo.findOne({ where: { id: userId } });
     }
     
-
-    /**
-     * Retrieves a single User by their userName and tenantId.
-     * This is useful for login or tenant-specific user lookup.
-     * @param userName The userName (email) of the user.
-     * @param tenantId The tenant ID.
-     * @param manager Optional EntityManager.
-     * @returns A promise that resolves to the User entity or null if not found.
-     */
-    async getUserByUserNameAndTenant(
-        userName: string,
-        tenantId: string,
-        manager?: EntityManager
-    ): Promise<User | null> {
-        const userRepo = manager ? manager.getRepository(User) : this.userRepository;
-        
-        // We need to find the User through UserTenantContext
-        const userContext = await this.userTenantContextRepository.createQueryBuilder('utc')
+    async getUserByUserNameAndTenant(userName: string, tenantId: number, manager?: EntityManager): Promise<User | null> {
+        const context = await this.userTenantContextRepository.createQueryBuilder('utc')
             .leftJoinAndSelect('utc.user', 'user')
             .where('user.userName = :userName', { userName })
             .andWhere('utc.tenantId = :tenantId', { tenantId })
             .getOne();
 
-        return userContext ? userContext.user : null;
+        return context ? context.user : null;
     }
 
-    // You might also need a method to get a user's roles for a specific tenant:
-    async getUserRolesForTenant(userId: number, tenantId: string, manager?: EntityManager): Promise<UserRoleLookup[]> {
-        const userTenantContextRepo = manager ? manager.getRepository(UserTenantContext) : this.userTenantContextRepository;
-        
-        const contexts = await userTenantContextRepo.find({
-            where: { userId: userId, tenantId: tenantId, isActiveInContext: true },
+    async getUserRolesForTenant(userId: number, tenantId: number, manager?: EntityManager): Promise<UserRoleLookup[]> {
+        const repo = manager ? manager.getRepository(UserTenantContext) : this.userTenantContextRepository;
+        const contexts = await repo.find({
+            where: { userId, tenantId, isActiveInContext: true },
             relations: ['role']
         });
-
         return contexts.map(context => context.role);
     }
-    /**
-     * Deletes a user by ID.
-     * @param id The ID of the user to delete.
-     */
-    async deleteUser(id: number
-        ,manager?: EntityManager): Promise<void> {
-        if (!this.userRepository) {
-            throw new Error("UserService repository not initialized. Call init() first.");
-        }   
-        
-        const userRepository = manager ? manager.getRepository(User) : this.userRepository;
-        await userRepository.delete(id);
-    }
-    getUserRoles = async (): Promise<UserRoleLookup[]> => { // Or Observable<EnumOption[]> if backend sends label/value
-            
-        if (!this.userRoleLookupRepository) {
-            throw new Error("userRoleLookupRepository repository not initialized. Call init() first.");
-        }
-       // return await this.userRoleLookupRepository.find({where:{rolefortenanttype:'INSTITUTE',rolename:Not ('SuperAdmin') }});
-       return await this.userRoleLookupRepository.find({where:{rolename:Not ('SuperAdmin') }});
 
+    async deleteUser(id: number, manager?: EntityManager): Promise<void> {
+        const repo = manager ? manager.getRepository(User) : this.userRepository;
+        await repo.delete(id);
+    }
+
+    async getUserRoles(ptenantId: number, manager?: EntityManager): Promise<UserRoleLookup[]> {
+        const repo = manager ? manager.getRepository(UserRoleLookup) : this.userRoleLookupRepository;
+        return await repo.find({ where: { tenantId: ptenantId } }); 
     }
 }
 
-export default UserService; // Export the CLASS
+export default UserService;

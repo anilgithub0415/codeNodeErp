@@ -5,7 +5,7 @@ import * as LoginService from '../../services/LoginServiceTypeorm_1'; // Changed
 import {  CreateUserDto, RegisterAndSubscribeDto } from '../../dto/CreateUser.dto';
 import { getUserRepository } from '../../dependencies';
 import { getRefreshTokenRepository } from '../../dependencies';
-import { getSettingsServiceRepository } from '../../dependencies';
+import { getSeuritySettingsServiceRepository } from '../../dependencies';
 import { User } from '../../entity/User';
 import { AppDataSource } from '../../../data-source';
 import { SubscriptionPlanLookup } from '../../entity/SubscriptionPlanLookup';
@@ -28,7 +28,7 @@ interface CreateUserInternalDTO {
     password?: string;
     displayName?: string;
     role?: UserRoleLookup;//userRole;//changed enum to lookup and made role field optional by '?'
-    tenantId: string;
+    tenantId: number;
     googleId?: string;
 }
 
@@ -41,7 +41,7 @@ interface RegisterResponse {
     exp: number; // Access token expiration timestamp
     userId: number; // Added userId to response
     availableContexts: { // Added availableContexts to response
-        tenantId: string;
+        tenantId: number;
         tenantName: string;
         roleName: string;
         permissions: string[];
@@ -59,7 +59,7 @@ const router = Router();
 // Define the structure for a single available context
 interface AvailableContext {
     userId:number;
-    tenantId: string;
+    tenantId: number;
     tenantName: string; // Include tenant name for display
     roleName: string;
     permissions: string[];
@@ -68,10 +68,12 @@ interface AvailableContext {
 interface ContextSpecificJwtPayload {
     userId: number;
     userName: string;displayName:string;
-    tenantId:string;
+    tenantId:number;
     roleName:string;
+    siteId?:number;
+    clientId?:number;
     //personId:number;
-   // tenantId: string;
+   // tenantId: number;
    // roleName: string;
     //permissions: string[];
     availableContexts:AvailableContext[];
@@ -82,7 +84,7 @@ interface ContextSpecificJwtPayload {
 interface SelectContextRequestBody {
     userId: number;
     refreshToken: string;
-    tenantId: string;
+    tenantId: number;
     roleName: string;
 }
 
@@ -201,7 +203,7 @@ router.post('/register-and-subscribeAtomic', async (req: Request<{}, {}, Registe
 
 //     const userService = getUserRepository();
 //     const refreshTokenRepo = getRefreshTokenRepository();
-//     const settingsService = getSettingsServiceRepository();
+//     const securitySettingsService = getSeuritySettingsServiceRepository();
 //     const userTenantContextRepo = AppDataSource.getRepository(UserTenantContext);
 
 //     try {
@@ -245,7 +247,7 @@ router.post('/register-and-subscribeAtomic', async (req: Request<{}, {}, Registe
 //         const userPermissions = userContext!.role.permissions ? userContext!.role.permissions.map(p => p.permissionName) : [];
 
 //         // 5. Generate a NEW, context-specific Access Token
-//         const currentAccessTokenLifetime = settingsService.getSettings().accessTokenLifetime;
+//         const currentAccessTokenLifetime = securitySettingsService.getSettings().accessTokenLifetime;
 //         const payload: ContextSpecificJwtPayload = {
 //             userId: user!.id,
 //             userName: user!.userName,
@@ -256,7 +258,7 @@ router.post('/register-and-subscribeAtomic', async (req: Request<{}, {}, Registe
 //         const accessToken = jwt.sign(payload, ACCESS_TOKEN_SECRET, { expiresIn: currentAccessTokenLifetime });
 
 //         // 6. Generate and save a NEW Refresh Token (for rotation)
-//         const currentRefreshTokenLifetime = settingsService.getSettings().refreshTokenLifetime;
+//         const currentRefreshTokenLifetime = securitySettingsService.getSettings().refreshTokenLifetime;
 //         const newRefreshTokenString = uuidv4();
 //         const newExpiresAt = new Date(Date.now() + currentRefreshTokenLifetime * 1000);
 
@@ -291,7 +293,7 @@ router.post('/register-and-subscribeAtomic', async (req: Request<{}, {}, Registe
 
 //     const userService = getUserRepository();
 //     const refreshTokenRepo = getRefreshTokenRepository();
-//     const settingsService = getSettingsServiceRepository();
+//     const securitySettingsService = getSeuritySettingsServiceRepository();
 //     const userTenantContextRepo = AppDataSource.getRepository(UserTenantContext);
 
 //     try {
@@ -350,7 +352,7 @@ router.post('/register-and-subscribeAtomic', async (req: Request<{}, {}, Registe
 //         const userPermissions = userContext!.role.permissions ? userContext!.role.permissions.map(p => p.permissionName) : [];
 
 //         // 5. Generate a NEW, context-specific Access Token
-//         const currentAccessTokenLifetime = settingsService.getSettings().accessTokenLifetime;
+//         const currentAccessTokenLifetime = securitySettingsService.getSettings().accessTokenLifetime;
 //         const payload: ContextSpecificJwtPayload = {
 //             userId: user!.id,
 //             userName: user!.userName,displayName:user!.displayName!,
@@ -360,7 +362,7 @@ router.post('/register-and-subscribeAtomic', async (req: Request<{}, {}, Registe
 //         const accessToken = jwt.sign(payload, ACCESS_TOKEN_SECRET, { expiresIn: currentAccessTokenLifetime });
 
 //         // 6. Generate and save a NEW Refresh Token (for rotation)
-//         const currentRefreshTokenLifetime = settingsService.getSettings().refreshTokenLifetime;
+//         const currentRefreshTokenLifetime = securitySettingsService.getSettings().refreshTokenLifetime;
 //         const newRefreshTokenString = uuidv4();
 //         const newExpiresAt = new Date(Date.now() + currentRefreshTokenLifetime * 1000);
 
@@ -424,6 +426,7 @@ router.post('/select-context', async (req: Request<{}, {}, SelectContextRequestB
                 userRepo.findOneBy({ id: userId }),
                 refreshTokenRepo.findOneBy({ token: refreshToken })
             ]);
+console.log('crosscheck 1');
 
             // --- 1. Validation Checks ---
             if (!storedToken || storedToken.userId !== userId) {
@@ -440,7 +443,7 @@ router.post('/select-context', async (req: Request<{}, {}, SelectContextRequestB
             storedTokenDeviceInfo = storedToken.deviceInfo;
             // 2. Invalidate the old refresh token inside the transaction
             await refreshTokenRepo.delete({ token: refreshToken });
-
+console.log('crosscheck 2');
             // 3. Find the specific UserTenantContext
             const userContext = await userTenantContextRepo.findOne({
                 where: {
@@ -452,16 +455,18 @@ router.post('/select-context', async (req: Request<{}, {}, SelectContextRequestB
                 relations: ['role', 'role.permissions', 'tenant'] //removed , 'person'
             });
 
+            console.log('crosscheck 3 usercontext:',userContext);
+
             if (!userContext || !userContext.role) {
                 throw new Error('Requested context (tenant/role) is invalid or inactive for this user.');
             }
 
             // 4. Extract permissions
-            const userPermissions = userContext.role.permissions ? userContext.role.permissions.map((p:any) => p.permissionName) : [];
+            const userPermissions = userContext.role.rolePermissions ? userContext.role.rolePermissions.map((p:any) => p.permissionName) : []; //here was error for .permissions
 
             // 5. Generate NEW Access Token
-            const settingsService = getSettingsServiceRepository();
-            const currentAccessTokenLifetime = settingsService.getSettings().accessTokenLifetime;
+            const securitySettingsService = getSeuritySettingsServiceRepository();
+            const currentAccessTokenLifetime = securitySettingsService.getSettings().accessTokenLifetime;
 
             const payload: ContextSpecificJwtPayload = {
                 userId: user.id,
@@ -469,11 +474,12 @@ router.post('/select-context', async (req: Request<{}, {}, SelectContextRequestB
                 displayName: user.displayName!,
                 tenantId: userContext.tenantId,
                 roleName: userContext.roleName,
+                siteId:user.siteId!,clientId:user.clientId!,
                // personId: userContext.person.id,
                 availableContexts: [{
                     userId: user.id,
                     tenantId: userContext.tenantId,
-                    tenantName: userContext.tenant.tenantName,
+                    tenantName: userContext.user.tenant!.tenantName,
                     roleName: userContext.roleName,
                     permissions: userPermissions
                 }]
@@ -481,10 +487,10 @@ router.post('/select-context', async (req: Request<{}, {}, SelectContextRequestB
             const accessToken = jwt.sign(payload, ACCESS_TOKEN_SECRET, { expiresIn: currentAccessTokenLifetime });
 
             // 6. Generate and save a NEW Refresh Token
-            const currentRefreshTokenLifetime = settingsService.getSettings().refreshTokenLifetime;
+            const currentRefreshTokenLifetime = securitySettingsService.getSettings().refreshTokenLifetime;
             const newRefreshTokenString = uuidv4();
             const newExpiresAt = new Date(Date.now() + currentRefreshTokenLifetime * 1000);
-
+console.log('crosscheck 4');
             const newRefreshToken = new RefreshToken();
             newRefreshToken.token = newRefreshTokenString;
             newRefreshToken.userId = user.id;
@@ -502,8 +508,8 @@ router.post('/select-context', async (req: Request<{}, {}, SelectContextRequestB
                 userId: user.id,
                 displayName: user.displayName,
                 tenantId: userContext.tenantId,
-                tenantName: userContext.tenant.tenantName,
-                tenantType: userContext.tenant.tenantTypeName,
+                tenantName: userContext.user.tenant!.tenantName,
+                tenantType: userContext.user.tenant!.tenantTypeName,
                 roleName: userContext.roleName,
                 permissions: userPermissions
             };

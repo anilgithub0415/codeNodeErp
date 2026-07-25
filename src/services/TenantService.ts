@@ -10,6 +10,8 @@ import { SubscriptionPlanLookup } from '../entity/SubscriptionPlanLookup';
 //import { generateUUID } from '../utils/uuid'; // Assuming you put generateUUID here
 import { generateUUID} from '../Utilities/Utility'
 import { BackendUpdateTenantDto } from '../dto/tenant.dto';
+import { getTenantStrategyServiceRepository } from '../dependencies';
+import { TenantStrategy } from '../entity/TenantStrategy';
 // Or: import { generateUUID } from '../Special/helpers'; // If you put it here
 
 // Import dependency getters
@@ -30,6 +32,7 @@ class TenantService {
     private tenantRepository!: Repository<Tenant>; // Will be set by init method
     private tenantTypeLookupRepository!: Repository<TenantTypeLookup>; // NEW: Repository for TenantTypeLookup
     private subscriptionPlanLookupRepository!: Repository<SubscriptionPlanLookup>; // NEW: Repository for SubscriptionPlanLookup
+    
 
     constructor() {
         // Constructor is lean, repository will be injected or set via init
@@ -43,9 +46,11 @@ class TenantService {
     async init(tenantRepo: Repository<Tenant>,
         tenantTypeLookupRepo: Repository<TenantTypeLookup>,
         subscriptionPlanLookupRepo: Repository<SubscriptionPlanLookup>): Promise<void> {
+            
         this.tenantRepository = tenantRepo
         this.tenantTypeLookupRepository = tenantTypeLookupRepo;
-        this.subscriptionPlanLookupRepository = subscriptionPlanLookupRepo;;
+        this.subscriptionPlanLookupRepository = subscriptionPlanLookupRepo;
+        
         console.log("TenantService repositories initialized.");
     }
 
@@ -80,7 +85,7 @@ class TenantService {
     CreateTenant = async (tenantData: CreateTenantDto
         ,manager?: EntityManager ): Promise<Tenant> => {
         // Ensure repositories are initialized
-        if (!this.tenantRepository || !this.tenantTypeLookupRepository || !this.subscriptionPlanLookupRepository) {
+        if (!this.tenantRepository || !this.tenantTypeLookupRepository || !this.subscriptionPlanLookupRepository ) {
             throw new Error("TenantService repositories not initialized. Call init() first.");
         }
 
@@ -108,7 +113,7 @@ class TenantService {
 
         // 3. Create an instance of the TypeORM Tenant entity
         const newTenant = new Tenant();
-        newTenant.tenantId = generateUUID(); // Assign a UUID
+        //newTenant.tenantId = generateUUID(); // Assign a UUID no increment decorator is used
         newTenant.tenantName = tenantData.tenantName;
         newTenant.isActive = true; // Default
 
@@ -143,7 +148,7 @@ class TenantService {
      * @returns The updated Tenant entity, or undefined if not found.
      */
 
-    updateTenant = async (id: string, tenantData: BackendUpdateTenantDto
+    updateTenant = async (id: number, tenantData: BackendUpdateTenantDto
         ,manager?: EntityManager ): Promise<Tenant | undefined> => {
         // Ensure repository is initialized
         if (!this.tenantRepository) {
@@ -207,7 +212,7 @@ if (tenantData.isActive !== undefined) existingTenant.isActive = tenantData.isAc
      * @param id The tenantId.
      * @returns The Tenant entity, or undefined if not found.
      */
-    getTenant = async (id: string
+    getTenant = async (id: number
         ,manager?: EntityManager): Promise<Tenant | null | undefined> => {
         if (!this.tenantRepository) {
             throw new Error("TenantService repository not initialized. Call init() first.");
@@ -220,7 +225,7 @@ if (tenantData.isActive !== undefined) existingTenant.isActive = tenantData.isAc
      * Retrieves all Tenant records from the database.
      * @returns An array of Tenant entities.
      */
-    getTenants = async (ptenantId:string
+    getTenants = async (ptenantId:number
         ,manager?: EntityManager): Promise<Tenant[]> => {
         if (!this.tenantRepository) {
             throw new Error("TenantService repository not initialized. Call init() first.");
@@ -256,6 +261,14 @@ if (tenantData.isActive !== undefined) existingTenant.isActive = tenantData.isAc
             throw new Error("subscriptionPlanLookupRepository repository not initialized. Call init() first.");
         }
         return await this.subscriptionPlanLookupRepository.find();
+
+    }
+
+    //like Pricing_Strategy, Discount_Strategy
+    getTenantStrategies = async (ptenantId:number): Promise<TenantStrategy[]> => { // Or Observable<EnumOption[]>
+        
+        const tenantStrategyService= getTenantStrategyServiceRepository();
+     return await   tenantStrategyService.getTenantStrategies(ptenantId);
 
     }
 
