@@ -91,4 +91,10 @@ export class User {
 
     @UpdateDateColumn({ type: 'datetime2', name: 'UpdatedAt' })
     updatedAt!: Date;
+
+    // Add this column inside your User class in src/entity/User.ts
+
+    @Column({ name: 'LastLoginAt', type: 'datetime2', nullable: true })
+    lastLoginAt?: Date | null;
+
 }

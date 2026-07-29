@@ -126,6 +126,7 @@ router.route('/:id').put(async (req: Request, res: Response) => {
         const loggedInTenantId =parseInt(req.user.tenantId);
         const { id, tenantId, poNumber, ...updatableFields } = req.body;
 
+        
         const updatedPo = await purchaseService.updatePurchaseOrder(
             targetPoId, 
             loggedInTenantId, 

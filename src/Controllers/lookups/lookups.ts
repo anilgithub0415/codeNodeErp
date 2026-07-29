@@ -269,7 +269,7 @@ const paddedCustomer = aCust.customerName.padEnd(customerWidth, 'c');
             const productCetegoryTypes = await productCetegoryService.getCategories(activeTenantId);//pass tenantId here as parameter
             var productCetegoryTypesAsLookup=productCetegoryTypes.map(item => {
                 const {  id,categoryName } = item; // Destructure to extract id and name
-                return { label: categoryName, value:categoryName };      // Return a new object with only id and name
+                return { label: categoryName, value:id };      // Return a new object with only id and name
               });
 
                  

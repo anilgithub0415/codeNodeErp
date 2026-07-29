@@ -62,9 +62,10 @@ router.route('').post(async (req: Request<{}, {}, CreatePermissionDto>, res: Res
 
         const securePermissionPayload = {
             ...req.body,
-            tenantId: req.user.tenantId,       // Lock data namespace context 
+           
             createdByUserId: req.user.id        // Audit log identification stamp
         };
+console.log('creating permission with ',securePermissionPayload);
 
         const permission = await permissionService.createPermissionClean(securePermissionPayload);
         return res.status(201).json(permission);    // ✅ 201 Created Status

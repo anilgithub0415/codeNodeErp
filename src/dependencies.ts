@@ -96,6 +96,7 @@ import DiscountTypeService from './services/DiscountTypeService';
 import { DiscountType } from './entity/DiscountType';
 import InteractionService from './services/InteractionService';
 import { Interaction } from './entity/Interaction';
+
 //import LeadsourceService from './services/LeadsourceService';
 
 
@@ -150,6 +151,8 @@ let tenantServiceInstance: TenantService; let tenantServiceInstance_New:TenantSe
 let tenantCustomScriptsInstance:Tenant_custom_scriptsService;
 let tenantFormServiceInstance :TenantFormService;
 let tenantStrategyServiceInstance: TenantStrategyService; 
+//let tenantFormConfigsServiceInstance:TenantFormConfigsService;
+
 let customerServiceInstance: CustomerService; let siteServiceInstance:SiteService;
 let productUOMconversionServiceInstance:ProductUomConversionService
 let customerCategoryServiceInstance: CustomerCategoryService;
@@ -439,6 +442,12 @@ discountTypeRepositoryInstance = new DiscountTypeService();
     // Pass the actual TypeORM repository instance to the service's init method
     await tenantStrategyServiceInstance.init(AppDataSource.getRepository(TenantStrategy));
     console.log("tenantStrategyServiceInstance initialized");
+    
+    
+    //  tenantFormConfigsServiceInstance = new TenantFormConfigsService();
+    // // Pass the actual TypeORM repository instance to the service's init method
+    // await tenantFormConfigsServiceInstance.init(AppDataSource.getRepository(TenantFormConfigs));
+    // console.log("tenantFormConfigsServiceInstance initialized");
     
     customerServiceInstance = new CustomerService();
     // Pass the actual TypeORM repository instance to the service's init method
@@ -750,6 +759,13 @@ export function getTenantStrategyServiceRepository(): TenantStrategyService {
     }
     return tenantStrategyServiceInstance;
 } 
+
+//  export function getTenantFormConfigsServiceRepository(): TenantFormConfigsService {
+//     if (!tenantFormConfigsServiceInstance) {
+//         throw new Error("TenantFormConfigsService not initialized. Call initializeDependencies() first.");
+//     }
+//     return tenantFormConfigsServiceInstance;
+// } 
 
 
 export function getCustomerServiceRepository(): CustomerService {

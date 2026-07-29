@@ -61,6 +61,11 @@ app.use('/api/form-schemas', formschemasC);
 import loginC from './src/Controllers/Login/Login'; // Use default import
 app.use('/api/login', loginC); // Mounts login routes under /api/login
 
+//for SuperAdmin contextswitch
+import loginswitchC from './src/Controllers/Login_Switchcontext/Login_Switchcontext'; // Use default import
+app.use('/api/loginswitch', loginswitchC); // for SuperAdmin to switch context
+
+
 import tokenC from './src/Controllers/Token/Token';
 app.use('/api/token', tokenC); // Mounts token routes under /api/token
 
@@ -79,6 +84,9 @@ app.use('/api/tenantType', tenantTypeC);
 
 import tenantStartegyC from './src/Controllers/TenantStrategy/TenantStrategy';
 app.use('/api/tenantStartegies', tenantStartegyC);
+
+
+
 
 
 import productC from './src/Controllers/Product/Product';
@@ -105,7 +113,7 @@ app.use('/api/site', siteC);
  
 
 import formC from './src/Controllers/TenanttForm/TenantForm';
-app.use('/api/form', formC);
+app.use('/api/tenantform', formC);
 
 
 import purchaseC from './src/Controllers/Purchase/Purchase';

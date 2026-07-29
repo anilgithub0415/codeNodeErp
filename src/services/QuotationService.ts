@@ -56,19 +56,33 @@ export class QuotationService {
         return result;
     }
 
-    async getQuotations(tenantId: number, clientId?: number): Promise<Quotation[]> {
-        const whereConditions: any = { tenantId };
-        
-        if (clientId) {
-            whereConditions.clientId = clientId;
+        async getQuotations(
+            tenantId: number, 
+            clientId?: number, 
+            isClientPortal: boolean = false
+        ): Promise<Quotation[]> {
+
+            console.log('in getQuotations............isClientPortal:',isClientPortal);
+            
+
+            const whereConditions: any = { tenantId };
+            
+            if (clientId) {
+                whereConditions.clientId = clientId;
+            }
+
+            // Explicitly restrict to APPROVED status only for the Client Portal
+            if (isClientPortal) {
+                whereConditions.status = QuotationStatus.SENT;
+            }
+
+            return await this.quotationRepository.find({
+                where: whereConditions,
+                relations: ['items', 'client'],
+                order: { createdAt: 'DESC' }
+            });
         }
 
-        return await this.quotationRepository.find({
-            where: whereConditions,
-            relations: ['items', 'client'],
-            order: { createdAt: 'DESC' }
-        });
-    }
 
     async createQuotationClean(
         createDto: CreateQuotationDto,
@@ -344,35 +358,51 @@ for (const incomingLine of (quotationData.items || [])) {
               await quotationItemRepo.delete({ quotationId: targetId });
               aggregateTotal = 0;
 
-              const freshlyMappedItems = updatableFields.items.map(itemInput => {
-                  const itemNode = new QuotationItem();
-                  
-                  // Relational Links
-                  itemNode.productId = itemInput.productId ?? null;
-                  itemNode.productVariantId = itemInput.productVariantId ?? null;
-                  
-                  // Transactional Identifiers
-                  itemNode.prodName = itemInput.prodName;
-                  itemNode.sku = itemInput.sku ?? null;
-                  itemNode.description = itemInput.description || null;
-                  itemNode.unit = itemInput.unit;
-                  
-                  // Metrics
-                  itemNode.quantity = Number(itemInput.quantity || 0.00);
-                  itemNode.gstPercentage = Number(itemInput.gstPercentage || 0.00);
-                  itemNode.price = Number(itemInput.price || 0.00);
-                  itemNode.discount = Number(itemInput.discount || 0.00);
-                  itemNode.customAttributes = itemInput.customAttributes ?? null;
 
-                  const baseAmount = itemNode.quantity * itemNode.price;
-                  const netAfterDiscount = baseAmount - itemNode.discount;
-                  const taxAmount = netAfterDiscount * (itemNode.gstPercentage / 100);
-                  
-                  itemNode.totalItemAmount = Number((netAfterDiscount + taxAmount).toFixed(2));
-                  aggregateTotal += itemNode.totalItemAmount;
+const productRepo = transactionalEntityManager.getRepository(Product);
 
-                  return itemNode;
-              });
+            const freshlyMappedItems = await Promise.all(
+    updatableFields.items.map(async (itemInput) => {
+        const itemNode = new QuotationItem();
+        
+        // Relational Links
+        itemNode.productId = itemInput.productId ?? null;
+        itemNode.productVariantId = itemInput.productVariantId ?? null;
+        
+        // Transactional Identifiers with Async DB Lookup
+        let dynamicProdName = itemInput.prodName;
+
+        if (!dynamicProdName && itemInput.productId) {
+            const dbProduct = await productRepo.findOne({ where: { id: itemInput.productId } });
+            if (dbProduct) {
+                dynamicProdName = dbProduct.prodName; // assuming column name is 'name' in Product entity
+            }
+        }
+        
+        // Fallback cascade safety check
+        itemNode.prodName = dynamicProdName || itemInput.description || 'Unknown Product';
+        itemNode.sku = itemInput.sku ?? null;
+        itemNode.description = itemInput.description || null;
+        itemNode.unit = itemInput.unit;
+        
+        // Metrics
+        itemNode.quantity = Number(itemInput.quantity || 0.00);
+        itemNode.gstPercentage = Number(itemInput.gstPercentage || 0.00);
+        itemNode.price = Number(itemInput.price || 0.00);
+        itemNode.discount = Number(itemInput.discount || 0.00);
+        itemNode.customAttributes = itemInput.customAttributes ?? null;
+
+        const baseAmount = itemNode.quantity * itemNode.price;
+        const netAfterDiscount = baseAmount - itemNode.discount;
+        const taxAmount = netAfterDiscount * (itemNode.gstPercentage / 100);
+        
+        itemNode.totalItemAmount = Number((netAfterDiscount + taxAmount).toFixed(2));
+        aggregateTotal += itemNode.totalItemAmount;
+
+        return itemNode;
+    })
+);
+
 
               existingQuotation.items = freshlyMappedItems;
           }
@@ -385,6 +415,104 @@ for (const incomingLine of (quotationData.items || [])) {
           return await quotationRepo.save(existingQuotation);
       });
   }
+
+
+    // ==========================================
+    // METHOD 1: UPDATE QUOTATION STATUS (SEND)
+    // ==========================================
+    async updateQuotationStatus(
+        quoteId: number,
+        tenantId: number,
+        newStatus: QuotationStatus,
+        manager?: EntityManager
+    ): Promise<Quotation> {
+        const activeManager = manager ? manager : AppDataSource.manager;
+        const quoteRepo = activeManager.getRepository(Quotation);
+
+        // 1. Fetch the target quotation
+        const targetQuote = await quoteRepo.findOne({
+            where: { id: quoteId, tenantId }
+        });
+
+        if (!targetQuote) {
+            throw new Error(`[QuotationService] Quotation not found for ID: ${quoteId}`);
+        }
+
+        // 2. State Safety Guard
+        // Allow transition to SENT only from DRAFT or REVISED states
+        if (targetQuote.status !== QuotationStatus.DRAFT && targetQuote.status !== QuotationStatus.REVISED) {
+            throw new Error(`[QuotationService] Only ${QuotationStatus.DRAFT} or ${QuotationStatus.REVISED} quotations can be sent. Current status is '${targetQuote.status}'.`);
+        }
+
+        console.log(`[QuotationService] Transitioning Quote ${targetQuote.quoteNumber} status from ${targetQuote.status} to ${newStatus}`);
+
+        // 3. Mutate status cleanly
+        targetQuote.status = newStatus;
+        
+        // 4. Save and return updated record
+        return await quoteRepo.save(targetQuote);
+    }
+
+    // ==========================================
+    // METHOD 2: APPROVE QUOTATION (NO STOCK CHANGES)
+    // ==========================================
+    async approveQuotation(
+        quoteId: number,
+        tenantId: number,
+        manager?: EntityManager
+    ): Promise<Quotation> {
+        const isExternalTransaction = !!manager;
+        const txManager = isExternalTransaction ? manager! : AppDataSource.manager;
+        let queryRunner: any = null;
+
+        try {
+            if (!isExternalTransaction) {
+                queryRunner = AppDataSource.createQueryRunner();
+                await queryRunner.connect();
+                await queryRunner.startTransaction();
+            }
+
+            const activeManager = isExternalTransaction ? txManager : queryRunner.manager;
+            const quoteRepo = activeManager.getRepository(Quotation);
+
+            // 1. Fetch the target quotation with its items
+            const targetQuote = await quoteRepo.findOne({
+                where: { id: quoteId, tenantId },
+                relations: ['items']
+            });
+
+            if (!targetQuote) {
+                throw new Error(`[QuotationService] Quotation not found for ID: ${quoteId}`);
+            }
+
+            // 2. State Safety Guard
+            // A quote can be approved if it is sent out or under review (REVISED)
+            if (targetQuote.status !== QuotationStatus.SENT && targetQuote.status !== QuotationStatus.REVISED) {
+                throw new Error(`[QuotationService] Cannot approve Quotation. Current status is '${targetQuote.status}', expected '${QuotationStatus.SENT}' or '${QuotationStatus.REVISED}'.`);
+            }
+
+            console.log(`[QuotationService] Approving Quote ${targetQuote.quoteNumber}...`);
+
+            // 3. Mutate status to APPROVED state safely inside the transaction
+            targetQuote.status = QuotationStatus.APPROVED; 
+            const approvedQuote = await quoteRepo.save(targetQuote);
+
+            // 4. Stock Isolation Check
+            // Explicitly skipping any stock alteration functions because quotation pipelines do not alter inventory balances.
+
+            if (!isExternalTransaction && queryRunner) {
+                await queryRunner.commitTransaction();
+            }
+
+            return approvedQuote;
+        } catch (error) {
+            if (!isExternalTransaction && queryRunner) await queryRunner.rollbackTransaction();
+            throw error;
+        } finally {
+            if (!isExternalTransaction && queryRunner) await queryRunner.release();
+        }
+    }
+
 
 
     /**

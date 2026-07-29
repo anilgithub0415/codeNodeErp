@@ -37,6 +37,21 @@ router.use((req, res, next) => {
     }
 });
 
+
+// GET: Fetch full configurations list scoped under target Tenant space
+router.route('/:tenantId').get(async (req: Request, res: Response) => {
+    try {
+        const formConfigsService = getTenantFormServiceRepository();
+        const tenantId = parseInt(req.params.tenantId, 10);
+                     
+        const configs = await formConfigsService.getTenantFormConfigs(tenantId);
+        return res.status(200).json(configs);
+    } catch (error: any) {
+        console.error('Failed to parse active tenant form configs:', error.message || error);
+        return res.status(500).json({ message: "Failed to locate active form config listings: " + error.message });
+    }
+ });
+
     router.route('/:tenantId/:formKey')
     .get(async (req: Request, res: Response) => {
         try {
@@ -46,8 +61,12 @@ router.use((req, res, next) => {
             const formKey=req.params.formKey;  
 
             const tenantFormService = getTenantFormServiceRepository();
+
+            console.log('tenantid:',tenantId,' formkey:',formKey);
+            
             const aForm = await tenantFormService.getTenantForm(tenantId,formKey,); 
              
+
 
             res.status(200).json(aForm); 
         } catch (error: any) {
@@ -57,5 +76,29 @@ router.use((req, res, next) => {
     }) 
   
     
+    // PUT: Modify details on existing item matching ownership parameters
+    router.route('/:tenantId/:id').put(async (req: Request, res: Response) => {
+        try {
+            const formConfigsService = getTenantFormServiceRepository();
+            const targetId = parseInt(req.params.id, 10);
+            const paramsTenantId = parseInt(req.params.tenantId, 10);
+    
+            if (isNaN(targetId)) {
+                return res.status(400).json({ message: 'Invalid target identifier syntax provided.' });
+            }
+    
+            const { id, tenantId, ...updatableFields } = req.body;
+    
+            const updatedConfig = await formConfigsService.updateFormConfig(
+                targetId, 
+                paramsTenantId,
+                updatableFields
+            );
+    
+            return res.status(200).json(updatedConfig); 
+        } catch (error: any) {
+            return res.status(400).json({ message: 'Form configuration update operation processing failure: ' + error.message });
+        }
+    });
 
 export default router;
