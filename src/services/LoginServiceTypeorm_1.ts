@@ -571,6 +571,7 @@ console.log('m here.............................................................
                 
 
 console.log('m here.....................................................................................................2.');
+console.log('...........................authenticatedUser:',authenticatedUser);
 
         if (userContexts.length === 0) {
             throw new Error(`No active contexts found for user ${authenticatedUser.userName}. Please contact support.`);
@@ -670,8 +671,9 @@ console.log('..............m here...............1');
         await refreshTokenRepo.deleteExistingTokenForDevice(verifiedUserId, deviceInfo);
 
 
-console.log('..............m here...............2');
+console.log('..............m here......................................................................................2');
 
+console.log('...........................authenticatedUser:',authenticatedUser);
 
         // 3. Fetch active tenant/role contexts for this authenticated User
         const userContexts = await userTenantContextRepo.createQueryBuilder('utc')
@@ -691,11 +693,13 @@ console.log('..............m here...............2');
             roleName: context.roleName,
             permissions: context.role?.rolePermissions ? context.role.rolePermissions.map(p => p.permissionName) : []
         }));
-console.log('..............m here...............3');
+console.log('..............m here...............3',authenticatedUser);
 
         // Extracted variables with array index fix applied
         const defaultTenantId = availableContexts.length > 0 ? availableContexts[0].tenantId : authenticatedUser.tenantId || 0;
         const defaultPermissions = availableContexts.length > 0 ? availableContexts[0].permissions : [];
+
+        const defaultRoleName = availableContexts.length > 0 ? availableContexts[0].roleName : 'Client'; // 👈 Add this line
 
         // 5. Construct token payload
         const payload: JwtPayload = {
@@ -704,10 +708,10 @@ console.log('..............m here...............3');
             siteId: authenticatedUser.siteId!,
             clientId: authenticatedUser.clientId!,
             tenantId: authenticatedUser.tenantId!,
-            roleName: 'Client',
+            roleName: defaultRoleName,
             availableContexts: availableContexts
         };
-console.log('..............m here...............4');
+console.log('..............m here...............4 defaultRoleName:',defaultRoleName);
 
         const currentAccessTokenLifetime = securitySettingsService.getSettings().accessTokenLifetime;
         const currentRefreshTokenLifetime = securitySettingsService.getSettings().refreshTokenLifetime;

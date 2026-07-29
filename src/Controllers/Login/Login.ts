@@ -407,7 +407,7 @@ router.post('/register-and-subscribeAtomic', async (req: Request<{}, {}, Registe
 
 router.post('/select-context', async (req: Request<{}, {}, SelectContextRequestBody>, res: Response) => {
     
-    console.log('.... started  posting request to select-context at mm:ss:',new Date);
+   
 
     const { userId, refreshToken, tenantId, roleName } = req.body;
     let storedTokenDeviceInfo: string | null | undefined;
@@ -452,10 +452,12 @@ console.log('crosscheck 2');
                     roleName: roleName,
                     isActiveInContext: true
                 },
-                relations: ['role', 'role.permissions', 'tenant'] //removed , 'person'
+                relations: ['role', 'role.rolePermissions', 'tenant'] //removed , 'person'
             });
 
-            console.log('crosscheck 3 usercontext:',userContext);
+          
+           
+            
 
             if (!userContext || !userContext.role) {
                 throw new Error('Requested context (tenant/role) is invalid or inactive for this user.');
@@ -479,7 +481,7 @@ console.log('crosscheck 2');
                 availableContexts: [{
                     userId: user.id,
                     tenantId: userContext.tenantId,
-                    tenantName: userContext.user.tenant!.tenantName,
+                    tenantName: userContext.tenant!.tenantName,
                     roleName: userContext.roleName,
                     permissions: userPermissions
                 }]
@@ -498,7 +500,18 @@ console.log('crosscheck 4');
             newRefreshToken.deviceInfo = storedTokenDeviceInfo;
             await refreshTokenRepo.save(newRefreshToken);
 
-            console.log('.... returning response of posting request to select-context at mm:ss:',new Date);
+         console.log('................after selecting ..........context returning:',{
+                access_token: accessToken,
+                refresh_token: newRefreshTokenString,
+                expires_in: currentAccessTokenLifetime,
+                userId: user.id,
+                displayName: user.displayName,
+                tenantId: userContext.tenantId,
+                tenantName: userContext.tenant!.tenantName,
+                tenantType: userContext.tenant!.tenantTypeName,
+                roleName: userContext.roleName,
+                permissions: userPermissions});
+         
 
             // 7. Return the final data
             return {
@@ -508,8 +521,8 @@ console.log('crosscheck 4');
                 userId: user.id,
                 displayName: user.displayName,
                 tenantId: userContext.tenantId,
-                tenantName: userContext.user.tenant!.tenantName,
-                tenantType: userContext.user.tenant!.tenantTypeName,
+                tenantName: userContext.tenant!.tenantName,
+                tenantType: userContext.tenant!.tenantTypeName,
                 roleName: userContext.roleName,
                 permissions: userPermissions
             };
