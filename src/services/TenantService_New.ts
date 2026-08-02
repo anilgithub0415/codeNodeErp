@@ -1,6 +1,7 @@
 import { EntityManager, Repository } from 'typeorm';
 import { Tenant } from '../entity/Tenant';
 import { AppDataSource } from '../../data-source'; 
+import { Not } from 'typeorm';
 
 interface CreateTenantDto {
     tenantId?: number;
@@ -51,21 +52,27 @@ export class TenantService_New {
         return tenant; 
     }
 
-    async getTenants(
-        manager?: EntityManager
-    ): Promise<Tenant[]> {
-        
-        if (!this.tenantRepository) {
-            throw new Error("TenantService_New repository not initialized. Call init() first.");
-        }
-        
-        const tenantRepository = manager ? manager.getRepository(Tenant) : this.tenantRepository;
-        const tenants = await tenantRepository.find({
-            relations: ['tenantType', 'subscriptionPlan']
-        }); 
-        
-        return tenants;
+   // Make sure to import Not at the top of your file
+
+async getTenants(
+    manager?: EntityManager
+): Promise<Tenant[]> {
+    
+    if (!this.tenantRepository) {
+        throw new Error("TenantService_New repository not initialized. Call init() first.");
     }
+    
+    const tenantRepository = manager ? manager.getRepository(Tenant) : this.tenantRepository;
+    const tenants = await tenantRepository.find({
+        where: {
+            tenantId: Not(0) // Skips the 'System' tenant record
+        },
+        relations: ['tenantType', 'subscriptionPlan']
+    }); 
+    
+    return tenants;
+}
+
 
     /**
      * Creates a new Tenant or updates an existing one if the tenantId matches.

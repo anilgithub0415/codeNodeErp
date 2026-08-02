@@ -122,6 +122,13 @@ app.use('/api/purchase', purchaseC);
 import clientPurchaseC from './src/Controllers/ClientPurchase/ClientPurchase'
 app.use('/api/clientPurchase', clientPurchaseC);
  
+import clientRFQC from './src/Controllers/ClientRFQ/ClientRFQ'
+app.use('/api/clientRFQ', clientRFQC);
+ 
+
+import ClientSummaryCountOfOrdersC from './src/Controllers/ClientSummaryCountOfOrders/ClientSummaryCountOfOrders'
+app.use('/api/ClientSummaryCountOfOrders', ClientSummaryCountOfOrdersC);
+
 import salesC from './src/Controllers/Sales/Sales';
 app.use('/api/sales', salesC);
 
@@ -172,6 +179,9 @@ app.use('/api/permission',permissionC)
 import rolePermissionC from './src/Controllers/RolePermission/RolePermission';
 app.use('/api/rolePermission',rolePermissionC)
 
+import dbStatusC from './src/Controllers/dbStatus/dbStatus';
+app.use('/api/dbStatus',dbStatusC)
+
 //End of global masters------------------------------------------------------------------------------------------------------------------
 
 
@@ -193,9 +203,10 @@ app.use('/api/migrate-database', migrateC);
 
 
 
-    // ==========================================
+// ==========================================
 // 🔒 GLOBAL PROCESS DIAGNOSTICS
 // ==========================================
+
 process.on('unhandledRejection', (reason, promise) => {
     console.error('❌ CRITICAL: Unhandled Promise Rejection detected!');
     console.error('Location:', promise);

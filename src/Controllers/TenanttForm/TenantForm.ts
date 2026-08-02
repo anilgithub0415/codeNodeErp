@@ -62,11 +62,11 @@ router.route('/:tenantId').get(async (req: Request, res: Response) => {
 
             const tenantFormService = getTenantFormServiceRepository();
 
-            console.log('tenantid:',tenantId,' formkey:',formKey);
-            
+                 
             const aForm = await tenantFormService.getTenantForm(tenantId,formKey,); 
              
 
+console.log(aForm);
 
             res.status(200).json(aForm); 
         } catch (error: any) {
@@ -75,6 +75,29 @@ router.route('/:tenantId').get(async (req: Request, res: Response) => {
         }
     }) 
   
+
+    // POST: New form JSON
+    router.route('/:tenantId').post(async (req: Request, res: Response) => {
+        try {
+            const formConfigsService = getTenantFormServiceRepository();
+          
+            const paramsTenantId = parseInt(req.params.tenantId, 10);
+    
+          
+    
+            const { id, tenantId, ...updatableFields } = req.body;
+    
+            const updatedConfig = await formConfigsService.createFormConfig( 
+                paramsTenantId,
+                updatableFields
+            );
+    
+            return res.status(200).json(updatedConfig); 
+        } catch (error: any) {
+            return res.status(400).json({ message: 'Form configuration update operation processing failure: ' + error.message });
+        }
+    });
+
     
     // PUT: Modify details on existing item matching ownership parameters
     router.route('/:tenantId/:id').put(async (req: Request, res: Response) => {

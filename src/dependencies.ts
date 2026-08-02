@@ -96,6 +96,8 @@ import DiscountTypeService from './services/DiscountTypeService';
 import { DiscountType } from './entity/DiscountType';
 import InteractionService from './services/InteractionService';
 import { Interaction } from './entity/Interaction';
+import ClientRFQOrderService from './services/ClientRFQOrderService';
+import { ClientRFQOrder } from './entity/ClientRFQOrder';
 
 //import LeadsourceService from './services/LeadsourceService';
 
@@ -124,6 +126,7 @@ let clientRequirementRepositoryInstance:ClientRequirementService;
 let quotationRepositoryInstance:QuotationService;
 let interactionRepositoryInstance:InteractionService;
 let clientPurchaseOrderRepository:ClientPurchaseOrderService;
+let clientRFQOrderRepository:ClientRFQOrderService;
 let deliveryChallanRepositoryInstance:DeliveryChallanService;
 
 let vendorRepositoryInstance:VendorService; let cityRepositoryInstance:CityService;
@@ -170,6 +173,8 @@ export async function initializeDependencies(): Promise<void> {
     // 1. Initialize AppDataSource if it's not already (should be done in server.ts ideally)
     if (!AppDataSource.isInitialized) {
         try {
+             const dbName = AppDataSource.options.database;
+            //const dbHost = AppDataSource.options.host;
             await AppDataSource.initialize();
             console.log("Data Source has been initialized by dependencies.ts.");
         } catch (err) {
@@ -281,6 +286,15 @@ quotationRepositoryInstance = new QuotationService();
       await clientPurchaseOrderRepository.init(AppDataSource.getRepository(ClientPurchaseOrder));
 
     console.log("clientPurchaseOrderRepository  instances created.");
+
+    
+
+    clientRFQOrderRepository = new ClientRFQOrderService();
+      // Pass the actual TypeORM repository instance to the service's init method
+      await clientRFQOrderRepository.init(AppDataSource.getRepository(ClientRFQOrder));
+
+    console.log("clientRFQOrderRepository  instances created.");
+
 
     //deliveryChallanRepositoryInstance
 deliveryChallanRepositoryInstance = new DeliveryChallanService();
@@ -591,6 +605,13 @@ export function getClientPurchaseOrderRepository(): ClientPurchaseOrderService {
     return clientPurchaseOrderRepository;
 }
 
+
+export function getClientRFQOrderRepository(): ClientRFQOrderService {
+    if (!clientRFQOrderRepository) {
+        throw new Error("clientRFQOrderRepository not initialized. Call initializeDependencies() first.");
+    }
+    return clientRFQOrderRepository;
+}
 
 export function getDeliveryChallanRepository(): DeliveryChallanService {
     if (!deliveryChallanRepositoryInstance) {

@@ -1,9 +1,9 @@
 // src/entity/Tenant.ts - MODIFIED
-import { Entity,PrimaryGeneratedColumn, PrimaryColumn, Column, OneToMany, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
-import { User } from './User'; // Import User entity
+import { Entity, PrimaryColumn, Column, OneToMany, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { User } from './User'; 
 import { UserTenantContext } from './UserTenantContext'; 
-import { TenantTypeLookup } from './TenantTypeLookup'; // NEW: Import TenantTypeLookup
-import { SubscriptionPlanLookup } from './SubscriptionPlanLookup'; // NEW: Import SubscriptionPlanLookup
+import { TenantTypeLookup } from './TenantTypeLookup'; 
+import { SubscriptionPlanLookup } from './SubscriptionPlanLookup'; 
 import { Tenant_custom_scripts } from './Tenant_custom_scripts';
 import { UserRoleLookup } from './UserRoleLookup';
 import { TenantStrategy } from './TenantStrategy';
@@ -12,88 +12,68 @@ import { Customer } from './Customer';
 import { Product } from './Product';
 import { Config } from './Config';
 import { Vendor } from './Vendor';
-//import { product_table_fields_tenantwise } from './product_table_fields_tenantwise';
 import { City } from './city';
 import { District } from './District';
 
-
-// REMOVE these enums from here, they are now represented by lookup tables
-// export enum TenantType { /* ... */ }
-// export enum SubscriptionPlan { /* ... */ }
-
 @Entity({ name: 'Tenant' })
 export class Tenant { 
-    @PrimaryGeneratedColumn('increment')
+    // --- MODIFIED: Changed from @PrimaryGeneratedColumn to allow manual 0 assignment ---
+    @PrimaryColumn({ type: 'int', name: 'tenantId' })
     tenantId!: number;
+    // --- END MODIFIED ---
 
     @Column({ type: 'nvarchar', length: 255, unique: true, name: 'tenantName' })
     tenantName!: string;
 
-    // --- NEW: Autocode configuration column ---
     @Column({ type: 'simple-json', nullable: true, name: 'AutocodeConfig' })
     autocodeConfig?: {
-        faculty?: string; // e.g., 'FAC-{YYYY}-{NNNN}'
-        student?: string; // e.g., 'STU-{YYYY}-{NNNN}'
-        // Add other roles or entities here as needed
+        faculty?: string; 
+        student?: string; 
     }; 
-    // --- END NEW ---
     
-    // --- MODIFIED: ManyToOne relationship to TenantTypeLookup ---
-    @Column({ type: 'nvarchar', length: 50, name: 'tenantType' }) // This column stores the TypeName string
-    tenantTypeName!: string; // Renamed to tenantTypeName to avoid conflict with relation property
+    @Column({ type: 'nvarchar', length: 50, name: 'tenantType' }) 
+    tenantTypeName!: string; 
 
     @ManyToOne(() => TenantTypeLookup, lookup => lookup.tenants)
-    @JoinColumn({ name: 'tenantType' }) // Foreign key column name in Tenant table
-    tenantType!: TenantTypeLookup; // This property now holds the actual TenantTypeLookup object
-    // --- END MODIFIED ---
-
+    @JoinColumn({ name: 'tenantType' }) 
+    tenantType!: TenantTypeLookup; 
 
     @OneToMany(() => Customer, (customer) => customer.tenant)
     customers!: Tenant_custom_scripts[];
-
-
     
     @OneToMany(() => Tenant_custom_scripts, (tcs) => tcs.tenant)
-  tenantscripts!: Tenant_custom_scripts[];
+    tenantscripts!: Tenant_custom_scripts[];
 
-   @OneToMany(() => Product, (product) => product.tenant)
-  products!: Product[];
-  // @OneToMany(() => product_table_fields_tenantwise, (ptftwise) => ptftwise.tenant)
-  // prodtblfieldtenantwises!: Product[];
+    @OneToMany(() => Product, (product) => product.tenant)
+    products!: Product[];
 
-   @OneToMany(() => Vendor, (vendor) => vendor.tenant)
-  vendors!: Vendor[];
+    @OneToMany(() => Vendor, (vendor) => vendor.tenant)
+    vendors!: Vendor[];
 
-   @OneToMany(() => City, (ct) => ct.tenant)
-  citys!: City[];
+    @OneToMany(() => City, (ct) => ct.tenant)
+    citys!: City[];
 
-  @OneToMany(()=>District,(dst) =>dst.tenant)
-  districts!:District[];
+    @OneToMany(()=>District,(dst) =>dst.tenant)
+    districts!:District[];
   
- @OneToMany(() => Config, (config) => config.tenant)
-  configs!: Product[];
-
-  // @OneToMany(() => SalesOrder, (salesord) => salesord.tenant)
-  // salesorders!: SalesOrder[];
-
+    @OneToMany(() => Config, (config) => config.tenant)
+    configs!: Product[];
 
     @OneToMany(() => UserRoleLookup, (url) => url.tenant)
-  userrolelookups!: UserRoleLookup[];
+    userrolelookups!: UserRoleLookup[];
 
-  @OneToMany(() => User, (user) => user.tenant)
-  users!: User[];
+    @OneToMany(() => User, (user) => user.tenant)
+    users!: User[];
 
-     @OneToMany(() => TenantStrategy, (tstrategy) => tstrategy.tenant)
-  tenantstrategies!: TenantStrategy[];
+    @OneToMany(() => TenantStrategy, (tstrategy) => tstrategy.tenant)
+    tenantstrategies!: TenantStrategy[];
   
-    // --- MODIFIED: ManyToOne relationship to SubscriptionPlanLookup ---
-    @Column({ type: 'nvarchar', length: 50, name: 'subscriptionPlan' }) // This column stores the PlanName string
-    subscriptionPlanName!: string; // Renamed to subscriptionPlanName to avoid conflict with relation property
+    @Column({ type: 'nvarchar', length: 50, name: 'subscriptionPlan' }) 
+    subscriptionPlanName!: string; 
 
     @ManyToOne(() => SubscriptionPlanLookup, lookup => lookup.tenants)
-    @JoinColumn({ name: 'subscriptionPlan' }) // Foreign key column name in Tenant table
-    subscriptionPlan!: SubscriptionPlanLookup; // This property now holds the actual SubscriptionPlanLookup object
-    // --- END MODIFIED ---
+    @JoinColumn({ name: 'subscriptionPlan' }) 
+    subscriptionPlan!: SubscriptionPlanLookup; 
 
     @Column({ type: 'datetime2', name: 'subscriptionEndDate', nullable: true })
     subscriptionEndDate?: Date | null;
@@ -106,17 +86,4 @@ export class Tenant {
 
     @UpdateDateColumn({ type: 'datetime2', name: 'updatedAt' })
     updatedAt!: Date;
-  
-    
-
-    
-
-    // --- NEW: One-to-Many relationship with UserTenantContext ---
-    // A tenant can have many user-tenant contexts
-    // @OneToMany(() => UserTenantContext, userTenantContext => userTenantContext.tenant)
-    // userTenantContexts?: UserTenantContext[];
-    // --- END NEW ---
-   
-   
-   
-}
+} 

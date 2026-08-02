@@ -62,7 +62,26 @@ class TenantFormService {
         const tenantFormRepository = manager ? manager.getRepository(TenantFormConfigs) : this.tenantFormRepository;
         return await tenantFormRepository.findOne({ where: { tenantId: ptenantId, FormKey: pformKey} });
     }
+        // Strict POST action pipeline
+        async createFormConfig(tenantId: number, createDto: CreateFormConfigDto, manager?: EntityManager): Promise<any> {
+        if (!this.tenantFormRepository) {
+        throw new Error("TenantFormConfigsService repository not initialized. Call init() first.");
+        }
+        const repo = manager ? manager.getRepository(TenantFormConfigs) : this.tenantFormRepository; 
 
+        // Security check isolating tenant context and stripping malicious payloads
+        const { id: payloadId, tenantId: payloadTenantId, ...safeFields } = createDto;
+
+        // Instantiate new entity instance populated with safe context
+        const newConfig = repo.create({
+        ...safeFields,
+        tenantId // Enforce the authenticated session's tenantId directly
+        });
+
+        return await repo.save(newConfig);
+
+        }
+        
  // Strict PUT action pipeline
     async updateFormConfig(id: number, tenantId: number, updateDto: Partial<CreateFormConfigDto>, manager?: EntityManager): Promise<TenantFormConfigs> {
         if (!this.tenantFormRepository) {

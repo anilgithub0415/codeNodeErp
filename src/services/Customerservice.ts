@@ -679,7 +679,7 @@ async updateCustomer(
   // 💡 FIX: Replaced .find() with .findOne() to pull a single database record
   const customer = await repo.findOne({ 
     where: { tenantId, id: customerId },
-    relations: ['sites']  
+    relations: ['sites','users']  
   });
   
   return customer;
