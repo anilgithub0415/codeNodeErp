@@ -28,6 +28,7 @@ const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI!; // This must be th
 
 // Define the structure for a single available context
 interface AvailableContext {
+    userId?:any;
     tenantId: number;
     tenantName: string; // Include tenant name for display
     roleName: string;
@@ -527,126 +528,114 @@ const generateAuthTokens = async (newUser: any, deviceInfo: string = '', manager
 //     }
 // };
 
-// --- MODIFIED Login function ---
-const Login_preserve = async (credentials: { userName: string; password: string; }, deviceInfo: string): Promise<LoginResponse> => 
-    {
-    // Get instances from the dependency getters
-    const userService = getUserRepository(); // Use the UserService instance
-    const refreshTokenRepo = getRefreshTokenRepository();
-    const securitySettingsService = getSeuritySettingsServiceRepository();
-    const userTenantContextRepo = AppDataSource.getRepository(UserTenantContext); // Get UserTenantContext repository
 
-    try {
-        console.log('Attempting login for userName:', credentials.userName);
+//commented on 29 July  2026
+// //this method was working with context selection that means if user is in 2 roles Addmin and Salesman, then we were selecting one role for login
+// const Login = async (credentials: { userName: string; password: string; }, deviceInfo: string): Promise<LoginResponse> => {
+//     const userService = getUserRepository();
+//     const refreshTokenRepo = getRefreshTokenRepository();
+//     const securitySettingsService = getSeuritySettingsServiceRepository();
+//     const userTenantContextRepo = AppDataSource.getRepository(UserTenantContext);
+
+//     try {
+//         console.log('Attempting login verification for userName:', credentials.userName);
         
-        // 1. Authenticate the global User
-        const authenticatedUser = await userService.Authenticate(credentials.userName, credentials.password);
-        if (!authenticatedUser) {
-            throw new Error('Invalid credentials');
-        }
+//         // 1. Authenticate global user profile info first
+//         const authenticatedUser = await userService.Authenticate(credentials.userName, credentials.password);
+//         if (!authenticatedUser || typeof authenticatedUser.id === 'undefined') {
+//             throw new Error('Invalid credentials');
+//         }
+// console.log('..............m here...............1');
 
-        if (typeof authenticatedUser.id === 'undefined') {
-            throw new Error('Authenticated user missing ID.');
-        }
-console.log('m here......................................................................................................');
-        // 2. Invalidate any existing refresh token for this user on this device
-        await refreshTokenRepo.deleteExistingTokenForDevice(authenticatedUser.id, deviceInfo);
-                
+//         // Convert user ID cleanly to a number to fix the TypeScript assignment error
+//         const verifiedUserId = Number(authenticatedUser.id);
 
-        // 3. Fetch all active UserTenantContexts for this authenticated User
-        // Eager load role and its permissions, and tenant for display name
+//         // 2. Clear existing tokens for this specific device FIRST to free locks
+//         await refreshTokenRepo.deleteExistingTokenForDevice(verifiedUserId, deviceInfo);
+
+
+// console.log('..............m here......................................................................................2');
+
+// console.log('...........................authenticatedUser:',authenticatedUser);
+
+//         // 3. Fetch active tenant/role contexts for this authenticated User
+//         const userContexts = await userTenantContextRepo.createQueryBuilder('utc')
+//             .leftJoinAndSelect('utc.user', 'user')
+//             .leftJoinAndSelect('user.tenant', 'tenant')
+//             .leftJoinAndSelect('utc.role', 'role')
+//             .leftJoinAndSelect('role.rolePermissions', 'rolePermissions')
+//             .addSelect(['tenant.tenantId', 'tenant.tenantName'])
+//             .where('utc.userId = :id', { id: verifiedUserId })
+//             .getMany();
+
+//         // 4. Map entities to AvailableContext DTOs safely
+//         const availableContexts: AvailableContext[] = userContexts.map(context => ({
+//             userId: context.userId,
+//             tenantId: context.tenantId,
+//             tenantName: context.user?.tenant?.tenantName || 'Unknown Tenant',
+//             roleName: context.roleName,
+//             permissions: context.role?.rolePermissions ? context.role.rolePermissions.map(p => p.permissionName) : []
+//         }));
+// console.log('..............m here...............3',authenticatedUser);
+
+//         // Extracted variables with array index fix applied
+//         const defaultTenantId = availableContexts.length > 0 ? availableContexts[0].tenantId : authenticatedUser.tenantId || 0;
+//         const defaultPermissions = availableContexts.length > 0 ? availableContexts[0].permissions : [];
+
+//         const defaultRoleName = availableContexts.length > 0 ? availableContexts[0].roleName : 'Client'; // 👈 Add this line
+
+//         // 5. Construct token payload
+//         const payload: JwtPayload = {
+//             userName: authenticatedUser.userName,
+//             userId: verifiedUserId,
+//             siteId: authenticatedUser.siteId!,
+//             clientId: authenticatedUser.clientId!,
+//             tenantId: authenticatedUser.tenantId!,
+//             roleName: defaultRoleName,
+//             availableContexts: availableContexts
+//         };
+// console.log('..............m here...............4 defaultRoleName:',defaultRoleName);
+
+//         const currentAccessTokenLifetime = securitySettingsService.getSettings().accessTokenLifetime;
+//         const currentRefreshTokenLifetime = securitySettingsService.getSettings().refreshTokenLifetime;
+
+//         // 6. Sign JWT token
+//         const accessToken = jwt.sign(payload, ACCESS_TOKEN_SECRET, { expiresIn: currentAccessTokenLifetime });
+
+//         // 7. Save structural refresh identity token values
+//         const refreshTokenString = uuidv4();
+//         const expiresAt = new Date(Date.now() + currentRefreshTokenLifetime * 1000);
+
+//         const newRefreshToken = new RefreshToken();
+//         newRefreshToken.token = refreshTokenString;
+//         newRefreshToken.userId = verifiedUserId;
+//         newRefreshToken.expiresAt = expiresAt;
+//         newRefreshToken.deviceInfo = deviceInfo;
+
+//         await refreshTokenRepo.save(newRefreshToken);
         
-                
-            const userContexts = await userTenantContextRepo.createQueryBuilder('utc')
-            .leftJoinAndSelect('utc.user', 'user')
-            .leftJoinAndSelect('user.tenant', 'tenant')
-            .leftJoinAndSelect('utc.role', 'role')
-            // EXPLICIT FIX: Jointure to fetch the permissions array nested inside the role
-            .leftJoinAndSelect('role.rolePermissions', 'rolePermissions') //here was error for .permissions
-            .addSelect(['tenant.tenantId', 'tenant.tenantName'])
-            .where('utc.userId = :id', { id: authenticatedUser.id })
-            .getMany();
+//         console.log(`Login completely validated for user ${authenticatedUser.userName}.`);
 
-            //querybuilder
-                
+//         // 8. Return payload securely
+//         return {
+//             access_token: accessToken,
+//             refresh_token: refreshTokenString,
+//             userId: verifiedUserId, 
+//             siteId: authenticatedUser.siteId!, 
+//             clientId: authenticatedUser.clientId!, 
+//             availableContexts: availableContexts,
+//             expires_in: currentAccessTokenLifetime,
+//             tenantId: defaultTenantId, 
+//             tenantType: 'INSTITUTE', 
+//             roleName: 'Coordinator',
+//             permissions: defaultPermissions
+//         };
 
-console.log('m here.....................................................................................................2.');
-
-        if (userContexts.length === 0) {
-            throw new Error(`No active contexts found for user ${authenticatedUser.userName}. Please contact support.`);
-        }
-
-        // 4. Map UserTenantContexts to AvailableContext DTOs
-        const availableContexts: AvailableContext[] = userContexts.map(context => ({
-            userId:context.userId,//added
-            tenantId: context.tenantId,
-            tenantName: context.user.tenant!.tenantName, // Assuming tenant name is available on the loaded tenant object
-            roleName: context.roleName,
-            permissions: context.role.rolePermissions ? context.role.rolePermissions.map(p => p.permissionName) : [] //here was error for .permissions
-        }));
-
-        
-        
-        // 5. Create JWT Payload
-        const payload: JwtPayload = {
-            userName: authenticatedUser.userName,
-            userId: authenticatedUser.id,
-            siteId:authenticatedUser.siteId!,
-            clientId:authenticatedUser.clientId!,tenantId:authenticatedUser.tenantId!,
-            roleName:'Client',
-            availableContexts: availableContexts // Include all contexts in the initial token
-        };
-
-        const currentAccessTokenLifetime = securitySettingsService.getSettings().accessTokenLifetime;
-        const currentRefreshTokenLifetime = securitySettingsService.getSettings().refreshTokenLifetime;
-
-        console.log('Current Access Token Lifetime:', currentAccessTokenLifetime, 'seconds');
-        console.log('Current Refresh Token Lifetime:', currentRefreshTokenLifetime, 'seconds');
-
-        // 6. Generate Access Token
-        const accessToken = jwt.sign(payload, ACCESS_TOKEN_SECRET, { expiresIn: currentAccessTokenLifetime });
-
-        // 7. Generate and Save Refresh Token
-        const refreshTokenString = uuidv4();
-        const expiresAt = new Date(Date.now() + currentRefreshTokenLifetime * 1000);
-
-
-        const newRefreshToken = new RefreshToken();
-        newRefreshToken.token = refreshTokenString;
-        newRefreshToken.userId = authenticatedUser.id;
-        newRefreshToken.expiresAt = expiresAt;
-        newRefreshToken.deviceInfo = deviceInfo;
-
-        await refreshTokenRepo.save(newRefreshToken);
-        
-        console.log(`Login successful for user ${authenticatedUser.userName}. Generated access and refresh tokens.`);
-
-
-
-        // 8. Return the response
-        return {
-            access_token: accessToken,
-            refresh_token: refreshTokenString,
-            userId: authenticatedUser.id, 
-            siteId: authenticatedUser.siteId!, 
-            clientId: authenticatedUser.clientId!, 
-            availableContexts: availableContexts, // Return the contexts to the frontend
-            expires_in : currentAccessTokenLifetime //earlier was AccessToken_expiresIn
-            ,tenantId: availableContexts[0]!.tenantId,
-          //  tenantName:  availableContexts![0].tenant.tenantName, // Make sure tenant relation is loaded
-            tenantType: 'INSTITUTE',//availableContexts![0].t.tenant.tenantTypeName, //pending- hardcoded
-            roleName: 'Coordinator',// availableContexts![0]!.roleName, //pending-hardcode
-            permissions:availableContexts![0]!.permissions
-           // permissions:['ClientPO.Approve','ClientPO.Reject']
-        };
-
-    } catch (error: any) {
-        console.error('Error during Login:', error.message || error);
-        throw error;
-    }
-}
-
-//modified Log method on:22Jul 2002
+//     } catch (error: any) {
+//         console.error('Core validation error caught during Login process:', error.message || error);
+//         throw error;
+//     }
+// };
 const Login = async (credentials: { userName: string; password: string; }, deviceInfo: string): Promise<LoginResponse> => {
     const userService = getUserRepository();
     const refreshTokenRepo = getRefreshTokenRepository();
@@ -661,7 +650,7 @@ const Login = async (credentials: { userName: string; password: string; }, devic
         if (!authenticatedUser || typeof authenticatedUser.id === 'undefined') {
             throw new Error('Invalid credentials');
         }
-console.log('..............m here...............1');
+        console.log('..............m here...............1');
 
         // Convert user ID cleanly to a number to fix the TypeScript assignment error
         const verifiedUserId = Number(authenticatedUser.id);
@@ -669,45 +658,147 @@ console.log('..............m here...............1');
         // 2. Clear existing tokens for this specific device FIRST to free locks
         await refreshTokenRepo.deleteExistingTokenForDevice(verifiedUserId, deviceInfo);
 
+        console.log('..............m here......................................................................................2');
+      
 
-console.log('..............m here...............2');
+        const isSuperAdmin = authenticatedUser.tenantId === 0;
+        let availableContexts: AvailableContext[] = [];
 
+                if (isSuperAdmin) {
+            console.log('👑 SuperAdmin Login: Fetching all active system tenants for dropdown options...');
+            
+            // Query the UserTenantContext mapping table to pull all distinct, active tenants available in the system
+            // UPDATED: Added left joins for role and rolePermissions to extract permissions for each tenant context
+            const rawTenants = await userTenantContextRepo.createQueryBuilder('utc')
+                .leftJoinAndSelect('utc.user', 'user')
+                .leftJoinAndSelect('user.tenant', 'tenant')
+                .leftJoinAndSelect('utc.role', 'role')
+                .leftJoinAndSelect('role.rolePermissions', 'rolePermissions')
+                .addSelect(['tenant.tenantId', 'tenant.tenantName'])
+                .where('tenant.tenantId IS NOT NULL')
+                .getMany();
 
-        // 3. Fetch active tenant/role contexts for this authenticated User
-        const userContexts = await userTenantContextRepo.createQueryBuilder('utc')
-            .leftJoinAndSelect('utc.user', 'user')
-            .leftJoinAndSelect('user.tenant', 'tenant')
-            .leftJoinAndSelect('utc.role', 'role')
-            .leftJoinAndSelect('role.rolePermissions', 'rolePermissions')
-            .addSelect(['tenant.tenantId', 'tenant.tenantName'])
-            .where('utc.userId = :id', { id: verifiedUserId })
-            .getMany();
+            // Use a Map to filter out unique tenant rows based on tenantId, now caching permissions as well
+            const uniqueTenantMap = new Map<number, { tenantName: string; permissions: string[] }>();
+            
+            rawTenants.forEach(item => {
+                console.log('rawTenants aitem:',item);
+                
+                // --- EXTRACTION FIX: Extract the first scalar value if the property returns an array ---
+                let tIdRaw = item.user?.tenant?.tenantId ?? item.tenantId;
+                let tNameRaw = item.user?.tenant?.tenantName ?? 'Unknown Tenant';
 
-        // 4. Map entities to AvailableContext DTOs safely
-        const availableContexts: AvailableContext[] = userContexts.map(context => ({
-            userId: context.userId,
-            tenantId: context.tenantId,
-            tenantName: context.user?.tenant?.tenantName || 'Unknown Tenant',
-            roleName: context.roleName,
-            permissions: context.role?.rolePermissions ? context.role.rolePermissions.map(p => p.permissionName) : []
-        }));
-console.log('..............m here...............3');
+                // If TypeORM grouped them into an array, extract the first primitive item out of it
+                const tId = Array.isArray(tIdRaw) ? Number(tIdRaw[0]) : Number(tIdRaw);
+                const tName = Array.isArray(tNameRaw) ? String(tNameRaw[0]) : String(tNameRaw);
 
-        // Extracted variables with array index fix applied
-        const defaultTenantId = availableContexts.length > 0 ? availableContexts[0].tenantId : authenticatedUser.tenantId || 0;
-        const defaultPermissions = availableContexts.length > 0 ? availableContexts[0].permissions : [];
+                // Map permissions array safely if they exist
+                const permissions = item.role?.rolePermissions 
+                    ? item.role.rolePermissions.map(p => p.permissionName) 
+                    : [];
 
-        // 5. Construct token payload
+                // Filter out invalid items, zeros, or duplicates
+                if (tId && tId !== 0 && tName) {
+                    // If the tenant exists, merge permissions; otherwise, set it new
+                    if (uniqueTenantMap.has(tId)) {
+                        const existing = uniqueTenantMap.get(tId)!;
+                        const mergedPermissions = Array.from(new Set([...existing.permissions, ...permissions]));
+                        console.log('.........mergedPermissions..............',mergedPermissions);
+                        
+                        uniqueTenantMap.set(tId, { tenantName: tName, permissions: mergedPermissions });
+                    } else {
+                        uniqueTenantMap.set(tId, { tenantName: tName, permissions });
+                    }
+                }
+            });
+ 
+            // Start the contexts list with the Global System option so it's index 0
+            availableContexts = [
+                {
+                    userId: verifiedUserId,
+                    tenantId: 0,
+                    tenantName: 'Global System (All Tenants)',
+                    roleName: 'SuperAdmin',
+                    permissions: ['ALL_PRIVILEGES']
+                }
+            ];
+
+            // Append all extracted tenants so the dropdown has choices to map over
+            uniqueTenantMap.forEach((data, tenantId) => {
+                availableContexts.push({
+                    userId: verifiedUserId,
+                    tenantId: tenantId,
+                    tenantName: data.tenantName,
+                    roleName: 'Admin', // Default target role to assume when spoofing
+                    permissions: data.permissions // FIXED: Now passing the extracted permissions array
+                });
+            });
+
+        } else {
+
+            console.log('👥 Regular User Login: Fetching specific assigned contexts...');
+            
+            // 3. Fetch active tenant/role contexts specifically assigned to this authenticated User
+            const userContexts = await userTenantContextRepo.createQueryBuilder('utc')
+                .leftJoinAndSelect('utc.user', 'user')
+                .leftJoinAndSelect('user.tenant', 'tenant')
+                .leftJoinAndSelect('utc.role', 'role')
+                .leftJoinAndSelect('role.rolePermissions', 'rolePermissions')
+               // .addSelect(['tenant.tenantId', 'tenant.tenantName'])
+                .where('utc.userId = :id', { id: verifiedUserId })
+                .getMany();
+
+            // 4. Map entities to AvailableContext DTOs safely
+            availableContexts = userContexts.map(context => ({
+                userId: context.userId,
+                tenantId: context.tenantId,
+                tenantName: context.user?.tenant?.tenantName || 'Unknown Tenant',
+                roleName: context.role?.rolename || 'No Role Assigned', // Corrected property case from rolename to roleName
+                permissions: context.role?.rolePermissions ? context.role.rolePermissions.map(p => p.permissionName) : []
+            }));
+        }
+
+        console.log('..............m here...............3 contexts length loaded:', availableContexts.length);
+
+        let targetTenantId: number;
+        let finalRoleName: string;
+        let combinedPermissions: string[];
+
+        if (isSuperAdmin) {
+            console.log('👑 SuperAdmin processing payload structural constraints...');
+            targetTenantId = 0;
+            finalRoleName = 'SuperAdmin';
+            combinedPermissions = ['ALL_PRIVILEGES']; 
+        } else {
+            console.log('👥 Regular user processing payload combinations...');
+            targetTenantId = availableContexts.length > 0 ? availableContexts[0].tenantId : authenticatedUser.tenantId || 0;
+            
+            // Collect distinct roles into a readable concatenated string (e.g. "Admin, Salesman")
+            const uniqueRoles = Array.from(new Set(availableContexts.map(c => c.roleName)));
+            finalRoleName = uniqueRoles.length > 0 ? uniqueRoles.join(', ') : 'User';
+
+            // Merge unique permissions from all contexts into a single flattened collection
+            const permissionSet = new Set<string>();
+            availableContexts.forEach(context => {
+                context.permissions.forEach(permission => permissionSet.add(permission));
+            });
+            combinedPermissions = Array.from(permissionSet);
+
+        
+            
+        }
+
+        // 5. Construct token payload using contextual evaluation rules
         const payload: JwtPayload = {
             userName: authenticatedUser.userName,
             userId: verifiedUserId,
             siteId: authenticatedUser.siteId!,
             clientId: authenticatedUser.clientId!,
-            tenantId: authenticatedUser.tenantId!,
-            roleName: 'Client',
-            availableContexts: availableContexts
+            tenantId: targetTenantId,
+            roleName: finalRoleName,
+            availableContexts: availableContexts 
         };
-console.log('..............m here...............4');
+       
 
         const currentAccessTokenLifetime = securitySettingsService.getSettings().accessTokenLifetime;
         const currentRefreshTokenLifetime = securitySettingsService.getSettings().refreshTokenLifetime;
@@ -729,7 +820,11 @@ console.log('..............m here...............4');
         
         console.log(`Login completely validated for user ${authenticatedUser.userName}.`);
 
-        // 8. Return payload securely
+
+console.log('............planning to assign permissions:',combinedPermissions);
+console.log('............availableContexts..............',availableContexts);
+
+        // 8. Return merged payload securely
         return {
             access_token: accessToken,
             refresh_token: refreshTokenString,
@@ -738,10 +833,10 @@ console.log('..............m here...............4');
             clientId: authenticatedUser.clientId!, 
             availableContexts: availableContexts,
             expires_in: currentAccessTokenLifetime,
-            tenantId: defaultTenantId, 
-            tenantType: 'INSTITUTE', 
-            roleName: 'Coordinator',
-            permissions: defaultPermissions
+            tenantId: targetTenantId, 
+            tenantType: isSuperAdmin ? 'SYSTEM' : 'INSTITUTE', 
+            roleName: finalRoleName,
+            permissions: combinedPermissions
         };
 
     } catch (error: any) {

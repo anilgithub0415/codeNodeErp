@@ -47,8 +47,12 @@ router.route('/:tenantId').get(async (req: Request, res: Response) => {
 });
 // src/routes/tenantStrategyRouter.ts (Part 2)
 // POST: Register brand new context details
-router.route('').post(async (req: Request, res: Response) => {
+router.route('/:tenantId').post(async (req: Request, res: Response) => {
     try {
+
+        console.log('.................creating for tenan:',req.params.tenantId);
+        
+         const { tenantId } = req.params;
         const strategyService = getTenantStrategyServiceRepository();
 
         if (!req.body.tenantStrategyName || !req.body.tenantStrategy) {
@@ -57,7 +61,7 @@ router.route('').post(async (req: Request, res: Response) => {
 
         const securePayload = {
             ...req.body,
-            tenantId: req.user.tenantId,        // Isolate context within verified space limits
+            tenantId: tenantId,        // Isolate context within verified space limits
             createdByUserId: req.user.id        // Audit ledger identity insertion tracking
         };
 
@@ -69,10 +73,12 @@ router.route('').post(async (req: Request, res: Response) => {
 });
 
 // PUT: Modify details on existing item matching ownership parameters
-router.route('/:id').put(async (req: Request, res: Response) => {
+router.route('/:tenantId/:id').put(async (req: Request, res: Response) => {
     try {
         const strategyService = getTenantStrategyServiceRepository();
         const targetId = parseInt(req.params.id, 10);
+
+        const paramstenantId=parseInt(req.params.tenantId)
 
         if (isNaN(targetId)) {
             return res.status(400).json({ message: 'Invalid target identifier syntax provided.' });
@@ -83,7 +89,8 @@ router.route('/:id').put(async (req: Request, res: Response) => {
 
         const updatedStrategy = await strategyService.updateStrategy(
             targetId, 
-            loggedInTenantId, 
+           // loggedInTenantId, dont use loggedIn but passed from req.params.tenantId
+paramstenantId,
             updatableFields
         );
 

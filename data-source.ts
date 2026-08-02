@@ -74,6 +74,8 @@ import { RolePermission } from './src/entity/RolePermission';
 import { LineDiscount } from './src/entity/LineDiscount';
 import { DiscountType } from './src/entity/DiscountType';
 import { Interaction } from './src/entity/Interaction';
+import { ClientRFQOrder } from './src/entity/ClientRFQOrder';
+import { ClientRFQOrderItem } from './src/entity/ClientRFQOrderItem';
 
 
 
@@ -117,6 +119,7 @@ export const AppDataSource = new DataSource({
     ,Tenant_custom_scripts, TenantFormConfigs
     ,PurchaseOrder,PurchaseOrderItem   
     ,ClientPurchaseOrder,ClientPurchaseOrderItem 
+    ,ClientRFQOrder,ClientRFQOrderItem
     ,SalesOrder,SalesOrderItem
     ,DeliveryChallan,DeliveryChallanItem
     ,Leadsource,ClientStatus,Site

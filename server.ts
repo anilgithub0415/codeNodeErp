@@ -61,6 +61,11 @@ app.use('/api/form-schemas', formschemasC);
 import loginC from './src/Controllers/Login/Login'; // Use default import
 app.use('/api/login', loginC); // Mounts login routes under /api/login
 
+//for SuperAdmin contextswitch
+import loginswitchC from './src/Controllers/Login_Switchcontext/Login_Switchcontext'; // Use default import
+app.use('/api/loginswitch', loginswitchC); // for SuperAdmin to switch context
+
+
 import tokenC from './src/Controllers/Token/Token';
 app.use('/api/token', tokenC); // Mounts token routes under /api/token
 
@@ -79,6 +84,9 @@ app.use('/api/tenantType', tenantTypeC);
 
 import tenantStartegyC from './src/Controllers/TenantStrategy/TenantStrategy';
 app.use('/api/tenantStartegies', tenantStartegyC);
+
+
+
 
 
 import productC from './src/Controllers/Product/Product';
@@ -105,7 +113,7 @@ app.use('/api/site', siteC);
  
 
 import formC from './src/Controllers/TenanttForm/TenantForm';
-app.use('/api/form', formC);
+app.use('/api/tenantform', formC);
 
 
 import purchaseC from './src/Controllers/Purchase/Purchase';
@@ -114,6 +122,13 @@ app.use('/api/purchase', purchaseC);
 import clientPurchaseC from './src/Controllers/ClientPurchase/ClientPurchase'
 app.use('/api/clientPurchase', clientPurchaseC);
  
+import clientRFQC from './src/Controllers/ClientRFQ/ClientRFQ'
+app.use('/api/clientRFQ', clientRFQC);
+ 
+
+import ClientSummaryCountOfOrdersC from './src/Controllers/ClientSummaryCountOfOrders/ClientSummaryCountOfOrders'
+app.use('/api/ClientSummaryCountOfOrders', ClientSummaryCountOfOrdersC);
+
 import salesC from './src/Controllers/Sales/Sales';
 app.use('/api/sales', salesC);
 
@@ -164,6 +179,9 @@ app.use('/api/permission',permissionC)
 import rolePermissionC from './src/Controllers/RolePermission/RolePermission';
 app.use('/api/rolePermission',rolePermissionC)
 
+import dbStatusC from './src/Controllers/dbStatus/dbStatus';
+app.use('/api/dbStatus',dbStatusC)
+
 //End of global masters------------------------------------------------------------------------------------------------------------------
 
 
@@ -185,9 +203,10 @@ app.use('/api/migrate-database', migrateC);
 
 
 
-    // ==========================================
+// ==========================================
 // 🔒 GLOBAL PROCESS DIAGNOSTICS
 // ==========================================
+
 process.on('unhandledRejection', (reason, promise) => {
     console.error('❌ CRITICAL: Unhandled Promise Rejection detected!');
     console.error('Location:', promise);

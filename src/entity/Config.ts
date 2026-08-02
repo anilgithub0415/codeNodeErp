@@ -1,34 +1,38 @@
 // src/entity/Config.ts
-import { Entity, PrimaryColumn, Column, PrimaryGeneratedColumn, JoinColumn, ManyToOne } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, JoinColumn, ManyToOne, Unique } from 'typeorm';
 import { Tenant } from './Tenant';
 
-// This class defines the structure of your 'Config' table in the database.
-// It is designed to hold a single row of global application settings.
-@Entity({ name: 'Config' }) // You can customize the table name if 'Config' isn't suitable, e.g., 'ApplicationConfig'
+@Entity({ name: 'Config' })
+@Unique(['tenantId', 'appname']) // Guarantees a unique application configuration record per tenant
 export class Config {
 
     @PrimaryGeneratedColumn()
-        id!: number;
-     
-         @Column({type:'int'})
-        tenantId!:number;
-
-        @ManyToOne(() => Tenant, (tenant) => tenant.configs, { onDelete: 'NO ACTION' })
-         @JoinColumn({ name: "tenantId" }) // Maps the relation to the column above
-         tenant!: Tenant;
-
-    // Primary Key for a Single Record Table:
-    // We use @PrimaryColumn() for a non-generated primary key.
-    // The value will be a fixed string (e.g., 'global_settings'), ensuring only one record.
-    @PrimaryColumn({ type: 'nvarchar', length: 50, name: 'appname' })
-    appname!: string; // Using 'settingKey' as the column name for clarity
-
+    id!: number;
  
-    // Decides whether user added thru superadmin or signup  
-    @Column({  name: 'config_useraddthru', type: 'nvarchar', length: 20 ,nullable:true})
-   config_useraddthru!: string;
+    @Column({ type: 'int' })
+    tenantId!: number;
 
-    @Column({  name: 'config_productFlatOrVariant', type: 'nvarchar', length: 20, default:'ProductFlat' })
-   config_productFlatOrVariant!: string;
-    
+    @ManyToOne(() => Tenant, (tenant) => tenant.configs, { onDelete: 'NO ACTION' })
+    @JoinColumn({ name: "tenantId" })
+    tenant!: Tenant;
+
+    @Column({ type: 'nvarchar', length: 50, name: 'appname' })
+    appname!: string; // Distinguishes multiple configurations if needed per tenant
+
+    // Decides whether user added thru superadmin or signup  
+    @Column({ name: 'config_useraddthru', type: 'nvarchar', length: 20, nullable: true })
+    config_useraddthru!: string;
+
+    @Column({ name: 'config_productFlatOrVariant', type: 'nvarchar', length: 20, default: 'ProductFlat' })
+    config_productFlatOrVariant!: string;
+
+    // Note:Logic/protocol
+    // if for Gharana 'Site_Supervisor' role is expected to allow  'behalf client side' then this config must have 'Site_Supervisor' role specified
+    // if for Khurana 'Site_Manager' role is expected then he must be specified for tenant Khurana
+    @Column({ 
+        name: 'config_client_onbehalf_roles',  
+        type: 'simple-array', // Fallback to 'simple-json' if storing complex objects, but simple-array is perfect for string lists
+        nullable: true 
+    })
+    config_client_onbehalf_roles!: string[]; // Example value: ['Site_Supervisor', 'Client_Admin', 'Site_Manager']
 }

@@ -51,11 +51,12 @@ router.use((req, res, next) => {
             
             const purchaseService = getPurchaseOrderRepository(); 
 
-            //var activeTenantId=parseInt(req.query?.activeTenantId?.toString()!);
-                 var tenantId=parseInt(req.params.tenantId);    
+           
+                 const loggedInTenantId = req.user.tenantId; // Secure boundary identification lock
+
         
         
-            const pos = await purchaseService.getPOs( tenantId!);
+            const pos = await purchaseService.getPOs( loggedInTenantId!);
              res.status(200).json(pos);
         } catch (error: any) {
             console.error('Failed to retrieve POs:', error.message || error);
@@ -126,6 +127,7 @@ router.route('/:id').put(async (req: Request, res: Response) => {
         const loggedInTenantId =parseInt(req.user.tenantId);
         const { id, tenantId, poNumber, ...updatableFields } = req.body;
 
+        
         const updatedPo = await purchaseService.updatePurchaseOrder(
             targetPoId, 
             loggedInTenantId, 

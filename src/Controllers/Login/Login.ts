@@ -18,6 +18,7 @@ import { RefreshToken } from '../../entity/RefreshToken';
 import  jwt from 'jsonwebtoken';
 import { CreateUserAndContextDto } from '../../services/UserService';
 import { EntityManager } from 'typeorm';
+import { Tenant } from '../../entity/Tenant';
 require('dotenv').config();
 
 const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET || 'aaa';
@@ -86,6 +87,7 @@ interface SelectContextRequestBody {
     refreshToken: string;
     tenantId: number;
     roleName: string;
+    availableContexts:any[];
 }
 
 export function generateUUID():string{
@@ -404,31 +406,25 @@ router.post('/register-and-subscribeAtomic', async (req: Request<{}, {}, Registe
 // });
 
 //optimised above code
-
+// 
 router.post('/select-context', async (req: Request<{}, {}, SelectContextRequestBody>, res: Response) => {
-    
-    console.log('.... started  posting request to select-context at mm:ss:',new Date);
-
     const { userId, refreshToken, tenantId, roleName } = req.body;
+    let finalTenantId = Number(tenantId); 
     let storedTokenDeviceInfo: string | null | undefined;
 
     try {
-        // Wrap the entire process in a single database transaction
         const result = await AppDataSource.manager.transaction(async (transactionalEntityManager: EntityManager) => {
-
-            // Use the transactional EntityManager for all operations
             const userRepo = transactionalEntityManager.getRepository(User);
             const refreshTokenRepo = transactionalEntityManager.getRepository(RefreshToken);
             const userTenantContextRepo = transactionalEntityManager.getRepository(UserTenantContext);
+            const tenantRepo = transactionalEntityManager.getRepository(Tenant);
 
-            // Fetch the user and token in a single, parallel batch
             const [user, storedToken] = await Promise.all([
                 userRepo.findOneBy({ id: userId }),
                 refreshTokenRepo.findOneBy({ token: refreshToken })
             ]);
-console.log('crosscheck 1');
 
-            // --- 1. Validation Checks ---
+            // --- 1. Base Security Checks ---
             if (!storedToken || storedToken.userId !== userId) {
                 throw new Error('Invalid or unauthorized refresh token.');
             }
@@ -439,58 +435,87 @@ console.log('crosscheck 1');
                 throw new Error('Refresh token expired.');
             }
 
-            // Store device info before deletion
             storedTokenDeviceInfo = storedToken.deviceInfo;
-            // 2. Invalidate the old refresh token inside the transaction
             await refreshTokenRepo.delete({ token: refreshToken });
-console.log('crosscheck 2');
-            // 3. Find the specific UserTenantContext
-            const userContext = await userTenantContextRepo.findOne({
-                where: {
-                    userId: userId,
-                    tenantId: tenantId,
-                    roleName: roleName,
-                    isActiveInContext: true
-                },
-                relations: ['role', 'role.permissions', 'tenant'] //removed , 'person'
-            });
 
-            console.log('crosscheck 3 usercontext:',userContext);
+            // --- 2. Evaluation Strategy Initialization ---
+            let finalTenantId = Number(tenantId);
+            let finalTenantName = 'Global System';
+            let finalTenantType = 'SYSTEM';
+            let finalRoleName = String(roleName);
+            let userPermissions: string[] = [];
+            let finalAvailableContexts: AvailableContext[] = req.body.availableContexts || [];
 
-            if (!userContext || !userContext.role) {
-                throw new Error('Requested context (tenant/role) is invalid or inactive for this user.');
-            }
+            // Core operational mapping markers
+            let targetSiteId = user.siteId;
+            let targetClientId = user.clientId;
 
-            // 4. Extract permissions
-            const userPermissions = userContext.role.rolePermissions ? userContext.role.rolePermissions.map((p:any) => p.permissionName) : []; //here was error for .permissions
+            const isSuperAdminUser = user.tenantId === 0;
 
-            // 5. Generate NEW Access Token
+            // --- Inside router.post('/select-context') ---
+
+if (isSuperAdminUser) {
+    // --- 👑 SUPERADMIN IMPERSONATION FLOW ---
+    if (finalTenantId !== 0) {
+        console.log(`👑 SuperAdmin Spoofing: Bypassing checks to assume Tenant ID: ${finalTenantId}`);
+        
+        const targetTenant = await tenantRepo.findOneBy({ tenantId: finalTenantId });
+        finalTenantName = targetTenant ? targetTenant.tenantName : 'Spoofed Tenant';
+        finalTenantType = targetTenant ? targetTenant.tenantTypeName || 'INSTITUTE' : 'INSTITUTE';
+        
+        
+        // Ensure permissions adjust based on the assumed administrative context
+        userPermissions = finalAvailableContexts.find(cxt=>cxt.tenantId!==0)?.permissions!;
+        finalRoleName = finalAvailableContexts.find(cxt=>cxt.tenantId!==0)?.roleName!
+
+        // Lookup any active user mapped to this tenant to adopt their site/client identities
+        const tenantUserSample = await userRepo.findOne({
+            where: { tenantId: finalTenantId }
+        });
+
+        if (tenantUserSample) {
+            targetSiteId = tenantUserSample.siteId;
+            targetClientId = tenantUserSample.clientId;
+        }
+    } else {
+        console.log('👑 SuperAdmin returning back to Global System Root Context.');
+        finalTenantName = 'Global System (All Tenants)';
+        finalTenantType = 'SYSTEM';
+        finalRoleName = 'SuperAdmin';
+        userPermissions = ['ALL_PRIVILEGES'];
+    }
+
+    // Keep the availableContexts dropdown array populated so the UI dropdown doesn't clear out!
+    // (Reuse the raw logic or pass back the initial contexts array from req.body to prevent layout flickering)
+    if (!finalAvailableContexts || finalAvailableContexts.length === 0) {
+         // Fallback if frontend didn't pass it back
+         finalAvailableContexts = req.body.availableContexts || [];
+    }
+}
+
+
+            // --- 3. Generate NEW Context-Specific Access Token ---
             const securitySettingsService = getSeuritySettingsServiceRepository();
             const currentAccessTokenLifetime = securitySettingsService.getSettings().accessTokenLifetime;
 
-            const payload: ContextSpecificJwtPayload = {
+            const payload: any = {
                 userId: user.id,
                 userName: user.userName,
                 displayName: user.displayName!,
-                tenantId: userContext.tenantId,
-                roleName: userContext.roleName,
-                siteId:user.siteId!,clientId:user.clientId!,
-               // personId: userContext.person.id,
-                availableContexts: [{
-                    userId: user.id,
-                    tenantId: userContext.tenantId,
-                    tenantName: userContext.user.tenant!.tenantName,
-                    roleName: userContext.roleName,
-                    permissions: userPermissions
-                }]
+                tenantId: finalTenantId, 
+                roleName: finalRoleName,   
+                siteId: targetSiteId,       // 👈 FIXED: Uses the contextual spoofed identifier!
+                clientId: targetClientId,   // 👈 FIXED: Uses the contextual spoofed identifier!
+                availableContexts: finalAvailableContexts 
             };
+            
             const accessToken = jwt.sign(payload, ACCESS_TOKEN_SECRET, { expiresIn: currentAccessTokenLifetime });
 
-            // 6. Generate and save a NEW Refresh Token
+            // --- 4. Generate and save a NEW Refresh Token ---
             const currentRefreshTokenLifetime = securitySettingsService.getSettings().refreshTokenLifetime;
             const newRefreshTokenString = uuidv4();
             const newExpiresAt = new Date(Date.now() + currentRefreshTokenLifetime * 1000);
-console.log('crosscheck 4');
+
             const newRefreshToken = new RefreshToken();
             newRefreshToken.token = newRefreshTokenString;
             newRefreshToken.userId = user.id;
@@ -498,32 +523,33 @@ console.log('crosscheck 4');
             newRefreshToken.deviceInfo = storedTokenDeviceInfo;
             await refreshTokenRepo.save(newRefreshToken);
 
-            console.log('.... returning response of posting request to select-context at mm:ss:',new Date);
 
-            // 7. Return the final data
+
+            // --- 5. Return Complete Response ---
             return {
                 access_token: accessToken,
                 refresh_token: newRefreshTokenString,
                 expires_in: currentAccessTokenLifetime,
                 userId: user.id,
                 displayName: user.displayName,
-                tenantId: userContext.tenantId,
-                tenantName: userContext.user.tenant!.tenantName,
-                tenantType: userContext.user.tenant!.tenantTypeName,
-                roleName: userContext.roleName,
-                permissions: userPermissions
+                tenantId: finalTenantId,
+                tenantName: finalTenantName,
+                tenantType: finalTenantType,
+                roleName: finalRoleName,
+                permissions: userPermissions,
+                availableContexts: finalAvailableContexts 
             };
         });
 
-        // If transaction is successful, send the response
         res.status(200).json(result);
 
     } catch (error: any) {
-        // If an error occurs inside the transaction, it is automatically rolled back
         console.error('Error selecting context and generating new token:', error.message);
         res.status(400).json({ message: 'Failed to select context: ' + error.message });
     }
 });
+
+
 
 router.post('/', async (req: Request, res: Response) => {
     try {

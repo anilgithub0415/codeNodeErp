@@ -1,72 +1,24 @@
 import { Router, Request, Response } from 'express';
-import { getClientPurchaseOrderRepository, getClientRFQOrderRepository } from '../../dependencies'; // Replace with your standard DI lookup wrappers
+import {  getClientRFQOrderRepository } from '../../dependencies'; // Replace with your standard DI lookup wrappers
 import { authorizeRoles } from '../Login/authorizeRoles';
 
 const router = Router();
 
 
-
-// // =====================================================================
-// // GET: EXTRACT SINGLE RESOURCE SPECIFICATION FILE BY ID
-// // =====================================================================
-// router.route('/:tenantId/:id').get(async (req: Request, res: Response) => {
-//     try {
-//         console.log('yes with id CLPO............');
-        
-//         const clientPoService = getClientPurchaseOrderRepository();
-//         const targetCpoId = parseInt(req.params.id, 10);
-
-//         if (isNaN(targetCpoId)) {
-//             return res.status(400).json({ message: 'Invalid target path tracking parameter structure.' });
-//         }
-
-       
-        
-
-//          const loggedInTenantId = req.user.tenantId; // Secure boundary identification lock
-        
-//         console.log('getting CLPOS for tenant:',loggedInTenantId, ' and clid',targetCpoId);
-
-//         const resultList = await clientPoService.getClientPO(loggedInTenantId, targetCpoId);
-
-//         if (!resultList || resultList.length === 0) {
-//             return res.status(404).json({ message: 'Requested Client Purchase Order record not found.' });
-//         }
-
-//         return res.status(200).json(resultList[0]); // Returns first element tracking object natively
-//     } catch (error: any) {
-//         console.error('[CPO Single Fetch Error]:', error.message);
-//         return res.status(400).json({ message: 'Failed to read document target parameters: ' + error.message });
-//     }
-// });
-
-
-// // =====================================================================
-// // GET: EXTRACT ALL CLIENT PURCHASE ORDERS UNDER SECURE TENANT
-// // =====================================================================
-// //Pending: authorizeRoles should take roles from config.behalfofClient
-//     router.route('/:tenantId').get(authorizeRoles('Site_Supervisor', 'Client'),async (req: Request, res: Response) => {
-//     try {
-        
-//         const clientPoService = getClientPurchaseOrderRepository();
-//         const loggedInTenantId = req.user.tenantId; // Secure boundary identification lock
-
-//         const results = await clientPoService.getClientPOs(loggedInTenantId);
-//         return res.status(200).json(results); // ✅ 200 OK
-//     } catch (error: any) {
-//         console.error('[CPO Bulk Fetch Error]:', error.message);
-//         return res.status(400).json({ message: 'Failed to retrieve context documents: ' + error.message });
-//     }
-// });
-
-
+//
+//Pending: In all Endpoints, Better to use below type of Secure boundary identification locks: 
+// const loggedInTenantId = req.user.tenantId; // Secure boundary identification lock
+//valid urls:
+// api/clientRFQ?activeTenantId=1&clientId=1
+// api/clientRFQ?activeTenantId=1
 // =====================================================================
 // GET: EXTRACT LIST REGISTERS BY TENANT, SITE, AND OPTIONAL CLIENT FILTER
 // =====================================================================
 router.route('').get(async (req: Request, res: Response) => {
     try {
-                
-        const clientPoService = getClientPurchaseOrderRepository();
+         console.log('.....only get is working..........................................................................');
+        
+        const clientPoService = getClientRFQOrderRepository();
 
         // 1. Extract values safely from request query parameters
         const tenantId = req.query.activeTenantId ? parseInt(req.query.activeTenantId as string, 10) : 1; // Fallback default tracking values preserved
@@ -83,15 +35,32 @@ router.route('').get(async (req: Request, res: Response) => {
         console.log(`Extracting registers for Tenant: ${tenantId}, Site: ${siteId}, Client: ${clientId}`);
 
         // 2. Fetch the dynamic dataset array using our refined service architecture
-        const resultList = await clientPoService.getClientPOsFiltered(tenantId, siteId, clientId);
+        const resultList = await clientPoService.getClientRFQsFiltered(tenantId, siteId, clientId);
+console.log(resultList);
 
         return res.status(200).json(resultList);
     } catch (error: any) {
-        console.error('[CPO Listing Fetch Error]:', error.message);
+        console.error('[CRFQ Listing Fetch Error]:', error.message);
         return res.status(400).json({ message: 'Failed to read document registries: ' + error.message });
     }
 });
-//
+
+// =====================================================================
+// GET: EXTRACT ALL CLIENT PURCHASE ORDERS UNDER SECURE TENANT
+// =====================================================================
+router.route('').get(authorizeRoles('Site_Supervisor', 'Client'),async (req: Request, res: Response) => {
+    try {
+        console.log('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+        const clientPoService = getClientRFQOrderRepository();
+        const loggedInTenantId = req.user.tenantId; // Secure boundary identification lock
+
+        const results = await clientPoService.getClientPOs(loggedInTenantId);
+        return res.status(200).json(results); // ✅ 200 OK
+    } catch (error: any) {
+        console.error('[CRFQ Bulk Fetch Error]:', error.message);
+        return res.status(400).json({ message: 'Failed to retrieve context documents: ' + error.message });
+    }
+});
 
 
 
@@ -102,7 +71,7 @@ router.route('').post(async (req: Request, res: Response) => {
     try {
         console.log('..........................posting client PO.................', req.body);
         
-        const clientPoService = getClientPurchaseOrderRepository();
+        const clientPoService = getClientRFQOrderRepository();
 
         // Structural Payload Integrity Gateways
         if (!req.body.clientId) {
@@ -158,11 +127,11 @@ router.route('').post(async (req: Request, res: Response) => {
         console.log('..........................posting client PO.................', securePayload);
 
         // Add type assertion at the method call boundary
-        const result = await clientPoService.createClientPurchaseOrder(securePayload as any);
+        const result = await clientPoService.createClientRFQOrder(securePayload as any);
 
         return res.status(201).json(result);
     } catch (error: any) {
-        console.error('[CPO POST Router Error]:', error.message || error);
+        console.error('[CRFQ POST Router Error]:', error.message || error);
         return res.status(400).json({ message: 'Failed to record Client Purchase Order: ' + error.message });
     }
 });
@@ -172,7 +141,7 @@ router.route('').post(async (req: Request, res: Response) => {
 router.route('/:id').put(async (req: Request, res: Response) => {
     try {
         
-        const clientPoService = getClientPurchaseOrderRepository();
+        const clientPoService = getClientRFQOrderRepository();
         
         const poId = Number(req.params.id);
         const loggedInTenantId = req.user.tenantId;
@@ -221,17 +190,17 @@ router.route('/:id').put(async (req: Request, res: Response) => {
         }
 
         // Invoke the update method we introduced into your service layer
-        const result = await clientPoService.updateClientPurchaseOrder(poId, loggedInTenantId, updatePayload);
+        const result = await clientPoService.updateClientRFQOrder(poId, loggedInTenantId, updatePayload);
         return res.status(200).json(result);
 
     } catch (error: any) {
-        console.error('[CPO PUT Router Error]:', error.message || error);
+        console.error('[CRFQ PUT Router Error]:', error.message || error);
         return res.status(400).json({ message: 'Failed to update Client Purchase Order: ' + error.message });
     }
 });
 router.route('/:id/approve').post(async (req: Request, res: Response) => {
     try {
-        const clientPoService = getClientPurchaseOrderRepository();
+        const clientPoService = getClientRFQOrderRepository();
         const poId = Number(req.params.id);
         const loggedInTenantId = req.user.tenantId;
         const { action, items } = req.body; 
@@ -265,11 +234,11 @@ router.route('/:id/approve').post(async (req: Request, res: Response) => {
         }
 
         // Pass payload downstream to the updated service method
-        const result = await clientPoService.processPoApproval(poId, loggedInTenantId, action, sanitizedItems);
+        const result = await clientPoService.processRFQApproval(poId, loggedInTenantId, action, sanitizedItems);
         return res.status(200).json(result);
 
     } catch (error: any) {
-        console.error('[CPO Approval Router Error]:', error.message || error);
+        console.error('[CRFQ Approval Router Error]:', error.message || error);
         return res.status(400).json({ message: 'Failed to process PO workflow: ' + error.message });
     }
 });

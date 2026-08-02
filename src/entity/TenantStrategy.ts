@@ -3,13 +3,14 @@
 
 
 // src/entity/TenantStrategy.ts
-import { Entity, PrimaryColumn, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryColumn, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn, Unique } from 'typeorm';
 import { Tenant } from './Tenant';
 
 // This class defines the structure of your 'TenantStrategy' table in the database.
 @Entity({ name: 'TenantStrategy' }) 
+@Unique(['tenantStrategyName'])
 export class TenantStrategy {
-
+  
     @PrimaryGeneratedColumn()
     id!: number;
  

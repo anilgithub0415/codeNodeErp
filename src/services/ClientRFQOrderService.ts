@@ -1,17 +1,17 @@
 import { EntityManager, Repository } from 'typeorm';
 import { AppDataSource } from '../../data-source'; 
-import { ClientPurchaseOrder, POStatus } from '../entity/ClientPurchaseOrder';
-import { ClientPurchaseOrderItem } from '../entity/ClientPurchaseOrderItem';
+import { ClientRFQOrder, RFQStatus } from '../entity/ClientRFQOrder';
+import { ClientRFQOrderItem } from '../entity/ClientRFQOrderItem';
 import { Product } from '../entity/Product';
 import { ProductVariant } from '../entity/productVariant';
 import { DocumentSequence } from '../entity/DocumentSequence';
 
-interface CreateClientPoDto {
+interface CreateClientRFQDto {
     id?:number;
     tenantId: number;
     clientId: number;
     siteId: number | null;
-    clientPoNumber:string;
+    clientRFQNumber:string;
     status: string;
     clientNotes?: string;
     requestedDeliveryDate?: Date | null;
@@ -23,31 +23,31 @@ interface CreateClientPoDto {
     }>;
 }
 
-export class ClientPurchaseOrderService {
-    private clientPoRepo!: Repository<ClientPurchaseOrder>;
+export class ClientRFQOrderService {
+    private clientRFQRepo!: Repository<ClientRFQOrder>;
 
-    async init(repo: Repository<ClientPurchaseOrder>): Promise<void> {
-        this.clientPoRepo = repo;
-        console.log("ClientPurchaseOrderService backend layer initialized successfully.");
+    async init(repo: Repository<ClientRFQOrder>): Promise<void> {
+        this.clientRFQRepo = repo;
+        console.log("ClientRFQOrderService backend layer initialized successfully.");
     }
 
         /* ---------------------------------------------------------
        GET SINGLE CLIENT PO FOR TENANT & ID – Aligned for Client Orders
        --------------------------------------------------------- */
-    async getClientPO(
+    async getClientRFQ(
         tenantId: number,
         cpoId: number,
         manager?: EntityManager
-    ): Promise<ClientPurchaseOrder[]> {
-        if (!this.clientPoRepo) {
+    ): Promise<ClientRFQOrder[]> {
+        if (!this.clientRFQRepo) {
             throw new Error(
-                'ClientPurchaseOrderService repository not initialized. Call init() first.'
+                'ClientRFQOrderService repository not initialized. Call init() first.'
             );
         }
 
         const repo = manager
-            ? manager.getRepository(ClientPurchaseOrder)
-            : this.clientPoRepo;
+            ? manager.getRepository(ClientRFQOrder)
+            : this.clientRFQRepo;
 
         // Fetches a specific tracking record isolated securely within the tenant space
         const orders = await repo.find({ 
@@ -64,19 +64,19 @@ export class ClientPurchaseOrderService {
         /* ---------------------------------------------------------
        GET CLIENT PO LIST FOR TENANT, SITE, & OPTIONAL CLIENT ID
        --------------------------------------------------------- */
-    async getClientPOsFiltered(
+    async getClientRFQsFiltered(
         tenantId: number,
         siteId?: number,
         clientId?: number,
         manager?: EntityManager
-    ): Promise<ClientPurchaseOrder[]> {
-        if (!this.clientPoRepo) {
-            throw new Error('ClientPurchaseOrderService repository not initialized.');
+    ): Promise<ClientRFQOrder[]> {
+        if (!this.clientRFQRepo) {
+            throw new Error('ClientRFQOrderService repository not initialized.');
         }
 
-        console.log('Filtering Client Purchase Orders for Tenant:', tenantId, ' Site:', siteId, ' Client:', clientId);
+        console.log('Filtering Client RFQ Orders for Tenant:', tenantId, ' Site:', siteId, ' Client:', clientId);
 
-        const repo = manager ? manager.getRepository(ClientPurchaseOrder) : this.clientPoRepo;
+        const repo = manager ? manager.getRepository(ClientRFQOrder) : this.clientRFQRepo;
 
         // 1. Initialize the TypeORM conditional query block matching primary tenant indexes
         const whereConditions: any = { tenantId };
@@ -107,16 +107,16 @@ export class ClientPurchaseOrderService {
     async getClientPOs(
         tenantId: number,
         manager?: EntityManager
-    ): Promise<ClientPurchaseOrder[]> {
-        if (!this.clientPoRepo) {
+    ): Promise<ClientRFQOrder[]> {
+        if (!this.clientRFQRepo) {
             throw new Error(
-                'ClientPurchaseOrderService repository not initialized. Call init() first.'
+                'ClientRFQOrderService repository not initialized. Call init() first.'
             );
         }
 
         const repo = manager
-            ? manager.getRepository(ClientPurchaseOrder)
-            : this.clientPoRepo;
+            ? manager.getRepository(ClientRFQOrder)
+            : this.clientRFQRepo;
 
         // Extracts all requisitions under the active multi-tenant workspace context safely
         const orders = await repo.find({ 
@@ -127,30 +127,31 @@ export class ClientPurchaseOrderService {
         return orders;
     }
 
-    // Add to ClientPurchaseOrder Service
-async getPOSummaryCount(
+
+    //Summary 
+    // Add to ClientRFQOrder Service
+async getRFQSummaryCount(
     tenantId: number,
     siteId?: number,
     clientId?: number,
     manager?: EntityManager
 ): Promise<Record<string, number>> {
-    const repo = manager ? manager.getRepository(ClientPurchaseOrder) : this.clientPoRepo;
+    const repo = manager ? manager.getRepository(ClientRFQOrder) : this.clientRFQRepo;
     
-    const query = repo.createQueryBuilder('po')
-        .select('po.status', 'status')
-        .addSelect('COUNT(po.id)', 'count')
-        .where('po.tenantId = :tenantId', { tenantId });
+    const query = repo.createQueryBuilder('rfq')
+        .select('rfq.status', 'status')
+        .addSelect('COUNT(rfq.id)', 'count')
+        .where('rfq.tenantId = :tenantId', { tenantId });
 
     if (siteId !== undefined && siteId !== null && !isNaN(siteId)) {
-        query.andWhere('po.siteId = :siteId', { siteId });
+        query.andWhere('rfq.siteId = :siteId', { siteId });
     }
     if (clientId !== undefined && clientId !== null && !isNaN(clientId)) {
-        query.andWhere('po.clientId = :clientId', { clientId });
+        query.andWhere('rfq.clientId = :clientId', { clientId });
     }
 
-    const rawResults = await query.groupBy('po.status').getRawMany();
+    const rawResults = await query.groupBy('rfq.status').getRawMany();
     
-    // Transform array [{ status: 'DRAFT', count: '5' }] into object { DRAFT: 5 }
     return rawResults.reduce((acc, row) => {
         acc[row.status] = parseInt(row.count, 10);
         return acc;
@@ -160,10 +161,10 @@ async getPOSummaryCount(
     /**
      * Records bare material tracking entries without altering live inventory balances.
      */
-    async createClientPurchaseOrder(
-    dto: CreateClientPoDto,
+    async createClientRFQOrder(
+    dto: CreateClientRFQDto,
     manager?: EntityManager
-): Promise<ClientPurchaseOrder> {
+): Promise<ClientRFQOrder> {
     const isExternalTx = !!manager;
     const txManager = isExternalTx ? manager! : AppDataSource.manager;
     let queryRunner: any = null;
@@ -177,8 +178,8 @@ async getPOSummaryCount(
 
         const activeManager = isExternalTx ? txManager : queryRunner.manager;
 
-        const cpoRepo = activeManager.getRepository(ClientPurchaseOrder);
-        const cpoiRepo = activeManager.getRepository(ClientPurchaseOrderItem);
+        const cpoRepo = activeManager.getRepository(ClientRFQOrder);
+        const cpoiRepo = activeManager.getRepository(ClientRFQOrderItem);
         const productRepo = activeManager.getRepository(Product);
         const variantRepo = activeManager.getRepository(ProductVariant);
 
@@ -191,27 +192,27 @@ async getPOSummaryCount(
             tenantId: dto.tenantId,
             clientId: dto.clientId,
             siteId: dto.siteId || null, // 🚀 FIXED: Assigns your incoming siteId tracking value here!
-            clientPoNumber: generatedNumber,
-            poDate: new Date(),
+            clientRFQNumber: generatedNumber,
+            rfqDate: new Date(),
             requestedDeliveryDate: dto.requestedDeliveryDate || null,
-            status: POStatus.DRAFT, 
-            totalAmount: 0.00, 
+            status: RFQStatus.DRAFT, 
+           
             clientNotes: dto.clientNotes || '',
             internalNotes: `Generated by site workflow automation routing.`
         });
 
 
         const savedParent = await cpoRepo.save(parentOrder);
-        const enrichedItems: ClientPurchaseOrderItem[] = [];
+        const enrichedItems: ClientRFQOrderItem[] = [];
 
         // 3. Process material records and snapshot string templates
                 // 3. Process material records and snapshot string templates
         for (const itemInput of dto.items) {
             const lineItem = cpoiRepo.create();
-            lineItem.clientPurchaseOrderId = savedParent.id;
-            lineItem.clientPurchaseOrder = savedParent;
+            lineItem.clientRFQOrderId = savedParent.id;
+            lineItem.clientRFQOrder = savedParent;
             lineItem.quantity = Number(itemInput.quantity || 1);
-            lineItem.finalPrice = 0.00; 
+           
 
             let chosenUom = itemInput.purchaseUom?.trim();
 
@@ -223,7 +224,7 @@ async getPOSummaryCount(
                 if (!product) throw new Error(`Material Product ID ${itemInput.productId} not found.`);
 
                 if (!chosenUom) {
-                    chosenUom = product.defaultPurchaseUom || product.baseUom || 'PCS';
+                    chosenUom = product.defaultRFQUom || product.baseUom || 'PCS';
                 }
 
                 lineItem.productId = product.id;
@@ -243,7 +244,7 @@ async getPOSummaryCount(
                 }
 
                 if (!chosenUom) {
-                    chosenUom = variant.productTemplate.defaultPurchaseUom || variant.productTemplate.baseUom || 'PCS';
+                    chosenUom = variant.productTemplate.defaultRFQUom || variant.productTemplate.baseUom || 'PCS';
                 }
 
                 const sizeStr = variant.size ? ` (${variant.size})` : '';
@@ -280,7 +281,7 @@ async getPOSummaryCount(
         // Break serialization infinite loop recursion paths
         if (savedParent.items) {
             for (const item of savedParent.items) {
-                delete (item as any).clientPurchaseOrder;
+                delete (item as any).clientRFQOrder;
             }
         }
 console.log('saving data.........................');
@@ -298,20 +299,20 @@ console.log('saving data.........................');
  * Strict PUT/PATCH Action: Manages modifications, item purging, and state mutations
  * like transitioning from DRAFT to PENDING_APPROVAL.
  */
-async updateClientPurchaseOrder(
+async updateClientRFQOrder(
     id: number,
     tenantId: number,
-    updateDto: Partial<CreateClientPoDto> & { status?: POStatus },
+    updateDto: Partial<CreateClientRFQDto> & { status?: RFQStatus },
     manager?: EntityManager
-): Promise<ClientPurchaseOrder> {
-    console.log('m in updateClientPurchaseOrder....................................');
+): Promise<ClientRFQOrder> {
+    console.log('m in updateClientRFQOrder....................................');
     
     const isExternalTx = !!manager;
     const txManager = isExternalTx ? manager! : AppDataSource.manager;
     let queryRunner: any = null;
 
     // Isolate enrichedItems here so it can be re-assigned safely after merging header fields
-    let enrichedItems: ClientPurchaseOrderItem[] = [];
+    let enrichedItems: ClientRFQOrderItem[] = [];
 
     try {
         if (!isExternalTx) {
@@ -322,38 +323,38 @@ async updateClientPurchaseOrder(
 
         const activeManager = isExternalTx ? txManager : queryRunner.manager;
 
-        const cpoRepo = activeManager.getRepository(ClientPurchaseOrder);
-        const cpoiRepo = activeManager.getRepository(ClientPurchaseOrderItem);
+        const cpoRepo = activeManager.getRepository(ClientRFQOrder);
+        const cpoiRepo = activeManager.getRepository(ClientRFQOrderItem);
         const productRepo = activeManager.getRepository(Product);
         const variantRepo = activeManager.getRepository(ProductVariant);
 
         // 🔒 Multi-Tenant Boundary Check
-        const existingPo = await cpoRepo.findOne({ where: { id, tenantId } });
-        if (!existingPo) throw new Error("Client Purchase Order record not found or unauthorized.");
+        const existingRFQ = await cpoRepo.findOne({ where: { id, tenantId } });
+        if (!existingRFQ) throw new Error("Client RFQ Order record not found or unauthorized.");
 
         // 🛠️ State Machine Guardrail
-        if (existingPo.status !== POStatus.DRAFT) {
-            throw new Error(`Cannot modify a Client Purchase Order with status: ${existingPo.status}`);
+        if (existingRFQ.status !== RFQStatus.DRAFT) {
+            throw new Error(`Cannot modify a Client RFQ Order with status: ${existingRFQ.status}`);
         }
 
         // 📑 Handle incoming items if updating contents during Draft phase
         if (updateDto.items && updateDto.items.length > 0) {
             // Delete old items first to cleanly regenerate lines
-            await cpoiRepo.delete({ clientPurchaseOrderId: existingPo.id });
+            await cpoiRepo.delete({ clientRFQOrderId: existingRFQ.id });
 
             for (const itemInput of updateDto.items) {
                 const lineItem = cpoiRepo.create();
-                lineItem.clientPurchaseOrderId = existingPo.id;
-                lineItem.clientPurchaseOrder = existingPo;
+                lineItem.clientRFQOrderId = existingRFQ.id;
+                lineItem.clientRFQOrder = existingRFQ;
                 lineItem.quantity = Number(itemInput.quantity || 1);
-                lineItem.finalPrice = 0.00;
+              
 
                 let chosenUom = itemInput.purchaseUom?.trim();
 
                 if (itemInput.productId && !itemInput.productVariantId) {
                     const product = await productRepo.findOne({ where: { id: itemInput.productId, tenantId } });
                     if (!product) throw new Error(`Material Product ID ${itemInput.productId} not found.`);
-                    if (!chosenUom) chosenUom = product.defaultPurchaseUom || product.baseUom || 'PCS';
+                    if (!chosenUom) chosenUom = product.defaultRFQUom || product.baseUom || 'PCS';
                     
                     lineItem.productId = product.id;
                     lineItem.productVariantId = null;
@@ -365,7 +366,7 @@ async updateClientPurchaseOrder(
                 } else if (itemInput.productVariantId && !itemInput.productId) {
                     const variant = await variantRepo.findOne({ where: { id: itemInput.productVariantId }, relations: ['productTemplate'] });
                     if (!variant || variant.productTemplate.tenantId !== tenantId) throw new Error(`Material Variant ID ${itemInput.productVariantId} not found.`);
-                    if (!chosenUom) chosenUom = variant.productTemplate.defaultPurchaseUom || variant.productTemplate.baseUom || 'PCS';
+                    if (!chosenUom) chosenUom = variant.productTemplate.defaultRFQUom || variant.productTemplate.baseUom || 'PCS';
 
                     const sizeStr = variant.size ? ` (${variant.size})` : '';
                     const finishStr = variant.finish ? ` - ${variant.finish}` : '';
@@ -381,7 +382,7 @@ async updateClientPurchaseOrder(
             console.log('saving enrichedItems:', enrichedItems);
             
             await cpoiRepo.save(enrichedItems);
-            existingPo.items = enrichedItems;
+            existingRFQ.items = enrichedItems;
         }
 
         // 🔄 Apply header updates and safely mutate the status machine string
@@ -389,31 +390,31 @@ async updateClientPurchaseOrder(
         const { 
             id: payloadId, 
             tenantId: payloadTenantId, 
-            clientPoNumber, 
+            clientRFQNumber, 
             items: rawItems, // 👈 Stripped out here
             ...updatableFields 
         } = updateDto;
         
         // Merges only non-item header fields (clientId, siteId, clientNotes, etc.)
-        cpoRepo.merge(existingPo, updatableFields);
+        cpoRepo.merge(existingRFQ, updatableFields);
 
         // 🚨 FIX: Re-bind enriched entities if they were updated in this execution
         if (enrichedItems.length > 0) {
-            existingPo.items = enrichedItems;
+            existingRFQ.items = enrichedItems;
         }
 
         // If supervisor requested submission, switch status now
-        if (updateDto.status === POStatus.PENDING_APPROVAL) {
+        if (updateDto.status === RFQStatus.PENDING_APPROVAL) {
             // Validation step: Prevent submitting an empty PO for approval
-            const finalItemCount = await cpoiRepo.count({ where: { clientPurchaseOrderId: existingPo.id } });
-            if (finalItemCount === 0 && (!existingPo.items || existingPo.items.length === 0)) {
-                throw new Error("Cannot submit an empty Purchase Order for approval.");
+            const finalItemCount = await cpoiRepo.count({ where: { clientRFQOrderId: existingRFQ.id } });
+            if (finalItemCount === 0 && (!existingRFQ.items || existingRFQ.items.length === 0)) {
+                throw new Error("Cannot submit an empty RFQ Order for approval.");
             }
-            existingPo.status = POStatus.PENDING_APPROVAL;
-            existingPo.internalNotes += ` | Submitted for approval on ${new Date().toISOString()}`;
+            existingRFQ.status = RFQStatus.PENDING_APPROVAL;
+            existingRFQ.internalNotes += ` | Submitted for approval on ${new Date().toISOString()}`;
         }
 
-        const targetOrder = await cpoRepo.save(existingPo);
+        const targetOrder = await cpoRepo.save(existingRFQ);
 
         if (!isExternalTx && queryRunner) {
             await queryRunner.commitTransaction();
@@ -421,7 +422,7 @@ async updateClientPurchaseOrder(
 
         if (targetOrder.items) {
             for (const item of targetOrder.items) {
-                delete (item as any).clientPurchaseOrder;
+                delete (item as any).clientRFQOrder;
             }
         }
 
@@ -436,66 +437,65 @@ async updateClientPurchaseOrder(
 }
 
 
-async processPoApproval(
+async processRFQApproval(
     id: number,
     tenantId: number,
     action: 'APPROVE' | 'REJECT',
     updatedItems?: any[]
-): Promise<ClientPurchaseOrder> {
+): Promise<ClientRFQOrder> {
     
     const queryRunner = AppDataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
     try {
-        const cpoRepo = queryRunner.manager.getRepository(ClientPurchaseOrder);
-        const cpoiRepo = queryRunner.manager.getRepository(ClientPurchaseOrderItem);
+        const cpoRepo = queryRunner.manager.getRepository(ClientRFQOrder);
+        const cpoiRepo = queryRunner.manager.getRepository(ClientRFQOrderItem);
         const productRepo = queryRunner.manager.getRepository(Product);
         const variantRepo = queryRunner.manager.getRepository(ProductVariant);
 
         // 🔒 1. Fetch record across Multi-Tenant Boundaries
-        const existingPo = await cpoRepo.findOne({ 
+        const existingRFQ = await cpoRepo.findOne({ 
             where: { id, tenantId },
             relations: ['items'] 
         });
-        if (!existingPo) throw new Error("Client Purchase Order record not found or unauthorized.");
+        if (!existingRFQ) throw new Error("Client RFQ Order record not found or unauthorized.");
 
         // 🛠️ 2. State Machine Guardrail
         // Blocks requests if the document is not explicitly locked under review
-        if (existingPo.status !== POStatus.PENDING_APPROVAL) {
-            throw new Error(`Approval processing denied. Order is currently in ${existingPo.status} status.`);
+        if (existingRFQ.status !== RFQStatus.PENDING_APPROVAL) {
+            throw new Error(`Approval processing denied. Order is currently in ${existingRFQ.status} status.`);
         }
 
         // 📑 3. Mutate lines if the approver submitted altered item quantities
         if (action === 'APPROVE' && updatedItems && updatedItems.length > 0) {
             // Delete original line records cleanly
-            await cpoiRepo.delete({ clientPurchaseOrderId: existingPo.id });
+            await cpoiRepo.delete({ clientRFQOrderId: existingRFQ.id });
 
-            const enrichedItems: ClientPurchaseOrderItem[] = [];
+            const enrichedItems: ClientRFQOrderItem[] = [];
             for (const itemInput of updatedItems) {
                 const lineItem = cpoiRepo.create();
-                lineItem.clientPurchaseOrderId = existingPo.id;
-                lineItem.clientPurchaseOrder = existingPo;
+                lineItem.clientRFQOrderId = existingRFQ.id;
+              //  lineItem.clientRFQOrder = existingRFQ; // making cirular reference so remove it
                 lineItem.quantity = Number(itemInput.quantity || 1);
-                lineItem.finalPrice = 0.00; // Recalculate based on pricing system rules if required
-
-                let chosenUom = itemInput.purchaseUom?.trim();
+                
+               
 
                 if (itemInput.productId && !itemInput.productVariantId) {
                     const product = await productRepo.findOne({ where: { id: itemInput.productId, tenantId } });
                     if (!product) throw new Error(`Material Product ID ${itemInput.productId} not found.`);
-                    if (!chosenUom) chosenUom = product.defaultPurchaseUom || product.baseUom || 'PCS';
+                   
                     
                     lineItem.productId = product.id;
                     lineItem.productVariantId = null;
                     lineItem.prodName = product.prodName;
                     lineItem.sku = product.sku;
-                    lineItem.purchaseUom = chosenUom;
+                   
 
                 } else if (itemInput.productVariantId && !itemInput.productId) {
                     const variant = await variantRepo.findOne({ where: { id: itemInput.productVariantId }, relations: ['productTemplate'] });
                     if (!variant || variant.productTemplate.tenantId !== tenantId) throw new Error(`Material Variant ID ${itemInput.productVariantId} not found.`);
-                    if (!chosenUom) chosenUom = variant.productTemplate.defaultPurchaseUom || variant.productTemplate.baseUom || 'PCS';
+                   
 
                     const sizeStr = variant.size ? ` (${variant.size})` : '';
                     const finishStr = variant.finish ? ` - ${variant.finish}` : '';
@@ -504,32 +504,32 @@ async processPoApproval(
                     lineItem.productVariantId = variant.id;
                     lineItem.prodName = `${variant.productTemplate.prodName}${sizeStr}${finishStr}`;
                     lineItem.sku = variant.sku;
-                    lineItem.purchaseUom = chosenUom;
+                    
                 }
                 enrichedItems.push(lineItem);
             }
             
             await cpoiRepo.save(enrichedItems);
-            existingPo.items = enrichedItems;
+            existingRFQ.items = enrichedItems;
         }
 
         // 🚦 4. Resolve Final Enum State Transitions
         if (action === 'APPROVE') {
-            existingPo.status = POStatus.APPROVED;
+            existingRFQ.status = RFQStatus.APPROVED;
             
             // 💡 System Design Hook: Your Sales Order automation should run right here:
-            // await this.createSalesOrderFromApprovedPo(existingPo, queryRunner.manager);
+            // await this.createSalesOrderFromApprovedPo(existingRFQ, queryRunner.manager);
             
         } else if (action === 'REJECT') {
             // Using CANCELLED as your closest matching enum fallback for structural workflow rejections
-            existingPo.status = POStatus.CANCELLED; 
+            existingRFQ.status = RFQStatus.CANCELLED; 
         }
 
         // 💾 5. Save header details and execute transaction database flush
-        const savedPo = await cpoRepo.save(existingPo);
+        const savedRFQ = await cpoRepo.save(existingRFQ);
         await queryRunner.commitTransaction();
         
-        return savedPo;
+        return savedRFQ;
 
     } catch (error: any) {
         await queryRunner.rollbackTransaction();
@@ -549,7 +549,7 @@ async processPoApproval(
     private async generateInternalSequenceNumber(transactionalEntityManager: EntityManager): Promise<string> {
         const now = new Date();
         const yearMonth = `${now.getFullYear().toString().slice(-2)}${(now.getMonth() + 1).toString().padStart(2, '0')}`;
-        const docType = "CLIENT_REQ_PO";
+        const docType = "CLIENT_REQ_RFQ";
 
         let sequence = await transactionalEntityManager
             .getRepository(DocumentSequence)
@@ -573,8 +573,8 @@ async processPoApproval(
             await transactionalEntityManager.save(DocumentSequence, sequence);
         }
 
-        return `CPO-${yearMonth}-${nextValue}`;
+        return `CRFQ-${yearMonth}-${nextValue}`;
     }
 }
 
-export default ClientPurchaseOrderService
+export default ClientRFQOrderService

@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { getQuotationRepository } from '../../dependencies'; // Mock Dependency Injection Loader
+import { QuotationStatus } from '../../entity/Quotation';
 
 const router = Router();
 
@@ -55,7 +56,12 @@ router.route('/:tenantId')
             const queryClientId = req.query.clientId ? parseInt(req.query.clientId as string, 10) : undefined;
             const clientId = isNaN(queryClientId as number) ? undefined : queryClientId;
 
-            const quotations = await quotationService.getQuotations(tenantId, clientId);
+            // Capture optional isPortalContext from request query attributes (e.g., /12?clientId=1)
+            // Note: If you have auth middleware, prefer using req.user.clientId for security!
+           const isPortalContext = req.query.isClientPortal  === 'true';
+
+
+            const quotations = await quotationService.getQuotations(tenantId, clientId, isPortalContext);
             return res.status(200).json(quotations);
         } catch (error: any) {
             console.error('Failed to retrieve quotations:', error.message || error);
@@ -144,6 +150,7 @@ router.route('/:id').put(async (req: Request, res: Response) => {
         const loggedInTenantId = req.user.tenantId;
         const { id, tenantId, ...updatableFields } = req.body;
 
+        console.log('updatableFields:',updatableFields);
         const updatedQuotation = await quotationService.updateQuotation(
             targetId, 
             loggedInTenantId, 
@@ -155,5 +162,67 @@ router.route('/:id').put(async (req: Request, res: Response) => {
         return res.status(400).json({ 'message': 'Quotation update failed: ' + error.message });
     }
 });
+
+
+
+// ==========================================
+// PATCH: SEND DRAFT/REVISED QUOTATION TO CLIENT
+// ==========================================
+router.route('/:id/send').patch(async (req: Request, res: Response) => {
+    try {
+        const quotationService = getQuotationRepository(); 
+        const targetQuoteId = parseInt(req.params.id, 10);
+
+        if (isNaN(targetQuoteId)) {
+            return res.status(400).json({ message: 'Invalid identity tracking index.' });
+        }
+
+        const loggedInTenantId = parseInt(req.user.tenantId, 10);
+
+        // Transition the quotation cleanly to SENT status
+        const updatedQuotation = await quotationService.updateQuotationStatus(
+            targetQuoteId,
+            loggedInTenantId,
+            QuotationStatus.SENT
+        );
+
+        return res.status(200).json({
+            message: `Quotation has been successfully sent to the client.`,
+            quotation: updatedQuotation
+        });
+    } catch (error: any) {
+        return res.status(400).json({ message: 'Failed to send quotation: ' + error.message });
+    }
+});
+
+// ==========================================
+// PATCH: APPROVE A SENT OR REVISED QUOTATION
+// ==========================================
+router.route('/:id/approve').patch(async (req: Request, res: Response) => {
+    try {
+        const quotationService = getQuotationRepository(); 
+        const targetQuoteId = parseInt(req.params.id, 10);
+        const loggedInTenantId = parseInt(req.user.tenantId, 10);
+
+        if (isNaN(targetQuoteId)) {
+            return res.status(400).json({ message: 'Invalid Quotation identification tracking path.' });
+        }
+
+        // Approve the quotation (No inventory calculations needed for quotes)
+        const approvedQuotation = await quotationService.approveQuotation(
+            targetQuoteId,
+            loggedInTenantId
+        );
+
+        return res.status(200).json({
+            message: `Quotation approved successfully. Ready to convert to an Order.`,
+            quotation: approvedQuotation
+        });
+    } catch (error: any) {
+        return res.status(400).json({ message: 'Quotation approval failed: ' + error.message });
+    }
+});
+
+
 
 export default router;
