@@ -4,6 +4,13 @@ import { MinLength } from 'class-validator';
 import { Site } from './Site';
 import { Customer } from './Customer';
 
+//for defining salesorder source is Client PO/RFQ/Manual
+export enum OrderSourceType {
+    MANUAL = "MANUAL",
+    CLIENT_PO = "CLIENT_PO",
+    RFQ = "RFQ",
+    ECOMMERCE = "ECOMMERCE"
+}
 /*
 corrected summary: 
 in master detail relation in 
@@ -29,9 +36,15 @@ export class SalesOrder{
       @MinLength(5, { message: "POnumber must be at least 5 characters long" }) // 2. Application-level validation
     soNumber!: string;
 
-    // Inside your sales-order.entity.ts
-    @Column({ name: "customer_po_number", type: "varchar", length: 50, nullable: true })
-    customerPoNumber!: string; // The PO number sent by your client
+
+    // Add this to your SalesOrder entity class
+    @Column({ type: 'varchar', default: OrderSourceType.MANUAL })
+    sourceType!: OrderSourceType;
+ 
+
+        // Inside your sales-order.entity.ts
+        @Column({ name: "customer_po_number", type: "varchar", length: 50, nullable: true })
+        customerPoNumber!: string; // The PO number sent by your client
 
     @Column({ type: "date", nullable: true })
     customerPoDate!: Date; // The date printed on the client's PO

@@ -66,7 +66,6 @@ router.route('/:tenantId').get(async (req: Request, res: Response) => {
             const aForm = await tenantFormService.getTenantForm(tenantId,formKey,); 
              
 
-console.log(aForm);
 
             res.status(200).json(aForm); 
         } catch (error: any) {

@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import {  getClientPurchaseOrderRepository, getClientRFQOrderRepository } from '../../dependencies'; // Replace with your standard DI lookup wrappers
+import {  getClientPurchaseOrderRepository, getClientRFQOrderRepository, getSalesOrderRepository } from '../../dependencies'; // Replace with your standard DI lookup wrappers
 
 
 import { POStatus } from '../../entity/ClientPurchaseOrder';
@@ -18,6 +18,8 @@ router.route('/summary').get(async (req: Request, res: Response) => {
         const clientPoService = getClientPurchaseOrderRepository();
         const clientRfqService = getClientRFQOrderRepository();
 
+          const SalesService = getSalesOrderRepository();
+
         // 1. Extract values safely from request query parameters
         const tenantId = req.query.activeTenantId ? parseInt(req.query.activeTenantId as string, 10) : 1;
         const siteId = req.query.siteId ? parseInt(req.query.siteId as string, 10) : undefined;
@@ -30,9 +32,10 @@ router.route('/summary').get(async (req: Request, res: Response) => {
         }
 
         // 2. Fetch counts concurrently for faster response times
-        const [poCounts, rfqCounts] = await Promise.all([
+        const [poCounts, rfqCounts, salesCounts] = await Promise.all([
             clientPoService.getPOSummaryCount(tenantId, siteId, clientId),
-            clientRfqService.getRFQSummaryCount(tenantId, siteId, clientId)
+            clientRfqService.getRFQSummaryCount(tenantId, siteId, clientId),
+            SalesService.getSOSummaryCount(tenantId, siteId, clientId)
         ]);
 
         // 3. Format response structure
@@ -54,7 +57,16 @@ router.route('/summary').get(async (req: Request, res: Response) => {
                 PARTIALLY_RECEIVED: rfqCounts[RFQStatus.PARTIALLY_RECEIVED] || 0,
                 CLOSED: rfqCounts[RFQStatus.CLOSED] || 0,
                 CANCELLED: rfqCounts[RFQStatus.CANCELLED] || 0
-            }
+            },
+             sales: {
+                DRAFT: salesCounts[POStatus.DRAFT] || 0,
+                PENDING_APPROVAL: salesCounts[POStatus.PENDING_APPROVAL] || 0,
+                APPROVED: salesCounts[POStatus.APPROVED] || 0,
+                SENT: salesCounts[POStatus.SENT] || 0,
+                PARTIALLY_RECEIVED: salesCounts[POStatus.PARTIALLY_RECEIVED] || 0,
+                CLOSED: salesCounts[POStatus.CLOSED] || 0,
+                CANCELLED: salesCounts[POStatus.CANCELLED] || 0
+            },
         };
 
         return res.status(200).json(summaryResponse);

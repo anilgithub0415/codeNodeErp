@@ -43,6 +43,10 @@ export class Quotation {
     })
     status!: QuotationStatus;
 
+    // Inside your Quotation Entity Class file
+    @Column({ name: 'originating_client_rfq_id', type: 'int', nullable: true })
+    originatingClientRfqId!: number | null;
+
     // 4. Threading fields to manage multi-round iterations
     @Column({ name: 'quote_number', type: 'varchar', length: 50, nullable: true })
     quoteNumber!: string; // e.g., "QT-2026-0001" (Shared across all revision iterations)

@@ -1,4 +1,4 @@
-import { EntityManager, Repository } from 'typeorm';
+import { EntityManager, Repository, In } from 'typeorm';
 import { AppDataSource } from '../../data-source'; 
 import { ClientRFQOrder, RFQStatus } from '../entity/ClientRFQOrder';
 import { ClientRFQOrderItem } from '../entity/ClientRFQOrderItem';
@@ -58,47 +58,51 @@ export class ClientRFQOrderService {
         return orders;
     }
 
-        /* ---------------------------------------------------------
-       GET CLIENT PO LIST FOR TENANT, SITE, & OPTIONAL CLIENT ID
-       --------------------------------------------------------- */
-        /* ---------------------------------------------------------
-       GET CLIENT PO LIST FOR TENANT, SITE, & OPTIONAL CLIENT ID
-       --------------------------------------------------------- */
-    async getClientRFQsFiltered(
-        tenantId: number,
-        siteId?: number,
-        clientId?: number,
-        manager?: EntityManager
-    ): Promise<ClientRFQOrder[]> {
-        if (!this.clientRFQRepo) {
-            throw new Error('ClientRFQOrderService repository not initialized.');
-        }
+// Import your RFQStatus enum here if needed for strict typing
 
-        console.log('Filtering Client RFQ Orders for Tenant:', tenantId, ' Site:', siteId, ' Client:', clientId);
-
-        const repo = manager ? manager.getRepository(ClientRFQOrder) : this.clientRFQRepo;
-
-        // 1. Initialize the TypeORM conditional query block matching primary tenant indexes
-        const whereConditions: any = { tenantId };
-
-        // 2. Map structural query target arguments securely
-        // Matches your entity declaration line: siteId!: number | null;
-        if (siteId !== undefined && siteId !== null && !isNaN(siteId)) {
-            whereConditions.siteId = siteId;
-        }
-
-        // Matches your entity declaration line: clientId!: number;
-        if (clientId !== undefined && clientId !== null && !isNaN(clientId)) {
-            whereConditions.clientId = clientId;
-        }
-
-        // 3. Execute find operation tracking nested line item sub-tables
-        return await repo.find({
-            where: whereConditions,
-            relations: { items: true },
-            order: { id: 'DESC' } // Most recent purchase rows render on top of grid matrix layouts
-        });
+/* ---------------------------------------------------------------------
+   GET CLIENT PO LIST FOR TENANT, SITE, OPTIONAL CLIENT ID & STATUSES
+   --------------------------------------------------------------------- */
+async getClientRFQsFiltered(
+    tenantId: number,
+    siteId?: number,
+    clientId?: number,
+    statuses?: string[], // 🚀 NEW: Added optional parameter
+    manager?: EntityManager
+): Promise<ClientRFQOrder[]> {
+    if (!this.clientRFQRepo) {
+        throw new Error('ClientRFQOrderService repository not initialized.');
     }
+
+    console.log('Filtering Client RFQ Orders for Tenant:', tenantId, ' Site:', siteId, ' Client:', clientId, ' Statuses:', statuses);
+
+    const repo = manager ? manager.getRepository(ClientRFQOrder) : this.clientRFQRepo;
+
+    // 1. Initialize the TypeORM conditional query block matching primary tenant indexes
+    const whereConditions: any = { tenantId };
+
+    // 2. Map structural query target arguments securely
+    if (siteId !== undefined && siteId !== null && !isNaN(siteId)) {
+        whereConditions.siteId = siteId;
+    }
+
+    if (clientId !== undefined && clientId !== null && !isNaN(clientId)) {
+        whereConditions.clientId = clientId;
+    }
+
+    // 🚀 NEW: Dynamically map incoming statuses array using TypeORM's In operator
+    if (statuses && statuses.length > 0) {
+        whereConditions.status = In(statuses);
+    }
+
+    // 3. Execute find operation tracking nested line item sub-tables
+    return await repo.find({
+        where: whereConditions,
+        relations: { items: true },
+        order: { id: 'DESC' } 
+    });
+}
+
 
 
     /* ---------------------------------------------------------
@@ -295,6 +299,71 @@ console.log('saving data.........................');
         if (!isExternalTx && queryRunner) await queryRunner.release();
     }
 }
+
+
+//Note/Protocol:Here ClientRFQorder is straiht way deleted if its not SENT yet means if DRAFT/PENDING_APPROVAL/APPROVED then delete
+//1Aug2026
+    async handleDeleteOrCancelRFQRequest(
+        tenantId: number,
+        clientRFQNumber: string,
+        manager?: EntityManager
+    ): Promise<{ success: boolean; action: 'DELETED' | 'CANCELLED' }> {
+        const isExternalTransaction = !!manager;
+        const txManager = isExternalTransaction ? manager! : AppDataSource.manager;
+        let queryRunner: any = null;
+
+        try {
+            if (!isExternalTransaction) {
+                queryRunner = AppDataSource.createQueryRunner();
+                await queryRunner.connect();
+                await queryRunner.startTransaction();
+            }
+
+            const activeManager = isExternalTransaction ? txManager : queryRunner.manager;
+            const clientRfqRepo = activeManager.getRepository(ClientRFQOrder);
+
+            // Locate the client RFQ order using tenantId and the unique clientRFQNumber
+            const existingOrder = await clientRfqRepo.findOne({
+                where: { tenantId, clientRFQNumber },
+                relations: ['items'] // Loaded to maintain consistent architecture or handle cascade cleanups
+            });
+
+            if (!existingOrder) {
+                throw new Error(`[ClientRFQService] Client RFQ Order not found for Number: ${clientRFQNumber}`);
+            }
+
+            let actionResult: 'DELETED' | 'CANCELLED';
+
+            // ✅ HARD DELETE FILTER: Erase completely if DRAFT or PENDING_APPROVAL
+            if (existingOrder.status === RFQStatus.DRAFT || existingOrder.status === RFQStatus.PENDING_APPROVAL || existingOrder.status === RFQStatus.APPROVED) {
+                console.log(`[ClientRFQService] Hard deleting ${existingOrder.status} Client RFQ: ${existingOrder.clientRFQNumber}.`);
+                
+                // Erase record and cascade items completely
+                await clientRfqRepo.remove(existingOrder);
+                actionResult = 'DELETED';
+            } else {
+                console.log(`[ClientRFQService] Cancelling active Client RFQ: ${existingOrder.clientRFQNumber}`);
+                
+                // Mutate status to CANCELLED enum value
+                existingOrder.status = RFQStatus.CANCELLED;
+                await clientRfqRepo.save(existingOrder);
+                actionResult = 'CANCELLED';
+            }
+
+            if (!isExternalTransaction && queryRunner) {
+                await queryRunner.commitTransaction();
+            }
+
+            return { success: true, action: actionResult };
+        } catch (error) {
+            if (!isExternalTransaction && queryRunner) await queryRunner.rollbackTransaction();
+            throw error;
+        } finally {
+            if (!isExternalTransaction && queryRunner) await queryRunner.release();
+        }
+    }
+
+
 /**
  * Strict PUT/PATCH Action: Manages modifications, item purging, and state mutations
  * like transitioning from DRAFT to PENDING_APPROVAL.
@@ -540,7 +609,97 @@ async processRFQApproval(
     }
 }
 
+async processRFQDispatch(
+id: number,
+tenantId: number,
+action: 'SENT',
+updatedItems?: any[]
+): Promise<ClientRFQOrder>{
 
+const queryRunner = AppDataSource.createQueryRunner();
+await queryRunner.connect();
+await queryRunner.startTransaction();
+
+try {
+const cpoRepo = queryRunner.manager.getRepository(ClientRFQOrder);
+const cpoiRepo = queryRunner.manager.getRepository(ClientRFQOrderItem);
+const productRepo = queryRunner.manager.getRepository(Product);
+const variantRepo = queryRunner.manager.getRepository(ProductVariant);
+// 🔒 1. Fetch record across Multi-Tenant Boundaries
+const existingRFQ = await cpoRepo.findOne({ 
+    where: { id, tenantId },
+    relations: ['items'] 
+});
+if (!existingRFQ) throw new Error("Client RFQ Order record not found or unauthorized.");
+
+// 🛠️ 2. State Machine Guardrail
+// Blocks requests if the document is not explicitly in APPROVED status
+if (existingRFQ.status !== RFQStatus.APPROVED) {
+    throw new Error(`Dispatch processing denied. Order is currently in ${existingRFQ.status} status.`);
+}
+
+// 📑 3. Mutate lines if the dispatcher submitted altered item quantities
+if (updatedItems && updatedItems.length > 0) {
+    // Delete original line records cleanly
+    await cpoiRepo.delete({ clientRFQOrderId: existingRFQ.id });
+
+    const enrichedItems: ClientRFQOrderItem[] = [];
+    for (const itemInput of updatedItems) {
+        const lineItem = cpoiRepo.create();
+        lineItem.clientRFQOrderId = existingRFQ.id;
+        lineItem.quantity = Number(itemInput.quantity || 1);
+        
+        if (itemInput.productId && !itemInput.productVariantId) {
+            const product = await productRepo.findOne({ where: { id: itemInput.productId, tenantId } });
+            if (!product) throw new Error(`Material Product ID ${itemInput.productId} not found.`);
+            
+            lineItem.productId = product.id;
+            lineItem.productVariantId = null;
+            lineItem.prodName = product.prodName;
+            lineItem.sku = product.sku;
+
+        } else if (itemInput.productVariantId && !itemInput.productId) {
+            const variant = await variantRepo.findOne({ where: { id: itemInput.productVariantId }, relations: ['productTemplate'] });
+            if (!variant || variant.productTemplate.tenantId !== tenantId) throw new Error(`Material Variant ID ${itemInput.productVariantId} not found.`);
+
+            const sizeStr = variant.size ? ` (${variant.size})` : '';
+            const finishStr = variant.finish ? ` - ${variant.finish}` : '';
+
+            lineItem.productId = null;
+            lineItem.productVariantId = variant.id;
+            lineItem.prodName = `${variant.productTemplate.prodName}${sizeStr}${finishStr}`;
+            lineItem.sku = variant.sku;
+        }
+        enrichedItems.push(lineItem);
+    }
+    
+    await cpoiRepo.save(enrichedItems);
+    existingRFQ.items = enrichedItems;
+}
+
+// 🚦 4. Resolve Final Enum State Transitions
+if (action === 'SENT') {
+    existingRFQ.status = RFQStatus.SENT;
+    
+    // 💡 System Design Hook: Your Vendor notification email trigger should run right here:
+    // await this.dispatchRfqNotificationToVendors(existingRFQ, queryRunner.manager);
+}
+
+// 💾 5. Save header details and execute transaction database flush
+const savedRFQ = await cpoRepo.save(existingRFQ);
+await queryRunner.commitTransaction();
+
+return savedRFQ;
+
+} catch (error: any) {
+await queryRunner.rollbackTransaction();
+console.error('[CPO Service Dispatch Rollback Failure]:', error.message || error);
+throw error;
+} finally {
+await queryRunner.release();
+}
+
+}
 
 
     /**
