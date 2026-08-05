@@ -57,8 +57,24 @@ siteId!: number | null; // 👈 Make sure this camelCase variable exists!
     @Column({ name: 'internal_notes', type: 'nvarchar', length: 'MAX', nullable: true })
     internalNotes!: string; 
 
+
+    @Column({
+        name: 'is_converted_to_sales',
+        type: 'bit',
+        default: false
+    })
+    isConvertedToSales!: boolean;
+
     @Column({ name: 'converted_sales_order_id', type: 'int', nullable: true })
-    convertedSalesOrderId!: number; 
+    convertedSalesOrderId!: number | null;
+  
+    @Column({
+    name: 'converted_sales_order_number',
+    type: 'varchar',
+    length: 50,
+    nullable: true
+    })
+    convertedSalesOrderNumber!: string | null;
 
     @CreateDateColumn({ name: 'created_at' })
     createdAt!: Date;

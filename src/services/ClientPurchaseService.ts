@@ -5,6 +5,8 @@ import { ClientPurchaseOrderItem } from '../entity/ClientPurchaseOrderItem';
 import { Product } from '../entity/Product';
 import { ProductVariant } from '../entity/productVariant';
 import { DocumentSequence } from '../entity/DocumentSequence';
+import { OrderSourceType, SalesOrder } from '../entity/SalesOrder';
+import { SalesOrderItem } from '../entity/SalesOrderItem';
 
 interface CreateClientPoDto {
     id?:number;
@@ -29,6 +31,159 @@ export class ClientPurchaseOrderService {
     async init(repo: Repository<ClientPurchaseOrder>): Promise<void> {
         this.clientPoRepo = repo;
         console.log("ClientPurchaseOrderService backend layer initialized successfully.");
+    }
+
+    async convertClientPOToSalesOrder(    poId: number,    tenantId: number        ): Promise<any> {
+
+        
+
+        const queryRunner = AppDataSource.createQueryRunner();
+
+            await queryRunner.connect();
+            await queryRunner.startTransaction();
+
+            
+
+            try {
+
+                const poRepo =
+                    queryRunner.manager.getRepository(ClientPurchaseOrder);
+
+                const po = await poRepo.findOne({
+                    where: {
+                        id: poId,
+                        tenantId
+                    },
+                    relations: ['items']
+                });
+
+              if (!po)
+                    throw new Error('Client PO not found.');
+
+                if (
+                    po.status !== POStatus.APPROVED &&
+                    po.status !== POStatus.SENT
+                ) {
+                    throw new Error(
+                        'Only Approved/Sent Client PO can be converted.'
+                    );
+                }
+
+                if (po.isConvertedToSales) {
+                    throw new Error(
+                        `Client PO ${po.clientPoNumber} is already converted to Sales Order ${po.convertedSalesOrderNumber}.`
+                    );
+                }
+
+                const salesOrderRepo =           queryRunner.manager.getRepository(SalesOrder);
+
+               const salesOrderItemRepo =    queryRunner.manager.getRepository(SalesOrderItem);
+
+                
+
+                const generatedSoNumber =   await this.generateSalesOrderNumber(queryRunner.manager);
+                const salesOrder = salesOrderRepo.create({
+                tenantId: po.tenantId,
+
+                clientId: po.clientId,
+
+                siteId: po.siteId!,
+
+               soNumber: generatedSoNumber,
+
+                status: 'DRAFT',
+
+                sourceType: OrderSourceType.CLIENT_PO,
+
+                customerPoNumber: po.clientPoNumber,
+
+                customerPoDate: po.poDate,
+
+                clientPurchaseOrderId: po.id,
+
+                clientPurchaseOrderNumber: po.clientPoNumber,
+
+                //pending, after pricing implementation, we should update this also
+                subTotal: 0,
+
+                taxAmount: 0,
+
+                shippingAmount: 0,
+
+                totalAmount: 0,
+
+                customAttributes: null
+            });
+
+ 
+            if (!po.items || po.items.length === 0) {
+              throw new Error("Client PO has no items to convert.");
+}
+            //For Header
+            const savedSalesOrder = await salesOrderRepo.save(salesOrder);
+            if (!savedSalesOrder.id) {
+               throw new Error("Sales Order creation failed.");
+}
+
+            const salesItems: SalesOrderItem[] = [];
+            for (const poItem of po.items) {
+
+                const salesItem = salesOrderItemRepo.create({
+
+                salesOrderId: savedSalesOrder.id,
+                
+                productId: poItem.productId,
+
+                productVariantId: poItem.productVariantId,
+
+                prodName: poItem.prodName,
+
+                sku: poItem.sku,
+
+                quantity: poItem.quantity,
+
+                salesUom: poItem.purchaseUom,
+
+                finalPrice: poItem.finalPrice,
+
+                customAttributes: null
+            });
+
+            salesItems.push(salesItem);
+                      
+        }
+        
+         await salesOrderItemRepo.save(salesItems);
+            savedSalesOrder.items = salesItems;
+
+            po.internalNotes =
+        (po.internalNotes || '') +
+        ` | Converted to Sales Order ${savedSalesOrder.soNumber} on ${new Date().toISOString()}`;
+
+            po.isConvertedToSales = true;
+            po.convertedSalesOrderId = savedSalesOrder.id;
+            po.convertedSalesOrderNumber = savedSalesOrder.soNumber;
+
+            await poRepo.save(po);
+
+            await queryRunner.commitTransaction();
+
+            const result = await salesOrderRepo.findOne({
+                where: { id: savedSalesOrder.id },
+                relations: ['items']
+            });
+
+            return result;
+        
+
+        }
+        catch (err: any) {
+           await queryRunner.rollbackTransaction();
+           throw err;
+        }
+        finally {
+            await queryRunner.release();
+        }
     }
 
         /* ---------------------------------------------------------
@@ -65,6 +220,7 @@ export class ClientPurchaseOrderService {
         siteId?: number,
         clientId?: number,
         statuses?: string[], // 🚀 NEW: Added optional parameter
+        includeConverted?: boolean,
         manager?: EntityManager
     ): Promise<ClientPurchaseOrder[]> {
         if (!this.clientPoRepo) {
@@ -91,6 +247,16 @@ export class ClientPurchaseOrderService {
         if (statuses && statuses.length > 0) {
             whereConditions.status = In(statuses);
         }
+        
+        if (!includeConverted) {
+           whereConditions.isConvertedToSales = false;
+        }
+        
+console.log('result......',await repo.find({
+            where: whereConditions,
+            relations: { items: true },
+            order: { id: 'DESC' } 
+        }));    
 
         // 3. Execute find operation tracking nested line item sub-tables
         return await repo.find({
@@ -754,6 +920,56 @@ await queryRunner.release();
 
         return `CPO-${yearMonth}-${nextValue}`;
     }
+
+    private async generateSalesOrderNumber(
+    transactionalEntityManager: EntityManager
+): Promise<string> {
+
+    const now = new Date();
+
+    const yearMonth =
+        `${now.getFullYear().toString().slice(-2)}${(now.getMonth() + 1)
+            .toString()
+            .padStart(2, '0')}`;
+
+    const docType = "SALES_ORDER";
+
+    let sequence = await transactionalEntityManager
+        .getRepository(DocumentSequence)
+        .createQueryBuilder("seq")
+        .setLock("pessimistic_write")
+        .where(
+            "seq.documentType = :docType AND seq.prefixYearMonth = :yearMonth",
+            { docType, yearMonth }
+        )
+        .getOne();
+
+    let nextValue: number;
+
+    if (!sequence) {
+
+        nextValue = 100001;
+
+        const newSequence = new DocumentSequence();
+
+        newSequence.documentType = docType;
+        newSequence.prefixYearMonth = yearMonth;
+        newSequence.currentValue = nextValue;
+
+        await transactionalEntityManager.save(DocumentSequence, newSequence);
+
+    } else {
+
+        nextValue = sequence.currentValue + 1;
+
+        sequence.currentValue = nextValue;
+
+        await transactionalEntityManager.save(DocumentSequence, sequence);
+    }
+
+    return `SO-${yearMonth}-${nextValue}`;
+}
+
 }
 
 export default ClientPurchaseOrderService

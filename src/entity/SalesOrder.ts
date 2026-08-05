@@ -49,8 +49,23 @@ export class SalesOrder{
     @Column({ type: "date", nullable: true })
     customerPoDate!: Date; // The date printed on the client's PO
 
+     @Column({
+        name: 'client_purchase_order_id',
+        type: 'int',
+        nullable: true
+    })
+    clientPurchaseOrderId!: number | null;
 
-   @Column()
+    @Column({
+        name: 'client_purchase_order_number',
+        type: 'varchar',
+        length: 50,
+        nullable: true
+    })
+    clientPurchaseOrderNumber!: string | null;
+
+    
+    @Column()
     clientId!: number; // Keeps raw numeric access
 
     @ManyToOne(() => Customer, { onDelete: 'NO ACTION' }) // Protects data, smooth transactions

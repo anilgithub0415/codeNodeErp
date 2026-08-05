@@ -38,6 +38,10 @@ const siteId = req.query.siteId
                 : rawStatus.split(',').map(s => s.trim());
         }
 
+        const includeConverted =
+    req.query.includeConverted === 'true';
+
+
         if (isNaN(tenantId)) {
             return res.status(400).json({ message: 'Invalid tenant identification parameters supplied.' });
         }
@@ -46,7 +50,7 @@ const siteId = req.query.siteId
 
         // 2. Fetch the dynamic dataset array using our refined service architecture
         // 🚀 UPDATED: Added statuses argument to service call
-        const resultList = await clientPoService.getClientPOsFiltered(tenantId, siteId!, clientId, statuses);
+        const resultList = await clientPoService.getClientPOsFiltered(tenantId, siteId!, clientId, statuses,includeConverted);
 
         return res.status(200).json(resultList);
     } catch (error: any) {
@@ -324,6 +328,41 @@ console.error('[CPO Send Router Error]:', error.message || error);
 return res.status(400).json({ message: 'Failed to process PO workflow: ' + error.message });
 }
 
+});
+
+
+// =====================================================
+// CONVERT CLIENT PURCHASE ORDER TO SALES ORDER
+// =====================================================
+router.route('/:id/convert-to-sales').post(async (req: Request, res: Response) => {
+    try {
+
+        const clientPoService = getClientPurchaseOrderRepository();
+
+        const poId = Number(req.params.id);
+        const tenantId = Number(req.user.tenantId);
+
+        if (isNaN(poId)) {
+            return res.status(400).json({
+                message: 'Invalid Purchase Order Id.'
+            });
+        }
+
+        const result = await clientPoService.convertClientPOToSalesOrder(
+            poId,
+            tenantId
+        );
+
+        return res.status(200).json(result); 
+
+    } catch (error: any) {
+ 
+        console.error(error);
+
+        return res.status(400).json({
+            message: error.message
+        });
+    }
 });
 
 export default router;
