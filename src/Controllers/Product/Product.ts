@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { getProductRepository, getProductTemplateRepository } from '../../dependencies'
-import PriceCalculationService from '../../services/PriceCalculationService';
+import PriceCalculationService from '../../services/PriceCalculationEngine';
 import { AppDataSource } from '../../../data-source';
 
 interface CreateProductRequestBody {
@@ -155,7 +155,7 @@ router.route('/finalPrice/:id/:tenantId/:custId')
             const custId = parseInt(req.params.custId);
 
             const priceCalcService = new PriceCalculationService(); 
-            const finalPrice = await priceCalcService.calculateFinalPrice(tenantId, prodId, custId, p)
+            const finalPrice = (await priceCalcService.calculateLinePrice(tenantId,  custId, p)).sellingPrice
 
             return res.status(200).json(finalPrice);
         } catch (error: any) {

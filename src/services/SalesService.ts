@@ -826,6 +826,42 @@ async approvePendingSalesOrder(
             availableSalesUnits: uniqueSalesUnits 
         };
     }
+
+
+
+        // Add to SalesOrder Service
+    async getSOSummaryCount(
+        tenantId: number,
+        siteId?: number,
+        clientId?: number,
+        manager?: EntityManager
+    ): Promise<Record<string, number>> {
+        // Fallback to local service repository pointer or inject via operational context manager
+        const repo = manager ? manager.getRepository(SalesOrder) : this.salesRepository;
+        
+        const query = repo.createQueryBuilder('so')
+            .select('so.status', 'status')
+            .addSelect('COUNT(so.id)', 'count')
+            .where('so.tenantId = :tenantId', { tenantId });
+
+        // Conditional filters mapped securely to handle structural numeric boundaries
+        if (siteId !== undefined && siteId !== null && !isNaN(siteId)) {
+            query.andWhere('so.siteId = :siteId', { siteId });
+        }
+        if (clientId !== undefined && clientId !== null && !isNaN(clientId)) {
+            query.andWhere('so.clientId = :clientId', { clientId });
+        }
+
+        const rawResults = await query.groupBy('so.status').getRawMany();
+        
+        // Transform active tracking array [{ status: 'draft', count: '12' }] into keyed matrix { draft: 12 }
+        return rawResults.reduce((acc, row) => {
+            acc[row.status] = parseInt(row.count, 10);
+            return acc;
+        }, {} as Record<string, number>);
+    }
+
+
 }
 
 export default SalesService;

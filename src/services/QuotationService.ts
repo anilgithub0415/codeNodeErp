@@ -5,7 +5,11 @@ import { QuotationItem } from '../entity/QuotationItem';
 import { Customer } from '../entity/Customer';
 import { Product } from '../entity/Product';
 import { LineDiscount } from '../entity/LineDiscount';
+import { IQuotationActions, QuotationWorkflowService } from './QuotationWorkflowService';
+import { ClientRFQOrder, RFQStatus } from '../entity/ClientRFQOrder';
+import DocumentConversionEngine from './DocumentConversionEngine';
 
+ 
 export interface ICreateQuotationItemInput {
     productId?: number | null;
     productVariantId?: number | null;
@@ -37,14 +41,65 @@ export interface CreatedQuotationResponse {
     quotation: Quotation;
 }
 
+
+
+//Convert to Quotation new approach:tag:convertToQuoteNewIdea
+export interface QuotationWorkflowDto{
+
+    quotationId:number;
+
+    status:QuotationStatus;
+
+    actions:IQuotationActions;
+
+}
 export class QuotationService {
     private quotationRepository!: Repository<Quotation>;
 
+    //Convert to Quotation new approach:tag:convertToQuoteNewIdea
+    private workflowService = new QuotationWorkflowService();
+        private workflow = new QuotationWorkflowService();
+
+    
     async init(repo: Repository<Quotation>): Promise<void> {
         this.quotationRepository = repo;
         console.log("QuotationService repository initialized.");       
     }
 
+    //Convert to Quotation new approach:tag:convertToQuoteNewIdea
+    public async getWorkflow(
+    quotationId:number,
+    tenantId:number
+    ):Promise<QuotationWorkflowDto>{
+
+        const quotation = await this.quotationRepository.findOne({
+
+            where:{
+                id:quotationId,
+                tenantId
+            }
+
+        });
+
+        if(!quotation){
+
+            throw new Error("Quotation not found.");
+
+        }
+
+        return{
+
+            quotationId:quotation.id,
+
+            status:quotation.status,
+
+            actions:this.workflowService.getAllowedActions(
+                quotation.status
+            )
+
+        };
+
+    }
     async getQuotation(tenantId: number, id: number): Promise<Quotation> {
         const result = await this.quotationRepository.findOne({
             where: { id, tenantId },
@@ -347,6 +402,8 @@ for (const incomingLine of (quotationData.items || [])) {
               where: { id: targetId, tenantId },
               relations: ['items']
           });
+        
+          this.workflow.ensureCanEdit(existingQuotation!.status);
 
           if (!existingQuotation) {
               throw new Error(`Quotation with identification ID ${targetId} missing on tenant context.`);
@@ -410,6 +467,13 @@ const productRepo = transactionalEntityManager.getRepository(Product);
           const { items, ...pureFields } = updatableFields;
           pureFields.totalAmount = Number(aggregateTotal.toFixed(2));
           
+          if (
+            updatableFields.clientId &&
+            updatableFields.clientId !== existingQuotation.clientId
+            ) {
+                this.workflow.ensureCanChangeCustomer(existingQuotation.status);
+              }
+
           quotationRepo.merge(existingQuotation, pureFields);
 
           return await quotationRepo.save(existingQuotation);
@@ -439,10 +503,7 @@ const productRepo = transactionalEntityManager.getRepository(Product);
         }
 
         // 2. State Safety Guard
-        // Allow transition to SENT only from DRAFT or REVISED states
-        if (targetQuote.status !== QuotationStatus.DRAFT && targetQuote.status !== QuotationStatus.REVISED) {
-            throw new Error(`[QuotationService] Only ${QuotationStatus.DRAFT} or ${QuotationStatus.REVISED} quotations can be sent. Current status is '${targetQuote.status}'.`);
-        }
+        this.workflow.ensureCanSubmit(targetQuote.status);
 
         console.log(`[QuotationService] Transitioning Quote ${targetQuote.quoteNumber} status from ${targetQuote.status} to ${newStatus}`);
 
@@ -486,10 +547,7 @@ const productRepo = transactionalEntityManager.getRepository(Product);
             }
 
             // 2. State Safety Guard
-            // A quote can be approved if it is sent out or under review (REVISED)
-            if (targetQuote.status !== QuotationStatus.SENT && targetQuote.status !== QuotationStatus.REVISED) {
-                throw new Error(`[QuotationService] Cannot approve Quotation. Current status is '${targetQuote.status}', expected '${QuotationStatus.SENT}' or '${QuotationStatus.REVISED}'.`);
-            }
+          this.workflow.ensureCanApprove(targetQuote.status);
 
             console.log(`[QuotationService] Approving Quote ${targetQuote.quoteNumber}...`);
 
@@ -529,6 +587,8 @@ const productRepo = transactionalEntityManager.getRepository(Product);
         where: { id: originalQuoteId, tenantId: tenantId },
         relations: ['items'],
       });
+
+      this.workflow.ensureCanCounterOffer(existingQuote!.status);
 
       if (!existingQuote) {
         throw new Error(`Quotation structure source context matching ID #${originalQuoteId} not found for tenant #${tenantId}.`);
@@ -610,9 +670,30 @@ const productRepo = transactionalEntityManager.getRepository(Product);
       return savedRoundHeader;
     });
   }
+// RFQ -> Quotation
+async convertRFQToQuotation(
+    tenantId: number,
+    rfqId: number,
+    userId: number
+//): Promise<Quotation> {
+){
+    
 
+const documentConversionEngine =   new DocumentConversionEngine();
 
+    return AppDataSource.transaction(async manager => {
 
+        return await documentConversionEngine
+            .convertRFQToQuotation(
+                manager,
+                tenantId,
+                rfqId,
+                userId
+            );
+
+    });
+
+}
 
 
 }

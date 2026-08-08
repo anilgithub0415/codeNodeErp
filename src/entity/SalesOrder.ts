@@ -4,6 +4,23 @@ import { MinLength } from 'class-validator';
 import { Site } from './Site';
 import { Customer } from './Customer';
 
+
+export enum SOStatus {
+    DRAFT = "DRAFT",
+    PENDING_APPROVAL = "PENDING_APPROVAL",
+    APPROVED = "APPROVED",
+    SENT = "SENT",
+    PARTIALLY_RECEIVED = "PARTIALLY_RECEIVED",
+    CLOSED = "CLOSED",
+    CANCELLED = "CANCELLED"
+}
+//for defining salesorder source is Client PO/RFQ/Manual
+export enum OrderSourceType {
+    MANUAL = "MANUAL",
+    CLIENT_PO = "CLIENT_PO",
+    RFQ = "RFQ",
+    ECOMMERCE = "ECOMMERCE"
+}
 /*
 corrected summary: 
 in master detail relation in 
@@ -13,6 +30,11 @@ in master detail relation in
   In flat entity (not a masterdetail) specify onDelete: 'NO ACTION' and never say onDelete: 'cascade'
  */
 
+
+  //Pending important global: Check evey field where 
+  // number | null
+  // or
+  // string | null
 @Entity("sales_orders")
 export class SalesOrder{
     @PrimaryGeneratedColumn('increment')
@@ -29,23 +51,44 @@ export class SalesOrder{
       @MinLength(5, { message: "POnumber must be at least 5 characters long" }) // 2. Application-level validation
     soNumber!: string;
 
-    // Inside your sales-order.entity.ts
-    @Column({ name: "customer_po_number", type: "varchar", length: 50, nullable: true })
-    customerPoNumber!: string; // The PO number sent by your client
+
+    // Add this to your SalesOrder entity class
+    @Column({ type: 'varchar', default: OrderSourceType.MANUAL })
+    sourceType!: OrderSourceType;
+ 
+
+        // Inside your sales-order.entity.ts
+        @Column({ name: "customer_po_number", type: "varchar", length: 50, nullable: true })
+        customerPoNumber!: string | null; // The PO number sent by your client
 
     @Column({ type: "date", nullable: true })
-    customerPoDate!: Date; // The date printed on the client's PO
+    customerPoDate!: Date|null; // The date printed on the client's PO
 
+     @Column({
+        name: 'client_purchase_order_id',
+        type: 'int',
+        nullable: true
+    })
+    clientPurchaseOrderId!: number | null;
 
-   @Column()
-    clientId!: number; // Keeps raw numeric access
+    @Column({
+        name: 'client_purchase_order_number',
+        type: 'varchar',
+        length: 50,
+        nullable: true
+    })
+    clientPurchaseOrderNumber!: string | null;
+
+    
+    @Column()
+    clientId!: number | null; // Keeps raw numeric access
 
     @ManyToOne(() => Customer, { onDelete: 'NO ACTION' }) // Protects data, smooth transactions
     @JoinColumn({ name: 'clientId' })
     client!: Customer;
 
    @Column({nullable:true})
-    siteId!: number; // Keeps raw numeric access
+    siteId!: number | null; // Keeps raw numeric access
 
     @ManyToOne(() => Site, { onDelete: 'NO ACTION' }) // Protects data, smooth transactions
     @JoinColumn({ name: 'siteId' })
@@ -78,4 +121,6 @@ export class SalesOrder{
     @UpdateDateColumn({ name: 'updated_at' ,nullable: true})
     updatedAt!: Date;
 
+    @Column({ nullable:true})
+    createdByUserId!:number;
 }

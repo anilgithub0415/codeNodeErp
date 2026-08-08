@@ -1,7 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { getQuotationRepository } from '../../dependencies'; // Mock Dependency Injection Loader
 import { QuotationStatus } from '../../entity/Quotation';
-
 const router = Router();
 
 router.use((req, res, next) => {
@@ -225,4 +224,61 @@ router.route('/:id/approve').patch(async (req: Request, res: Response) => {
 
 
 
+//Convert to Quotation new approach:tag:convertToQuoteNewIdea
+router.get(
+    "/:id/workflow",
+    async(req,res,next)=>{
+
+        try{
+
+            const tenantId=req.user.tenantId;
+
+            const quotationId=Number(req.params.id);
+  const quotationService = getQuotationRepository(); 
+            const result=
+                await quotationService.getWorkflow(
+                    quotationId,
+                    tenantId
+                );
+
+            res.json(result);
+
+        }
+        catch(ex){
+
+            next(ex);
+
+        }
+
+    }
+);
+
+router.post(
+    "/convert",
+    async (req, res, next) => {
+console.log('m at post of quotation convert..............');
+
+        try {
+
+            const tenantId = req.user.tenantId;
+
+            const userId = req.user.id;
+
+            const quotation =
+                await getQuotationRepository()
+                    .convertRFQToQuotation(
+                        tenantId,
+                        req.body.rfqId,
+                        userId
+                    );
+
+            res.json(quotation);
+
+        }
+        catch (ex) {
+            next(ex);
+        }
+
+    }
+);
 export default router;

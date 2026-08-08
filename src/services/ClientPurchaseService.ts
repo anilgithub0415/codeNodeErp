@@ -1,10 +1,14 @@
-import { EntityManager, Repository } from 'typeorm';
+import { EntityManager, In, QueryRunner, Repository } from 'typeorm';
 import { AppDataSource } from '../../data-source'; 
-import { ClientPurchaseOrder, POStatus } from '../entity/ClientPurchaseOrder';
+import { ClientPurchaseOrder, Client_POStatus } from '../entity/ClientPurchaseOrder';
 import { ClientPurchaseOrderItem } from '../entity/ClientPurchaseOrderItem';
 import { Product } from '../entity/Product';
 import { ProductVariant } from '../entity/productVariant';
 import { DocumentSequence } from '../entity/DocumentSequence';
+import { OrderSourceType, SalesOrder } from '../entity/SalesOrder';
+import { SalesOrderItem } from '../entity/SalesOrderItem';
+import DocumentConversionEngine from './DocumentConversionEngine';
+import { getSalesOrderRepository } from '../dependencies';
 
 interface CreateClientPoDto {
     id?:number;
@@ -24,6 +28,7 @@ interface CreateClientPoDto {
 }
 
 export class ClientPurchaseOrderService {
+    
     private clientPoRepo!: Repository<ClientPurchaseOrder>;
 
     async init(repo: Repository<ClientPurchaseOrder>): Promise<void> {
@@ -31,6 +36,90 @@ export class ClientPurchaseOrderService {
         console.log("ClientPurchaseOrderService backend layer initialized successfully.");
     }
 
+    async convertClientPOToSalesOrder(
+    poId: number,
+    tenantId: number,
+    userId: number,
+    manager?: EntityManager
+): Promise<SalesOrder> {
+
+    const isExternalTx = !!manager;
+
+    const txManager =
+        isExternalTx
+            ? manager!
+            : AppDataSource.manager;
+
+            //Pending: Important and global check, see below line where is just imported (nothing else)
+                //need to check whether unnecessary code is written
+    let queryRunner: QueryRunner | null = null;
+
+    try {
+
+        if (!isExternalTx) {
+
+            queryRunner =
+                AppDataSource.createQueryRunner();
+
+            await queryRunner.connect();
+
+            await queryRunner.startTransaction();
+
+        }
+
+        const activeManager =
+            isExternalTx
+                ? txManager
+                : queryRunner!.manager;
+
+        const salesService =
+            getSalesOrderRepository();
+
+        const channelCode = "Z";
+
+        const generatedSoNumber =
+            await salesService.generateSalesOrderNumber(
+                activeManager,
+                channelCode
+            );
+
+        const engine =
+            new DocumentConversionEngine();
+
+        const result =
+            await engine.convertClientPOToSalesOrder(
+                activeManager,
+                tenantId,
+                poId,
+                generatedSoNumber,
+                userId
+            );
+
+        if (!isExternalTx) {
+            await queryRunner!.commitTransaction();
+        }
+
+        return result;
+
+    }
+    catch (error) {
+
+        if (!isExternalTx && queryRunner) {
+            await queryRunner.rollbackTransaction();
+        }
+
+        throw error;
+
+    }
+    finally {
+
+        if (!isExternalTx && queryRunner) {
+            await queryRunner.release();
+        }
+
+    }
+
+}
         /* ---------------------------------------------------------
        GET SINGLE CLIENT PO FOR TENANT & ID – Aligned for Client Orders
        --------------------------------------------------------- */
@@ -57,24 +146,22 @@ export class ClientPurchaseOrderService {
       
         return orders;
     }
-
-        /* ---------------------------------------------------------
-       GET CLIENT PO LIST FOR TENANT, SITE, & OPTIONAL CLIENT ID
-       --------------------------------------------------------- */
-        /* ---------------------------------------------------------
-       GET CLIENT PO LIST FOR TENANT, SITE, & OPTIONAL CLIENT ID
-       --------------------------------------------------------- */
+    /* ---------------------------------------------------------------------
+       GET CLIENT PO LIST FOR TENANT, SITE, OPTIONAL CLIENT ID & STATUSES
+       --------------------------------------------------------------------- */
     async getClientPOsFiltered(
         tenantId: number,
         siteId?: number,
         clientId?: number,
+        statuses?: string[], // 🚀 NEW: Added optional parameter
+        includeConverted?: boolean,
         manager?: EntityManager
     ): Promise<ClientPurchaseOrder[]> {
         if (!this.clientPoRepo) {
             throw new Error('ClientPurchaseOrderService repository not initialized.');
         }
 
-        console.log('Filtering Client Purchase Orders for Tenant:', tenantId, ' Site:', siteId, ' Client:', clientId);
+        console.log('Filtering Client Purchase Orders for Tenant:', tenantId, ' Site:', siteId, ' Client:', clientId, ' Statuses:', statuses);
 
         const repo = manager ? manager.getRepository(ClientPurchaseOrder) : this.clientPoRepo;
 
@@ -82,21 +169,34 @@ export class ClientPurchaseOrderService {
         const whereConditions: any = { tenantId };
 
         // 2. Map structural query target arguments securely
-        // Matches your entity declaration line: siteId!: number | null;
         if (siteId !== undefined && siteId !== null && !isNaN(siteId)) {
             whereConditions.siteId = siteId;
         }
 
-        // Matches your entity declaration line: clientId!: number;
         if (clientId !== undefined && clientId !== null && !isNaN(clientId)) {
             whereConditions.clientId = clientId;
         }
+
+        // 🚀 NEW: Dynamically map incoming statuses array using TypeORM's In operator
+        if (statuses && statuses.length > 0) {
+            whereConditions.status = In(statuses);
+        }
+        
+        if (!includeConverted) {
+           whereConditions.isConvertedToSales = false;
+        }
+        
+console.log('result......',await repo.find({
+            where: whereConditions,
+            relations: { items: true },
+            order: { id: 'DESC' } 
+        }));    
 
         // 3. Execute find operation tracking nested line item sub-tables
         return await repo.find({
             where: whereConditions,
             relations: { items: true },
-            order: { id: 'DESC' } // Most recent purchase rows render on top of grid matrix layouts
+            order: { id: 'DESC' } 
         });
     }
 
@@ -194,7 +294,7 @@ async getPOSummaryCount(
             clientPoNumber: generatedNumber,
             poDate: new Date(),
             requestedDeliveryDate: dto.requestedDeliveryDate || null,
-            status: POStatus.DRAFT, 
+            status: Client_POStatus.DRAFT, 
             totalAmount: 0.00, 
             clientNotes: dto.clientNotes || '',
             internalNotes: `Generated by site workflow automation routing.`
@@ -301,7 +401,7 @@ console.log('saving data.........................');
 async updateClientPurchaseOrder(
     id: number,
     tenantId: number,
-    updateDto: Partial<CreateClientPoDto> & { status?: POStatus },
+    updateDto: Partial<CreateClientPoDto> & { status?: Client_POStatus },
     manager?: EntityManager
 ): Promise<ClientPurchaseOrder> {
     console.log('m in updateClientPurchaseOrder....................................');
@@ -332,7 +432,7 @@ async updateClientPurchaseOrder(
         if (!existingPo) throw new Error("Client Purchase Order record not found or unauthorized.");
 
         // 🛠️ State Machine Guardrail
-        if (existingPo.status !== POStatus.DRAFT) {
+        if (existingPo.status !== Client_POStatus.DRAFT) {
             throw new Error(`Cannot modify a Client Purchase Order with status: ${existingPo.status}`);
         }
 
@@ -403,13 +503,13 @@ async updateClientPurchaseOrder(
         }
 
         // If supervisor requested submission, switch status now
-        if (updateDto.status === POStatus.PENDING_APPROVAL) {
+        if (updateDto.status === Client_POStatus.PENDING_APPROVAL) {
             // Validation step: Prevent submitting an empty PO for approval
             const finalItemCount = await cpoiRepo.count({ where: { clientPurchaseOrderId: existingPo.id } });
             if (finalItemCount === 0 && (!existingPo.items || existingPo.items.length === 0)) {
                 throw new Error("Cannot submit an empty Purchase Order for approval.");
             }
-            existingPo.status = POStatus.PENDING_APPROVAL;
+            existingPo.status = Client_POStatus.PENDING_APPROVAL;
             existingPo.internalNotes += ` | Submitted for approval on ${new Date().toISOString()}`;
         }
 
@@ -435,6 +535,69 @@ async updateClientPurchaseOrder(
     }
 }
 
+
+//Note/Protocol:Here ClientPurchaseorder is straiht way deleted if its not SENT yet means if DRAFT/PENDING_APPROVAL/APPROVED
+//1Aug2026
+    async handleDeleteOrCancelClientRequest(
+        tenantId: number,
+        clientPoNumber: string,
+        manager?: EntityManager
+    ): Promise<{ success: boolean; action: 'DELETED' | 'CANCELLED' }> {
+        const isExternalTransaction = !!manager;
+        const txManager = isExternalTransaction ? manager! : AppDataSource.manager;
+        let queryRunner: any = null;
+
+        try {
+            if (!isExternalTransaction) {
+                queryRunner = AppDataSource.createQueryRunner();
+                await queryRunner.connect();
+                await queryRunner.startTransaction();
+            }
+
+            const activeManager = isExternalTransaction ? txManager : queryRunner.manager;
+            const clientPoRepo = activeManager.getRepository(ClientPurchaseOrder);
+
+            // Locate the client purchase order using tenantId and the unique clientPoNumber
+            const existingOrder = await clientPoRepo.findOne({
+                where: { tenantId, clientPoNumber },
+                relations: ['items'] // Loaded to pass to the stock reversal helper if needed
+            });
+
+            if (!existingOrder) {
+                throw new Error(`[ClientPurchaseService] Client Purchase Order not found for Number: ${clientPoNumber}`);
+            }
+
+            let actionResult: 'DELETED' | 'CANCELLED';
+
+            // ✅ MODIFIED CONDITION: Hard delete if DRAFT or PENDING_APPROVAL
+            if (existingOrder.status === Client_POStatus.DRAFT || existingOrder.status === Client_POStatus.PENDING_APPROVAL || existingOrder.status === Client_POStatus.APPROVED) {
+                console.log(`[ClientPurchaseService] Hard deleting ${existingOrder.status} Client PO: ${existingOrder.clientPoNumber}. Stock adjustment skipped.`);
+                
+                // Erase record and cascade items completely
+                await clientPoRepo.remove(existingOrder);
+                actionResult = 'DELETED';
+            } else {
+                console.log(`[ClientPurchaseService] Cancelling active Client PO: ${existingOrder.clientPoNumber}`);
+                
+                             
+                // Mutate status to CANCELLED enum value
+                existingOrder.status = Client_POStatus.CANCELLED;
+                await clientPoRepo.save(existingOrder);
+                actionResult = 'CANCELLED';
+            }
+
+            if (!isExternalTransaction && queryRunner) {
+                await queryRunner.commitTransaction();
+            }
+
+            return { success: true, action: actionResult };
+        } catch (error) {
+            if (!isExternalTransaction && queryRunner) await queryRunner.rollbackTransaction();
+            throw error;
+        } finally {
+            if (!isExternalTransaction && queryRunner) await queryRunner.release();
+        }
+    }
 
 async processPoApproval(
     id: number,
@@ -462,7 +625,7 @@ async processPoApproval(
 
         // 🛠️ 2. State Machine Guardrail
         // Blocks requests if the document is not explicitly locked under review
-        if (existingPo.status !== POStatus.PENDING_APPROVAL) {
+        if (existingPo.status !== Client_POStatus.PENDING_APPROVAL) {
             throw new Error(`Approval processing denied. Order is currently in ${existingPo.status} status.`);
         }
 
@@ -515,23 +678,33 @@ async processPoApproval(
 
         // 🚦 4. Resolve Final Enum State Transitions
         if (action === 'APPROVE') {
-            existingPo.status = POStatus.APPROVED;
+            existingPo.status = Client_POStatus.APPROVED;
             
             // 💡 System Design Hook: Your Sales Order automation should run right here:
             // await this.createSalesOrderFromApprovedPo(existingPo, queryRunner.manager);
             
         } else if (action === 'REJECT') {
             // Using CANCELLED as your closest matching enum fallback for structural workflow rejections
-            existingPo.status = POStatus.CANCELLED; 
+            existingPo.status = Client_POStatus.CANCELLED; 
         }
 
         // 💾 5. Save header details and execute transaction database flush
-        const savedPo = await cpoRepo.save(existingPo);
+            // 💾 5. Save header details and execute transaction database flush
+        await cpoRepo.save(existingPo);
+        
+        // 🧼 Fetch a fresh, clean instance across the queryRunner manager to avoid circular pollution
+        const cleanPo = await queryRunner.manager.getRepository(ClientPurchaseOrder).findOne({
+            where: { id: existingPo.id, tenantId },
+            relations: ['items']
+        });
+
         await queryRunner.commitTransaction();
         
-        return savedPo;
+        if (!cleanPo) throw new Error("Failed to reload processed Purchase Order.");
+        return cleanPo;
 
     } catch (error: any) {
+
         await queryRunner.rollbackTransaction();
         console.error('[CPO Service Workflow Rollback Failure]:', error.message || error);
         throw error;
@@ -540,7 +713,113 @@ async processPoApproval(
     }
 }
 
+async processPoDispatch(
+id: number,
+tenantId: number,
+action: 'SENT',
+updatedItems?: any[]
+): Promise<ClientPurchaseOrder> { 
 
+const queryRunner = AppDataSource.createQueryRunner();
+await queryRunner.connect();
+await queryRunner.startTransaction();
+
+try {
+const cpoRepo = queryRunner.manager.getRepository(ClientPurchaseOrder);
+const cpoiRepo = queryRunner.manager.getRepository(ClientPurchaseOrderItem);
+const productRepo = queryRunner.manager.getRepository(Product);
+const variantRepo = queryRunner.manager.getRepository(ProductVariant);
+// 🔒 1. Fetch record across Multi-Tenant Boundaries
+const existingPo = await cpoRepo.findOne({ 
+    where: { id, tenantId },
+    relations: ['items'] 
+});
+if (!existingPo) throw new Error("Client Purchase Order record not found or unauthorized.");
+
+// 🛠️ 2. State Machine Guardrail
+// Blocks requests if the document is not explicitly APPROVED
+if (existingPo.status !== Client_POStatus.APPROVED) {
+    throw new Error(`Dispatch processing denied. Order is currently in ${existingPo.status} status.`);
+}
+
+// 📑 3. Mutate lines if the sender submitted altered item quantities
+if (updatedItems && updatedItems.length > 0) {
+    // Delete original line records cleanly
+    await cpoiRepo.delete({ clientPurchaseOrderId: existingPo.id });
+
+    const enrichedItems: ClientPurchaseOrderItem[] = [];
+    for (const itemInput of updatedItems) {
+        const lineItem = cpoiRepo.create();
+        lineItem.clientPurchaseOrderId = existingPo.id;
+        lineItem.clientPurchaseOrder = existingPo;
+        lineItem.quantity = Number(itemInput.quantity || 1);
+        lineItem.finalPrice = 0.00; // Recalculate based on pricing system rules if required
+
+        let chosenUom = itemInput.purchaseUom?.trim();
+
+        if (itemInput.productId && !itemInput.productVariantId) {
+            const product = await productRepo.findOne({ where: { id: itemInput.productId, tenantId } });
+            if (!product) throw new Error(`Material Product ID ${itemInput.productId} not found.`);
+            if (!chosenUom) chosenUom = product.defaultPurchaseUom || product.baseUom || 'PCS';
+            
+            lineItem.productId = product.id;
+            lineItem.productVariantId = null;
+            lineItem.prodName = product.prodName;
+            lineItem.sku = product.sku;
+            lineItem.purchaseUom = chosenUom;
+
+        } else if (itemInput.productVariantId && !itemInput.productId) {
+            const variant = await variantRepo.findOne({ where: { id: itemInput.productVariantId }, relations: ['productTemplate'] });
+            if (!variant || variant.productTemplate.tenantId !== tenantId) throw new Error(`Material Variant ID ${itemInput.productVariantId} not found.`);
+            if (!chosenUom) chosenUom = variant.productTemplate.defaultPurchaseUom || variant.productTemplate.baseUom || 'PCS';
+
+            const sizeStr = variant.size ? ` (${variant.size})` : '';
+            const finishStr = variant.finish ? ` - ${variant.finish}` : '';
+
+            lineItem.productId = null;
+            lineItem.productVariantId = variant.id;
+            lineItem.prodName = `${variant.productTemplate.prodName}${sizeStr}${finishStr}`;
+            lineItem.sku = variant.sku;
+            lineItem.purchaseUom = chosenUom;
+        }
+        enrichedItems.push(lineItem);
+    }
+    
+    await cpoiRepo.save(enrichedItems);
+    existingPo.items = enrichedItems;
+}
+
+// 🚦 4. Resolve Final Enum State Transitions
+if (action === 'SENT') {
+    existingPo.status = Client_POStatus.SENT;
+    
+    // 💡 System Design Hook: Your Vendor EDI transmission or email alert should run right here:
+    // await this.transmitPoToExternalVendor(existingPo, queryRunner.manager);
+}
+
+// 💾 5. Save header details and execute transaction database flush
+await cpoRepo.save(existingPo);
+
+// 🧼 Fetch a fresh, clean instance across the queryRunner manager to avoid circular pollution
+const cleanPo = await queryRunner.manager.getRepository(ClientPurchaseOrder).findOne({
+    where: { id: existingPo.id, tenantId },
+    relations: ['items']
+});
+
+await queryRunner.commitTransaction();
+
+if (!cleanPo) throw new Error("Failed to reload processed Purchase Order.");
+return cleanPo;
+
+} catch (error: any) {
+await queryRunner.rollbackTransaction();
+console.error('[CPO Service Dispatch Rollback Failure]:', error.message || error);
+throw error;
+} finally {
+await queryRunner.release();
+}
+
+}
 
 
     /**
@@ -575,6 +854,56 @@ async processPoApproval(
 
         return `CPO-${yearMonth}-${nextValue}`;
     }
+
+    private async generateSalesOrderNumber(
+    transactionalEntityManager: EntityManager
+): Promise<string> {
+
+    const now = new Date();
+
+    const yearMonth =
+        `${now.getFullYear().toString().slice(-2)}${(now.getMonth() + 1)
+            .toString()
+            .padStart(2, '0')}`;
+
+    const docType = "SALES_ORDER";
+
+    let sequence = await transactionalEntityManager
+        .getRepository(DocumentSequence)
+        .createQueryBuilder("seq")
+        .setLock("pessimistic_write")
+        .where(
+            "seq.documentType = :docType AND seq.prefixYearMonth = :yearMonth",
+            { docType, yearMonth }
+        )
+        .getOne();
+
+    let nextValue: number;
+
+    if (!sequence) {
+
+        nextValue = 100001;
+
+        const newSequence = new DocumentSequence();
+
+        newSequence.documentType = docType;
+        newSequence.prefixYearMonth = yearMonth;
+        newSequence.currentValue = nextValue;
+
+        await transactionalEntityManager.save(DocumentSequence, newSequence);
+
+    } else {
+
+        nextValue = sequence.currentValue + 1;
+
+        sequence.currentValue = nextValue;
+
+        await transactionalEntityManager.save(DocumentSequence, sequence);
+    }
+
+    return `SO-${yearMonth}-${nextValue}`;
+}
+
 }
 
 export default ClientPurchaseOrderService

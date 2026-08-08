@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { getDistrictRepository} from '../../dependencies'
-import PriceCalculationService from '../../services/PriceCalculationService';
+import PriceCalculationService from '../../services/PriceCalculationEngine';
 import { AppDataSource } from '../../../data-source';
 
 

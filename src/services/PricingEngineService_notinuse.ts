@@ -2,7 +2,7 @@ import {getCustomerServiceRepository, getProductRepository, getTenantStrategySer
 import { HookBroker } from './execution/hook-broker';
 
 
-class PriceCalculationService{
+class PricingEngineService{
 private hookBroker =new HookBroker();         
    
       async  calculateFinalPrice(tenantId:number, productId:number, customerId:number,p:any){
@@ -46,4 +46,4 @@ console.log('found customerCategory :',customerCategory,' of custid:',customerId
       }
    }
    
-   export default PriceCalculationService
+   export default PricingEngineService

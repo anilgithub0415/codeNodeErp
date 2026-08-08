@@ -6,11 +6,12 @@ export enum RFQStatus {
     PENDING_APPROVAL = "PENDING_APPROVAL",
     APPROVED = "APPROVED",
     SENT = "SENT",
-    PARTIALLY_RECEIVED = "PARTIALLY_RECEIVED",
+    PARTIALLY_QUOTED = "PARTIALLY_QUOTED",
+    QUOTED='QUOTED',
     CLOSED = "CLOSED",
     CANCELLED = "CANCELLED"
 }
-@Check(`status IN ('DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'SENT', 'PARTIALLY_RECEIVED', 'CLOSED', 'CANCELLED')`)
+@Check(`status IN ('DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'SENT', 'PARTIALLY_QUOTED', 'QUOTED', 'PARTIALLY_RECEIVED', 'CLOSED', 'CANCELLED')`)
 
 //few more statuses://'PENDING_REVIEW' | 'ACCEPTED' | 'REJECTED' | 'PARTIALLY_CONVERTED';
 
@@ -57,15 +58,38 @@ siteId!: number | null; // 👈 Make sure this camelCase variable exists!
     @Column({ name: 'internal_notes', type: 'nvarchar', length: 'MAX', nullable: true })
     internalNotes!: string; 
 
-    @Column({ name: 'converted_sales_order_id', type: 'int', nullable: true })
-    convertedSalesOrderId!: number; 
+   @Column({
+    default: false
+    })
+    isConvertedToQuotation!: boolean;
+
+    @Column({
+        name: 'converted_quotation_id', 
+        type: 'int', 
+        nullable: true
+    })
+    convertedQuotationId!: number | null;
+
+    @Column({
+        name: 'converted_quotation_number',
+        type: 'varchar',
+        length: 50,
+        nullable: true
+    })
+    convertedQuotationNumber!: string | null; 
 
     @CreateDateColumn({ name: 'created_at' })
     createdAt!: Date;
 
     @UpdateDateColumn({ name: 'updated_at' })
     updatedAt!: Date;
-
-    @OneToMany(() => ClientRFQOrderItem, (item) => item.clientRFQOrder, { cascade: true })
+@OneToMany(
+    () => ClientRFQOrderItem,
+    item => item.clientRFQOrder,
+    {
+        cascade: true,
+        orphanedRowAction: "delete"
+    }
+)
     items!: ClientRFQOrderItem[];
 }

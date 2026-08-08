@@ -159,6 +159,13 @@ app.use('/api/discountType',discountTypeC)
 
 //end Discount announcing---------------------------------------------------------------------------------------------------------
 
+
+//Pricing-------------------------------------------------------------------------------------------------------------------------
+import pricingC from './src/Controllers/pricing/pricing';
+app.use('/api/pricing', pricingC);
+//End Pricing---------------------------------------------------------------------------------------------------------------------
+
+
 //global masters------------------------------------------------------------------------------------------------------------------
 
 import hsnC from './src/Controllers/HSNTaxRule/HSNTaxRule';
@@ -219,6 +226,8 @@ process.on('uncaughtException', (error) => {
     console.error(error.stack || error);
     process.exit(1); 
 });
+
+
 
 /**
  * Starts the Node.js Express server after all dependencies are initialized.
