@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import {  getClientPurchaseOrderRepository, getClientRFQOrderRepository, getSalesOrderRepository } from '../../dependencies'; // Replace with your standard DI lookup wrappers
 
 
-import { POStatus } from '../../entity/ClientPurchaseOrder';
+import { Client_POStatus } from '../../entity/ClientPurchaseOrder';
 import { RFQStatus } from '../../entity/ClientRFQOrder';
 
 
@@ -41,31 +41,31 @@ router.route('/summary').get(async (req: Request, res: Response) => {
         // 3. Format response structure
         const summaryResponse = {
             clientPurchaseOrders: {
-                DRAFT: poCounts[POStatus.DRAFT] || 0,
-                PENDING_APPROVAL: poCounts[POStatus.PENDING_APPROVAL] || 0,
-                APPROVED: poCounts[POStatus.APPROVED] || 0,
-                SENT: poCounts[POStatus.SENT] || 0,
-                PARTIALLY_RECEIVED: poCounts[POStatus.PARTIALLY_RECEIVED] || 0,
-                CLOSED: poCounts[POStatus.CLOSED] || 0,
-                CANCELLED: poCounts[POStatus.CANCELLED] || 0
+                DRAFT: poCounts[Client_POStatus.DRAFT] || 0,
+                PENDING_APPROVAL: poCounts[Client_POStatus.PENDING_APPROVAL] || 0,
+                APPROVED: poCounts[Client_POStatus.APPROVED] || 0,
+                SENT: poCounts[Client_POStatus.SENT] || 0,
+                PARTIALLY_RECEIVED: poCounts[Client_POStatus.PARTIALLY_FULFILLED] || 0,
+                CLOSED: poCounts[Client_POStatus.CLOSED] || 0,
+                CANCELLED: poCounts[Client_POStatus.CANCELLED] || 0
             },
             clientRFQs: {
                 DRAFT: rfqCounts[RFQStatus.DRAFT] || 0,
                 PENDING_APPROVAL: rfqCounts[RFQStatus.PENDING_APPROVAL] || 0,
                 APPROVED: rfqCounts[RFQStatus.APPROVED] || 0,
                 SENT: rfqCounts[RFQStatus.SENT] || 0,
-                PARTIALLY_RECEIVED: rfqCounts[RFQStatus.PARTIALLY_RECEIVED] || 0,
+                PARTIALLY_RECEIVED: rfqCounts[RFQStatus.PARTIALLY_QUOTED] || 0,
                 CLOSED: rfqCounts[RFQStatus.CLOSED] || 0,
                 CANCELLED: rfqCounts[RFQStatus.CANCELLED] || 0
             },
              sales: {
-                DRAFT: salesCounts[POStatus.DRAFT] || 0,
-                PENDING_APPROVAL: salesCounts[POStatus.PENDING_APPROVAL] || 0,
-                APPROVED: salesCounts[POStatus.APPROVED] || 0,
-                SENT: salesCounts[POStatus.SENT] || 0,
-                PARTIALLY_RECEIVED: salesCounts[POStatus.PARTIALLY_RECEIVED] || 0,
-                CLOSED: salesCounts[POStatus.CLOSED] || 0,
-                CANCELLED: salesCounts[POStatus.CANCELLED] || 0
+                DRAFT: salesCounts[Client_POStatus.DRAFT] || 0,
+                PENDING_APPROVAL: salesCounts[Client_POStatus.PENDING_APPROVAL] || 0,
+                APPROVED: salesCounts[Client_POStatus.APPROVED] || 0,
+                SENT: salesCounts[Client_POStatus.SENT] || 0,
+                PARTIALLY_RECEIVED: salesCounts[Client_POStatus.PARTIALLY_FULFILLED] || 0,
+                CLOSED: salesCounts[Client_POStatus.CLOSED] || 0,
+                CANCELLED: salesCounts[Client_POStatus.CANCELLED] || 0
             },
         };
 

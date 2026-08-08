@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { getUser_PreferenceRepository} from '../../dependencies'
-import PriceCalculationService from '../../services/PriceCalculationService';
+import PriceCalculationService from '../../services/PriceCalculationEngine';
 import { AppDataSource } from '../../../data-source';
 //import { user_Preference_table_fields } from '../../entity/user_Preference_table_fields';
 //import { user_Preference_table_fields_tenantwise } from '../../entity/user_Preference_table_fields_tenantwise';

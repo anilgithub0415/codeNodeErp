@@ -1,16 +1,17 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany, Check, Index } from 'typeorm';
 import { ClientPurchaseOrderItem } from './ClientPurchaseOrderItem';
 
-export enum POStatus {
+export enum Client_POStatus {
     DRAFT = "DRAFT",
     PENDING_APPROVAL = "PENDING_APPROVAL",
     APPROVED = "APPROVED",
     SENT = "SENT",
-    PARTIALLY_RECEIVED = "PARTIALLY_RECEIVED",
+    PARTIALLY_FULFILLED = "PARTIALLY_FULFILLED",
+    FULFILLED ='FULFILLED',
     CLOSED = "CLOSED",
     CANCELLED = "CANCELLED"
 }
-@Check(`status IN ('DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'SENT', 'PARTIALLY_RECEIVED', 'CLOSED', 'CANCELLED')`)
+@Check(`status IN ('DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'SENT', 'PARTIALLY_FULFILLED', 'FULFILLED', 'CLOSED', 'CANCELLED')`)
 
 //few more statuses://'PENDING_REVIEW' | 'ACCEPTED' | 'REJECTED' | 'PARTIALLY_CONVERTED';
 
@@ -27,21 +28,21 @@ export class ClientPurchaseOrder {
        @Column({ 
             type: "varchar", 
             length: 25, // Generous enough padding for your longest status string
-            default: POStatus.DRAFT 
+            default: Client_POStatus.DRAFT 
         })
-        status!: POStatus;
+        status!: Client_POStatus;
 
     @Column({ name: 'client_id', type: 'int' })
-    clientId!: number; 
+    clientId!: number|null; 
 
     @Column({ name: 'client_po_number', type: 'varchar', length: 50 })
-    clientPoNumber!: string; 
+    clientPoNumber!: string  | null; 
 
     @Column({ name: 'site_id', type: 'int', nullable: true })
 siteId!: number | null; // 👈 Make sure this camelCase variable exists!
 
     @Column({ name: 'po_date', type: 'date' })
-    poDate!: Date; 
+    poDate!: Date | null; 
 
     @Column({ name: 'requested_delivery_date', type: 'date', nullable: true })
     requestedDeliveryDate!: Date;

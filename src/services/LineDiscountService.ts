@@ -31,18 +31,36 @@ export class LineDiscountService {
         console.log("LineDiscountService repository initialized.");       
     }
 
-    async getDiscount(ptenantId: number, pDiscountId: number, manager?: EntityManager): Promise<LineDiscount> {
+    async getDiscount(tenantId: number, discountId: number, manager?: EntityManager): Promise<LineDiscount|null> {
         if (!this.discountRepository) {
             throw new Error("LineDiscountService repository not initialized.");
         }
         const discountRepo = manager ? manager.getRepository(LineDiscount) : this.discountRepository;
         const result = await discountRepo.findOne({ 
-            where: { tenantId: ptenantId , id: pDiscountId },
+            where: { tenantId: tenantId , id: discountId },
             relations: ['product'] // Dynamic loading for label tracking
         }); 
-        return result!; 
+        return result; 
     }
 
+    //Pending:Need to consider discount for customerId 
+    //Pending: Need to consider discount for Quantity
+
+    async findBestDiscount(
+        tenantId:number,    productId:number,    productVariantId:number|null,
+        customerId:number,  quantity:number,   sellingPrice:number, manager?: EntityManager
+    ): Promise<LineDiscount> {
+        if (!this.discountRepository) {
+            throw new Error("LineDiscountService repository not initialized.");
+        }
+        const discountRepo = manager ? manager.getRepository(LineDiscount) : this.discountRepository;
+        const result = await discountRepo.findOne({ 
+            where: { tenantId: tenantId , productId:productId  },
+            relations: ['product'] 
+        }); 
+        return result!; 
+
+    }
    async getDiscounts(ptenantId: number, manager?: EntityManager): Promise<LineDiscount[]> {
     if (!this.discountRepository) {
         throw new Error("LineDiscountService repository not initialized.");

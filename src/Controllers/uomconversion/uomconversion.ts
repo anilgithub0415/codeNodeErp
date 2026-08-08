@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { getProductUomConversionRepository} from '../../dependencies'
-import PriceCalculationService from '../../services/PriceCalculationService';
+import PriceCalculationService from '../../services/PriceCalculationEngine';
 import { AppDataSource } from '../../../data-source';
 //import { site_table_fields } from '../../entity/site_table_fields';
 //import { site_table_fields_tenantwise } from '../../entity/site_table_fields_tenantwise';

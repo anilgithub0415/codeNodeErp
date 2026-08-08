@@ -48,3 +48,28 @@ export class Tenant_custom_scripts {
 
 }
 
+
+//Pending: Valuable recommendation reg storing scripts
+/*
+Wrap every tenant script inside a function.
+
+Like
+
+const wrapped = `
+(function () {
+
+    const context = globalThis.context;
+
+    ${customScript}
+
+})();
+`;
+
+Now tenant scripts can legitimately write
+
+const item = context.product;
+
+...
+
+return item;
+ */

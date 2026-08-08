@@ -90,7 +90,7 @@ router.route('/:id').delete(async (req: Request, res: Response) => {
         // 2. Forward straight into service transactional persistence layer engine
         const operationResult = await clientPurchaseService.handleDeleteOrCancelClientRequest(
             loggedInTenantId,
-            clientPurchaseOrderInstance.clientPoNumber
+            clientPurchaseOrderInstance.clientPoNumber!
         );
 
         // 3. Return structural metadata back to the client application
@@ -341,7 +341,7 @@ router.route('/:id/convert-to-sales').post(async (req: Request, res: Response) =
 
         const poId = Number(req.params.id);
         const tenantId = Number(req.user.tenantId);
-
+        const createdByUserId= req.user.id;   
         if (isNaN(poId)) {
             return res.status(400).json({
                 message: 'Invalid Purchase Order Id.'
@@ -350,7 +350,8 @@ router.route('/:id/convert-to-sales').post(async (req: Request, res: Response) =
 
         const result = await clientPoService.convertClientPOToSalesOrder(
             poId,
-            tenantId
+            tenantId,
+            createdByUserId
         );
 
         return res.status(200).json(result); 
