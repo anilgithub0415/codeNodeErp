@@ -58,8 +58,7 @@ router.route('')
                return res.status(400).json({ message: 'hsnCode and description are required files.' });
             }
 
-            console.log('.........................................................hsnTaxRule body:', req.body);
-
+            
             const result = await hsnService.createHsnTaxRule(req.body);
             res.status(201).json(result);
         } catch (error: any) {

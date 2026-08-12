@@ -38,8 +38,7 @@ router.route('/')
     .post(async (req: Request, res: Response) => {
         try {
             const dcService = getDeliveryChallanRepository(); 
-            console.log('Incoming Delivery Challan Payload:', req.body);
-            
+                      
             const deliveryChallan = await dcService.createDeliveryChallan(req.body);
             res.status(201).json(deliveryChallan);
         } catch (error: any) {

@@ -2,6 +2,8 @@ import { EntityManager, Like, Repository, Not } from 'typeorm';
 import { Product } from '../entity/Product';
 import { ProductCategory } from '../entity/ProductCategory';
 import { AppDataSource } from '../../data-source'; 
+import { ProductTemplate } from '../entity/product_template';
+import { ProductVariant } from '../entity/productVariant';
 
 interface CreateProductDto {
     id?: number;
@@ -57,6 +59,112 @@ export class ProductService {
 
         return baseProduct;
     }
+
+    async getProductVariant(
+    ptenantId: number,
+    pVariantId: number,
+    manager?: EntityManager
+): Promise<ProductVariant> {
+
+    if (!this.productRepository) {
+        throw new Error(
+            "ProductService repository not initialized. Call init() first."
+        );
+    }
+
+    const variantRepository =
+        manager
+            ? manager.getRepository(ProductVariant)
+            : AppDataSource.getRepository(ProductVariant);
+
+
+    // ------------------------------------------------------------
+    // Try loading variant with its parent template and relations
+    // ------------------------------------------------------------
+
+    try {
+
+        const variant =
+            await variantRepository.findOne({
+
+                where: {
+                    id: pVariantId,
+
+                    productTemplate: {
+                        tenantId: ptenantId
+                    }
+
+                },
+
+                relations: [
+                    'productTemplate',
+                    'productTemplate.productCategory',
+                    'productTemplate.hsnTaxRule'
+                ]
+
+            });
+
+
+        if (variant) {
+            return variant;
+        }
+
+    }
+    catch (relationError) {
+
+        console.warn(
+            "Failed to eager load ProductVariant relations. Falling back to base query:",
+            relationError
+        );
+
+    }
+
+
+    // ------------------------------------------------------------
+    // Fallback: load variant + parent template
+    // ------------------------------------------------------------
+
+    const baseVariant =
+        await variantRepository.findOne({
+
+            where: {
+                id: pVariantId
+            },
+
+            relations: [
+                'productTemplate'
+            ]
+
+        });
+
+
+    if (!baseVariant) {
+
+        throw new Error(
+            `ProductVariant with ID ${pVariantId} does not exist.`
+        );
+
+    }
+
+
+    // ------------------------------------------------------------
+    // Tenant validation
+    // ------------------------------------------------------------
+
+    if (
+        !baseVariant.productTemplate ||
+        baseVariant.productTemplate.tenantId !== ptenantId
+    ) {
+
+        throw new Error(
+            `ProductVariant with ID ${pVariantId} does not exist for tenant ${ptenantId}.`
+        );
+
+    }
+
+
+    return baseVariant;
+}
 
     async getProducts(ptenantId: number, manager?: EntityManager): Promise<Product[]> {
         if (!this.productRepository) {

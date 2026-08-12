@@ -58,7 +58,7 @@ export interface PricingLineResponse{
 
     basePrice:number;
 
-    finalPrice:number;
+    customPrice:number;
 
     appliedDiscount:number;
 
@@ -98,153 +98,222 @@ class PriceCalculationEngine{
     private promotionEngine =  new PromotionCalculationEngine();
     private couponEngine =    new CouponCalculationEngine();
 
-          async calculateLinePrice(
-            tenantId: number,
-            customerId: number,
-            request: PricingLineRequest,
-            couponCode?: string
-         ): Promise<PricingResult> {
+         async calculateLinePrice(
+    tenantId: number,
+    customerId: number,
+    request: PricingLineRequest,
+    couponCode?: string
+): Promise<PricingResult> {
 
-            //1. ---------------------------------------------------------------------------------------------------
-                        const priceResolver = new PriceResolverEngine();
+    // ============================================================
+    // 1. PRICE RESOLUTION
+    // ============================================================
 
-                        const priceResult =  await priceResolver.resolve({
+    const priceResolver =
+        new PriceResolverEngine();
 
-                                tenantId,
+    const priceResult =
+        await priceResolver.resolve({
 
-                                customerId,
+            tenantId,
 
-                                productId:request.productId,
+            customerId,
 
-                                productVariantId:request.productVariantId,
+            productId:
+                request.productId,
 
-                                quantity:request.quantity
+            productVariantId:
+                request.productVariantId,
 
-                            });
-                        const sellingPrice =   priceResult.sellingPrice;
+            quantity:
+                request.quantity
 
-                        const basePrice =   priceResult.basePrice;    
+        });
 
-                        const discountResult =await this.discountEngine.calculate({
+    const sellingPrice =
+        priceResult.sellingPrice;
 
-                            tenantId, customerId, productId: request.productId,  productVariantId: request.productVariantId,
-                            quantity: request.quantity,   sellingPrice
+    const basePrice =
+        priceResult.basePrice;
 
-                        });
+   
 
 
-                  //2. ---------------------------------------------------------------------------------------------------
-                             
-                        //Promotions
-                      let taxableAmount =
-                                Number(
-                                    (
-                                        sellingPrice *
-                                        request.quantity -
-                                        discountResult.discount
-                                    ).toFixed(2)
-                                );
+    // ============================================================
+    // 2. LINE DISCOUNT
+    // ============================================================
 
-                            const promotionResult =
-                                await this.promotionEngine.calculate({
+    const discountResult =
+        await this.discountEngine.calculate({
 
-                                    tenantId,
+            tenantId,
 
-                                    customerId,
+            customerId,
 
-                                    productId:request.productId,
+            productId:
+                request.productId,
 
-                                    productVariantId:request.productVariantId,
+            productVariantId:
+                request.productVariantId,
 
-                                    quantity:request.quantity,
+            quantity:
+                request.quantity,
 
-                                    sellingPrice,
+            sellingPrice
 
-                                    discountAmount:discountResult.discount,
+        });
 
-                                    taxableAmount
 
-                                });
-                                
-                            taxableAmount =
-                                Number(
-                                    (
-                                        taxableAmount -
-                                        promotionResult.promotionAmount
-                                    ).toFixed(2)
-                                );                    
+    // ============================================================
+    // 3. INITIAL TAXABLE AMOUNT
+    // ============================================================
 
-            //3. ---------------------------------------------------------------------------------------------------
-                       const couponResult =
-                            await this.couponEngine.calculate({
+    let taxableAmount =
+        Number(
+            (
+                sellingPrice *
+                request.quantity -
+                discountResult.discount
+            ).toFixed(2)
+        );
 
-                                tenantId,
 
-                                customerId,
+    // ============================================================
+    // 4. PROMOTION
+    // ============================================================
 
-                                couponCode,
+    const promotionResult =
+        await this.promotionEngine.calculate({
 
-                                productId: request.productId,
+            tenantId,
 
-                                productVariantId: request.productVariantId,
+            customerId,
 
-                                quantity: request.quantity,
+            productId:
+                request.productId,
 
-                                sellingPrice,
+            productVariantId:
+                request.productVariantId,
 
-                                discountAmount: discountResult.discount,
+            quantity:
+                request.quantity,
 
-                                promotionAmount: promotionResult.promotionAmount,
+            sellingPrice,
 
-                                taxableAmount
+            discountAmount:
+                discountResult.discount,
 
-                            });
+            taxableAmount
 
-                        taxableAmount = Number(
-                            (
-                                taxableAmount -
-                                couponResult.couponAmount
-                            ).toFixed(2)
-                        );
-            //-------------------------------------------------------------------------------------------------------
-                        const taxResult =
-                            await this.taxCalculationEngine.calculate({
+        });
 
-                                tenantId,
 
-                                productId: request.productId,
+    taxableAmount =
+        Number(
+            (
+                taxableAmount -
+                promotionResult.promotionAmount
+            ).toFixed(2)
+        );
 
-                                productVariantId: request.productVariantId,
 
-                                taxableAmount,
+    // ============================================================
+    // 5. COUPON
+    // ============================================================
 
-                                gstPercentage: request.gstPercentage
+    const couponResult =
+        await this.couponEngine.calculate({
 
-                            });
+            tenantId,
 
-                        return {
+            customerId,
 
-                            basePrice,
+            couponCode,
 
-                            sellingPrice,
+            productId:
+                request.productId,
 
-                            discount: discountResult.discount,
+            productVariantId:
+                request.productVariantId,
 
-                            appliedDiscountId:  discountResult.appliedDiscountId,
+            quantity:
+                request.quantity,
 
-                            gstPercentage:  request.gstPercentage,
+            sellingPrice,
 
-                            gstAmount:taxResult.gstAmount,
+            discountAmount:
+                discountResult.discount,
 
-                            taxableAmount,
+            promotionAmount:
+                promotionResult.promotionAmount,
 
-                            totalAmount: taxResult.totalAmount
-                            
-                                
+            taxableAmount
 
-                        };
+        });
 
-        }
+
+    taxableAmount =
+        Number(
+            (
+                taxableAmount -
+                couponResult.couponAmount
+            ).toFixed(2)
+        );
+
+
+    // ============================================================
+    // 6. TAX
+    // ============================================================
+
+    const taxResult =
+        await this.taxCalculationEngine.calculate({
+
+            tenantId,
+
+            productId:
+                request.productId,
+
+            productVariantId:
+                request.productVariantId,
+
+            taxableAmount,
+
+            gstPercentage:
+                request.gstPercentage
+
+        });
+
+
+    // ============================================================
+    // 7. FINAL RESULT
+    // ============================================================
+
+    return {
+
+        basePrice,
+
+        sellingPrice,
+
+        discount:
+            discountResult.discount,
+
+        appliedDiscountId:
+            discountResult.appliedDiscountId,
+
+        gstPercentage:
+            request.gstPercentage,
+
+        gstAmount:
+            taxResult.gstAmount,
+
+        taxableAmount,
+
+        totalAmount:
+            taxResult.totalAmount
+
+    };
+
+}
 
    
         
@@ -313,7 +382,7 @@ console.log('hookpayload',hookPayload);
                     );
 console.log('returned pricing :',pricing);
 
-                return Number(pricing.product.finalPrice);//sellingPrice
+                return Number(pricing.product.customPrice);//sellingPrice
             }
 
             if (pricingStrategy.tenantStrategy === PricingStrategyType.PLAIN) {

@@ -204,7 +204,7 @@ const paddedCustomer = aCust.customerName.padEnd(customerWidth, 'c');
  router.route('/productTypesWithVariants/ptenantId/:ptenantId')
     router.route('/productTypesWithVariants/ptenantId/:ptenantId')
     .get(async (req: Request, res: Response) => {
-        console.log('this is productTypesWithVariants get');
+        
         
         try {
             const productTemplService = getProductTemplateRepository();

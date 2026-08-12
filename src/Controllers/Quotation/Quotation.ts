@@ -13,6 +13,36 @@ router.use((req, res, next) => {
     }
 }); 
 
+
+//Convert to Quotation new approach:tag:convertToQuoteNewIdea
+router.get(
+    "/:id/workflow",
+    async(req,res,next)=>{
+
+        try{
+
+console.log('......here is tenantid in quotation/123/workflow url:');
+            const tenantId=req.user.tenantId;
+
+            const quotationId=Number(req.params.id);
+  const quotationService = getQuotationRepository(); 
+            const result=
+                await quotationService.getWorkflow(
+                    quotationId,
+                    tenantId
+                );
+
+            res.json(result);
+
+        }
+        catch(ex){
+
+            next(ex);
+
+        }
+
+    }
+);
 // ==========================================
 // GET: RETRIEVE A SINGLE QUOTATION RECORD
 // ==========================================
@@ -163,6 +193,68 @@ router.route('/:id').put(async (req: Request, res: Response) => {
 });
 
 
+//added
+// ==========================================
+// PATCH: SUBMIT QUOTATION FOR APPROVAL
+// DRAFT -> PENDING_APPROVAL
+// ==========================================
+
+router.route('/:id/submit-to-approval').patch(
+      async (req: Request, res: Response) => {
+
+console.log('................its submitting for approval....................');
+
+        try {
+
+            const quotationService =
+                getQuotationRepository();
+
+            const targetQuoteId =
+                parseInt(req.params.id, 10);
+
+            const loggedInTenantId =
+                parseInt(req.user.tenantId, 10);
+
+            if (isNaN(targetQuoteId)) {
+
+                return res.status(400).json({
+                    message:
+                        'Invalid Quotation identification tracking path.'
+                });
+
+            }
+
+            const quotation =
+                await quotationService.updateQuotationStatus(
+                    targetQuoteId,
+                    loggedInTenantId,
+                    QuotationStatus.PENDING_APPROVAL
+                );
+
+            return res.status(200).json({
+
+                message:
+                    'Quotation submitted for approval successfully.',
+
+                quotation
+
+            });
+
+        }
+        catch (error: any) {
+
+            return res.status(400).json({
+
+                message:
+                    'Failed to submit quotation for approval: ' +
+                    error.message
+
+            });
+
+        }
+
+    }
+);
 
 // ==========================================
 // PATCH: SEND DRAFT/REVISED QUOTATION TO CLIENT
@@ -224,34 +316,6 @@ router.route('/:id/approve').patch(async (req: Request, res: Response) => {
 
 
 
-//Convert to Quotation new approach:tag:convertToQuoteNewIdea
-router.get(
-    "/:id/workflow",
-    async(req,res,next)=>{
-
-        try{
-
-            const tenantId=req.user.tenantId;
-
-            const quotationId=Number(req.params.id);
-  const quotationService = getQuotationRepository(); 
-            const result=
-                await quotationService.getWorkflow(
-                    quotationId,
-                    tenantId
-                );
-
-            res.json(result);
-
-        }
-        catch(ex){
-
-            next(ex);
-
-        }
-
-    }
-);
 
 router.post(
     "/convert",

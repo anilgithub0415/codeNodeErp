@@ -13,7 +13,7 @@ const router = Router();
 //pending its POST request and not get
 router.route('/calculate').get(async (req: Request, res: Response) => {
     try {
-
+        
             const priceCalcService = new PriceCalculationService(); 
             const obj =await priceCalcService.calculateLinePrice(1,  1, {    productId:2,
                                                                                      quantity:10, 

@@ -5,9 +5,10 @@ import { QuotationItem } from '../entity/QuotationItem';
 import { Customer } from '../entity/Customer';
 import { Product } from '../entity/Product';
 import { LineDiscount } from '../entity/LineDiscount';
-import { IQuotationActions, QuotationWorkflowService } from './QuotationWorkflowService';
+import { IQuotationActions, QuotationWorkflowService, QuotationWorkflowType } from './QuotationWorkflowService';
 import { ClientRFQOrder, RFQStatus } from '../entity/ClientRFQOrder';
 import DocumentConversionEngine from './DocumentConversionEngine';
+import { getTenantStrategyServiceRepository } from '../dependencies';
 
  
 export interface ICreateQuotationItemInput {
@@ -19,7 +20,7 @@ export interface ICreateQuotationItemInput {
     unit: string;
     quantity: number;
     gstPercentage: number;
-    price: number;
+    customPrice: number;targetPrice:number;
     discount: number;
     customAttributes?: Record<string, any> | null;
 }
@@ -87,19 +88,62 @@ export class QuotationService {
 
         }
 
+
+         const tenantStrategyService =
+                getTenantStrategyServiceRepository();
+
+         const strategies =
+        await tenantStrategyService
+            .getTenantStrategies(tenantId);
+
+    const workflowStrategy =
+        strategies.find(
+            s =>
+                s.tenantStrategyName ===
+                "Quotation_Workflow"
+        );
+
+    if (!workflowStrategy) {
+        throw new Error(
+            "Quotation Workflow not configured."
+        );
+    }
+
+    const workflowName =
+        workflowStrategy.tenantStrategy;
+
+       const workflowType=this.toQuotationWorkflowType(workflowName) 
         return{
 
             quotationId:quotation.id,
 
             status:quotation.status,
 
-            actions:this.workflowService.getAllowedActions(
+            actions: await this.workflowService.getAllowedActions(workflowType,
                 quotation.status
             )
 
         };
 
     }
+
+    //helper function to map Quotation_Workflow strategy to enum
+     toQuotationWorkflowType(
+    value: string
+): QuotationWorkflowType {
+
+    if (
+        Object.values(QuotationWorkflowType)
+            .includes(value as QuotationWorkflowType)
+    ) {
+        return value as QuotationWorkflowType;
+    }
+
+    throw new Error(
+        `Unsupported Quotation Workflow strategy: ${value}`
+    );
+}
+
     async getQuotation(tenantId: number, id: number): Promise<Quotation> {
         const result = await this.quotationRepository.findOne({
             where: { id, tenantId },
@@ -117,8 +161,7 @@ export class QuotationService {
             isClientPortal: boolean = false
         ): Promise<Quotation[]> {
 
-            console.log('in getQuotations............isClientPortal:',isClientPortal);
-            
+                 
 
             const whereConditions: any = { tenantId };
             
@@ -143,7 +186,7 @@ export class QuotationService {
         createDto: CreateQuotationDto,
         manager?: EntityManager
     ): Promise<CreatedQuotationResponse> {
-        console.log('createDto for quotation initialized:', createDto);
+      
         
         const isExternalTransaction = !!manager;
         const txManager = isExternalTransaction ? manager! : AppDataSource.manager;
@@ -214,11 +257,11 @@ export class QuotationService {
                 // Metrics
                 itemNode.quantity = Number(itemInput.quantity || 0.00);
                 itemNode.gstPercentage = Number(itemInput.gstPercentage || 0.00);
-                itemNode.price = Number(itemInput.price || 0.00);
+                itemNode.customPrice = Number(itemInput.customPrice || 0.00);
                 itemNode.discount = Number(itemInput.discount || 0.00);
                 itemNode.customAttributes = itemInput.customAttributes ?? null;
                 
-                const baseAmount = itemNode.quantity * itemNode.price;
+                const baseAmount = itemNode.quantity * itemNode.customPrice;
                 const netAfterDiscount = baseAmount - itemNode.discount;
                 const taxAmount = netAfterDiscount * (itemNode.gstPercentage / 100);
                 
@@ -330,7 +373,7 @@ for (const incomingLine of (quotationData.items || [])) {
 
         if (activeDiscount) {
             item.appliedLineDiscountId = activeDiscount.id;
-            const itemSubtotalBase = Number(item.price) * Number(item.quantity);
+            const itemSubtotalBase = Number(item.customPrice) * Number(item.quantity);
             const strategyLabel = activeDiscount.discountType ? activeDiscount.discountType.typeName : 'PERCENTAGE';
 
             if (strategyLabel === 'PERCENTAGE') {
@@ -342,7 +385,7 @@ for (const incomingLine of (quotationData.items || [])) {
     }
 
     // Compute net totals using the individual 'item' variables context
-    const rawGrossTotal = (Number(item.price) * Number(item.quantity)) - Number(item.discount);
+    const rawGrossTotal = (Number(item.customPrice) * Number(item.quantity)) - Number(item.discount);
     const finalLineTotal = rawGrossTotal >= 0 ? rawGrossTotal : 0;
     
     const taxFactor = 1 + (Number(item.gstPercentage) / 100);
@@ -402,8 +445,35 @@ for (const incomingLine of (quotationData.items || [])) {
               where: { id: targetId, tenantId },
               relations: ['items']
           });
-        
-          this.workflow.ensureCanEdit(existingQuotation!.status);
+     
+
+        // --------------------------------------------------
+        // 1. Get tenant quotation workflow strategy
+        // --------------------------------------------------
+             const tenantStrategyService =
+            getTenantStrategyServiceRepository();
+
+        const strategies =
+            await tenantStrategyService.getTenantStrategies(tenantId);
+
+        const quotationWorkflowStrategy =
+            strategies.find(
+                s => s.tenantStrategyName === 'Quotation_Workflow'
+            );
+
+        if (!quotationWorkflowStrategy) {
+            throw new Error(
+                `Quotation Workflow strategy is not configured for tenant ${tenantId}.`
+            );
+        }
+
+        const workflowName =
+            quotationWorkflowStrategy.tenantStrategy as QuotationWorkflowType;
+
+            //---------------------------------------------------------------------------
+
+
+          this.workflow.ensureCanEdit(workflowName,existingQuotation!.status);
 
           if (!existingQuotation) {
               throw new Error(`Quotation with identification ID ${targetId} missing on tenant context.`);
@@ -420,6 +490,10 @@ const productRepo = transactionalEntityManager.getRepository(Product);
 
             const freshlyMappedItems = await Promise.all(
     updatableFields.items.map(async (itemInput) => {
+
+        //pending:remove cons log
+        console.log('..itemInput...',itemInput);
+        
         const itemNode = new QuotationItem();
         
         // Relational Links
@@ -445,11 +519,14 @@ const productRepo = transactionalEntityManager.getRepository(Product);
         // Metrics
         itemNode.quantity = Number(itemInput.quantity || 0.00);
         itemNode.gstPercentage = Number(itemInput.gstPercentage || 0.00);
-        itemNode.price = Number(itemInput.price || 0.00);
+        itemNode.customPrice = Number(itemInput.customPrice || 0.00);
+
+        itemNode.targetPrice = Number(itemInput.targetPrice || 0.00);
+
         itemNode.discount = Number(itemInput.discount || 0.00);
         itemNode.customAttributes = itemInput.customAttributes ?? null;
 
-        const baseAmount = itemNode.quantity * itemNode.price;
+        const baseAmount = itemNode.quantity * itemNode.customPrice;
         const netAfterDiscount = baseAmount - itemNode.discount;
         const taxAmount = netAfterDiscount * (itemNode.gstPercentage / 100);
         
@@ -471,7 +548,7 @@ const productRepo = transactionalEntityManager.getRepository(Product);
             updatableFields.clientId &&
             updatableFields.clientId !== existingQuotation.clientId
             ) {
-                this.workflow.ensureCanChangeCustomer(existingQuotation.status);
+                this.workflow.ensureCanChangeCustomer(workflowName,existingQuotation.status);
               }
 
           quotationRepo.merge(existingQuotation, pureFields);
@@ -490,6 +567,9 @@ const productRepo = transactionalEntityManager.getRepository(Product);
         newStatus: QuotationStatus,
         manager?: EntityManager
     ): Promise<Quotation> {
+
+        console.log('.............m in updateQuotationStatus.............');
+        
         const activeManager = manager ? manager : AppDataSource.manager;
         const quoteRepo = activeManager.getRepository(Quotation);
 
@@ -502,8 +582,37 @@ const productRepo = transactionalEntityManager.getRepository(Product);
             throw new Error(`[QuotationService] Quotation not found for ID: ${quoteId}`);
         }
 
+
+        // --------------------------------------------------
+        // 1. Get tenant quotation workflow strategy
+        // --------------------------------------------------
+             const tenantStrategyService =
+            getTenantStrategyServiceRepository();
+
+        const strategies =
+            await tenantStrategyService.getTenantStrategies(tenantId);
+
+        const quotationWorkflowStrategy =
+            strategies.find(
+                s => s.tenantStrategyName === 'Quotation_Workflow'
+            );
+
+        if (!quotationWorkflowStrategy) {
+            throw new Error(
+                `Quotation Workflow strategy is not configured for tenant ${tenantId}.`
+            );
+        }
+
+        const workflowName =
+            quotationWorkflowStrategy.tenantStrategy as QuotationWorkflowType;
+
+            //---------------------------------------------------------------------------
+console.log('........workflowName.......',workflowName);
+
+            
+
         // 2. State Safety Guard
-        this.workflow.ensureCanSubmit(targetQuote.status);
+        this.workflow.ensurecanSubmitToApprove(workflowName,targetQuote.status);
 
         console.log(`[QuotationService] Transitioning Quote ${targetQuote.quoteNumber} status from ${targetQuote.status} to ${newStatus}`);
 
@@ -546,8 +655,35 @@ const productRepo = transactionalEntityManager.getRepository(Product);
                 throw new Error(`[QuotationService] Quotation not found for ID: ${quoteId}`);
             }
 
+
+        // --------------------------------------------------
+        // 1. Get tenant quotation workflow strategy
+        // --------------------------------------------------
+             const tenantStrategyService =
+            getTenantStrategyServiceRepository();
+
+        const strategies =
+            await tenantStrategyService.getTenantStrategies(tenantId);
+
+        const quotationWorkflowStrategy =
+            strategies.find(
+                s => s.tenantStrategyName === 'Quotation_Workflow'
+            );
+
+        if (!quotationWorkflowStrategy) {
+            throw new Error(
+                `Quotation Workflow strategy is not configured for tenant ${tenantId}.`
+            );
+        }
+
+        const workflowName =
+            quotationWorkflowStrategy.tenantStrategy as QuotationWorkflowType;
+
+            //---------------------------------------------------------------------------
+
+            
             // 2. State Safety Guard
-          this.workflow.ensureCanApprove(targetQuote.status);
+          this.workflow.ensureCanApprove(workflowName,targetQuote.status);
 
             console.log(`[QuotationService] Approving Quote ${targetQuote.quoteNumber}...`);
 
@@ -588,7 +724,34 @@ const productRepo = transactionalEntityManager.getRepository(Product);
         relations: ['items'],
       });
 
-      this.workflow.ensureCanCounterOffer(existingQuote!.status);
+
+        // --------------------------------------------------
+        // 1. Get tenant quotation workflow strategy
+        // --------------------------------------------------
+             const tenantStrategyService =
+            getTenantStrategyServiceRepository();
+
+        const strategies =
+            await tenantStrategyService.getTenantStrategies(tenantId);
+
+        const quotationWorkflowStrategy =
+            strategies.find(
+                s => s.tenantStrategyName === 'Quotation_Workflow'
+            );
+
+        if (!quotationWorkflowStrategy) {
+            throw new Error(
+                `Quotation Workflow strategy is not configured for tenant ${tenantId}.`
+            );
+        }
+
+        const workflowName =
+            quotationWorkflowStrategy.tenantStrategy as QuotationWorkflowType;
+
+            //---------------------------------------------------------------------------
+
+            
+      this.workflow.ensureCanCounterOffer(workflowName,existingQuote!.status);
 
       if (!existingQuote) {
         throw new Error(`Quotation structure source context matching ID #${originalQuoteId} not found for tenant #${tenantId}.`);
@@ -651,7 +814,7 @@ const productRepo = transactionalEntityManager.getRepository(Product);
           itemRow.quantity = Number(incomingLine.quantity || 0);
           
           // Track both core wholesale value and newly requested target metrics
-          itemRow.price = Number(incomingLine.price || 0);
+          itemRow.customPrice = Number(incomingLine.price || 0);   //Pending: crosscheck price  or customPrice
          itemRow.targetPrice = incomingLine.targetPrice ? Number(incomingLine.targetPrice) : null;
           
           itemRow.discount = Number(incomingLine.discount || 0);

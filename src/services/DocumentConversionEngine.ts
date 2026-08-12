@@ -5,6 +5,7 @@ import { ClientRFQOrder, RFQStatus } from '../entity/ClientRFQOrder';
 import { OrderSourceType, SalesOrder, SOStatus } from '../entity/SalesOrder';
 import { Client_POStatus, ClientPurchaseOrder } from '../entity/ClientPurchaseOrder';
 import { SalesOrderItem } from '../entity/SalesOrderItem';
+import { Customer } from '../entity/Customer';
 
 class DocumentConversionEngine {
 //Pending:similarly we need to got for convertClientPOtoSalesOrder
@@ -107,27 +108,37 @@ class DocumentConversionEngine {
                                 rfq: ClientRFQOrder,
                                 userId: number
                             ): Promise<Quotation> {
-console.log('crate quot.........................');
-                                const quotation =
-                                    manager
-                                        .getRepository(Quotation)
-                                        .create({
 
-                                            tenantId,
+                                 const cust =  await manager.getRepository(Customer)
+                                      		.findOne({
+                                                      where: {
+                                                              id: rfq.clientId,tenantId
+                                                              },
+                                                     });
+                                 if (!cust) throw new Error("Client not found.");
 
-                                            clientId: rfq.clientId,
+                                         const quotation = manager.getRepository(Quotation)
+                                                          .create({
+                                                            
+                                                                    tenantId,
 
-                                            clientName:'garbage', //pending:'garnage' is stored
+                                                                    clientId: rfq.clientId,
 
-                                            quotationDate: new Date(),
+                                                                    clientName:cust.customerName, //pending:replace by cust.customerName currently'garnage' is stored 
 
-                                            status: QuotationStatus.DRAFT,
+                                                                    contactPerson:cust.commercialContactPerson, //fill with cust.commercialContactPerson
 
-                                            originatingClientRfqId: rfq.id,
+                                                                    clientCategory: cust.customerCategoryId,
 
-                                            createdByUserId: userId
+                                                                    quotationDate: new Date(),
 
-                                        });
+                                                                    status: QuotationStatus.DRAFT,
+
+                                                                    originatingClientRfqId: rfq.id,
+
+                                                                    createdByUserId: userId
+
+                                                                });
 
                                 return await manager
                                     .getRepository(Quotation)
@@ -423,7 +434,7 @@ const salesOrder = salesOrderRepo.create({
                     salesUom:
                         poItem.purchaseUom,
 
-                    finalPrice:
+                    customPrice:
                         poItem.finalPrice,
 
                     customAttributes: null

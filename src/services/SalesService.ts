@@ -12,13 +12,27 @@ import { ProductVariant } from '../entity/productVariant';
 import { ProductUomConversion } from '../entity/ProductUomConversion';
 import { getProductRepository, getProductUomConversionRepository, getProductVariantRepository } from '../dependencies';
 
+export interface ICreateSalesItemInput {
+    productId?: number | null;
+    productVariantId?: number | null;
+    prodName: string;
+    sku?: string | null;
+    description?: string | null;
+    unit: string;
+    quantity: number;
+    gstPercentage: number;
+    customPrice: number;targetPrice:number;
+    discount: number;salesUom:string|null;
+    customAttributes?: Record<string, any> | null;
+}
+
 interface CreateSalesOrderDto {
     tenantId: number;
     soNumber: string;
     customerId: number; 
     siteId?: number;
     createdByUserId?: number;
-    items: any[];
+    items: ICreateSalesItemInput[];
     [key: string]: any;
 }
 
@@ -120,6 +134,10 @@ export class SalesService {
                     orderItem.customAttributes = itemInput.customAttributes || null;
                     orderItem.salesUom = chosenUom; 
 
+                    orderItem.customPrice = itemInput.customPrice; 
+                    orderItem.targetPrice = itemInput.targetPrice; 
+
+
                 } else if (itemInput.productVariantId && !itemInput.productId) {
                     const variant = await variantRepo.findOne({
                         where: { id: itemInput.productVariantId },
@@ -151,20 +169,27 @@ export class SalesService {
                     throw new Error("Invalid item format. Provide exactly one: productId OR productVariantId.");
                 }
 
-                orderItem.finalPrice = Number(itemInput.finalPrice || itemInput.unitPrice || itemInput.price || extractedPrice || 0.00);
+                orderItem.customPrice = Number(itemInput.customPrice || extractedPrice || 0.00);
                 enrichedItems.push(orderItem);
             }
             if (existingSales) {
+
+              
+                
                 const oldItems = await poiRepo.find({ where: { salesOrderId: existingSales.id } });
                 await poiRepo.delete({ salesOrderId: existingSales.id });
 
                 const { soNumber, customerId, ...updateData } = createDto;
-                salesRepo.merge(existingSales, { ...updateData, clientId: createDto.customerId });  
+                  
+              
 
+                salesRepo.merge(existingSales, { ...updateData, clientId: createDto.customerId });  
+  
                 for (const item of enrichedItems) {
                     item.salesOrderId = existingSales.id;
-                    item.salesOrder = existingSales;
+                    item.salesOrder = existingSales; 
                 }
+console.log('yes existing sales......enrichedItems:',enrichedItems);
                 existingSales.items = enrichedItems;
                 targetOrder = await salesRepo.save(existingSales);
 
@@ -629,6 +654,7 @@ async updateSalesOrderStatus(
 ): Promise<SalesOrder> {
     const activeManager = manager ? manager : AppDataSource.manager;
     const salesRepo = activeManager.getRepository(SalesOrder);
+
 
     const targetSO = await salesRepo.findOne({
         where: { id: soId, tenantId }
