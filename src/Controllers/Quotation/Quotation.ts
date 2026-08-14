@@ -315,7 +315,42 @@ router.route('/:id/approve').patch(async (req: Request, res: Response) => {
 });
 
 
+router.route('/:id/revise').patch(async (req: Request, res: Response) => {
+    try {
+console.log('m here endpoint revise1');
 
+        const quotationService = getQuotationRepository();
+
+        const quoteId = Number(req.params.id);
+        const tenantId = Number(req.user.tenantId);
+
+        if (isNaN(quoteId)) {
+            return res.status(400).json({
+                message: 'Invalid quotation identification.'
+            });
+        }
+
+        const revisedQuotation =
+            await quotationService.processQuotationRevision(
+                quoteId,
+                tenantId,
+                req.body
+            );
+
+        return res.status(200).json({
+            message: 'Quotation revised successfully.',
+            quotation: revisedQuotation
+        });
+
+    } catch (error: any) {
+
+        return res.status(400).json({
+            message:
+                'Quotation revision failed: ' +
+                error.message
+        });
+    }
+});
 
 router.post(
     "/convert",

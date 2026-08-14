@@ -6,19 +6,20 @@ import { Customer } from './Customer';
 export enum QuotationStatus {
     DRAFT = "DRAFT",                                     // Wholesaler creating the quote
     PENDING_APPROVAL="PENDING_APPROVAL",                        
-    APPROVED = "APPROVED",     
+    APPROVED = "APPROVED",      
     SENT = "SENT",                                       // Sent to client, visible in ClientPortal
     COUNTER_OFFERED = "COUNTER_OFFERED",                 // Client changed prices and sent back
     REVISED = "REVISED",                                 // Wholesaler adjusted prices based on counter-offer
     REJECTED = "REJECTED",                               // Client or Wholesaler cancelled negotiation
     EXPIRED = "EXPIRED",
-    UNDER_REVIEW="UNDER_REVIEW",
+  
     CANCELLED="CANCELLED"                                  // Validity date passed
 }
 
 // 2. Add SQL Check constraint covering all enum values
 @Check(`"total_amount" >= 0`)
-@Check(`status IN ('DRAFT', 'SENT', 'COUNTER_OFFERED', 'REVISED', 'APPROVED','PENDING_APPROVAL', 'REJECTED', 'EXPIRED')`)@Entity("quotations")
+@Check(`status IN ('DRAFT', 'PENDING_APPROVAL','APPROVED', 'SENT', 'COUNTER_OFFERED', 'REVISED', 'REJECTED', 'EXPIRED','CANCELLED')`)
+@Entity("quotations")
 export class Quotation {
 
     @PrimaryGeneratedColumn('increment')

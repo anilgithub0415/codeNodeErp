@@ -6,6 +6,10 @@ import { Product } from '../entity/Product';
 import { ProductVariant } from '../entity/productVariant';
 import { DocumentSequence } from '../entity/DocumentSequence';
 
+import { ClientRFQWorkflowService, IClientRFQActions } from './ClientRFQWorkflowService';
+import {    ClientRFQWorkflowType } from './ClientRFQWorkflowService'; 
+import { getTenantStrategyServiceRepository } from '../dependencies';
+
 interface CreateClientRFQDto {
     id?:number;
     tenantId: number;
@@ -23,14 +27,110 @@ interface CreateClientRFQDto {
     }>;
 }
 
+export interface ClientRFQWorkflowDto{
+
+    rfqId:number;
+
+    status:RFQStatus;
+
+    actions:IClientRFQActions;
+
+}
+
 export class ClientRFQOrderService {
     private clientRFQRepo!: Repository<ClientRFQOrder>;
 
+
+        private workflowService = new ClientRFQWorkflowService();
+    private workflow!: ClientRFQWorkflowService;
+
     async init(repo: Repository<ClientRFQOrder>): Promise<void> {
         this.clientRFQRepo = repo;
+          this.workflow = new ClientRFQWorkflowService();
+
         console.log("ClientRFQOrderService backend layer initialized successfully.");
     }
 
+
+
+        public async getWorkflow(
+        quotationId:number,
+        tenantId:number
+        ):Promise<ClientRFQWorkflowDto>{
+    
+            const quotation = await this.clientRFQRepo.findOne({
+    
+                where:{
+                    id:quotationId,
+                    tenantId
+                }
+    
+            });
+    
+            if(!quotation){
+    
+                throw new Error("Quotation not found.");
+    
+            }
+    
+    
+             const tenantStrategyService =
+                    getTenantStrategyServiceRepository();
+    
+             const strategies =
+            await tenantStrategyService
+                .getTenantStrategies(tenantId);
+    
+        const workflowStrategy =
+            strategies.find(
+                s =>
+                    s.tenantStrategyName ===
+                    "ClientRFQ_Workflow"
+            );
+    
+        if (!workflowStrategy) {
+            throw new Error(
+                "ClientRFQ Workflow not configured."
+            );
+        }
+    
+        const workflowName =
+            workflowStrategy.tenantStrategy;
+    
+           
+
+           const workflowType=this.toClientRFQWorkflowType(workflowName) 
+            return{
+    
+                rfqId:quotation.id,
+    
+                status:quotation.status,
+    
+                                
+                actions: await this.workflowService.getAllowedActions(workflowType,
+                    quotation.status,quotation.isConvertedToQuotation
+                )
+    
+            };
+    
+        }
+
+            //helper function to map Quotation_Workflow strategy to enum
+             toClientRFQWorkflowType(
+            value: string
+        ): ClientRFQWorkflowType {
+        
+            if (
+                Object.values(ClientRFQWorkflowType)
+                    .includes(value as ClientRFQWorkflowType)
+            ) {
+                return value as ClientRFQWorkflowType;
+            }
+        
+            throw new Error(
+                `Unsupported ClientRFQ Workflow strategy: ${value}`
+            );
+        }
         /* ---------------------------------------------------------
        GET SINGLE CLIENT PO FOR TENANT & ID – Aligned for Client Orders
        --------------------------------------------------------- */
@@ -335,21 +435,49 @@ console.log('saving data.........................');
             let actionResult: 'DELETED' | 'CANCELLED';
 
             // ✅ HARD DELETE FILTER: Erase completely if DRAFT or PENDING_APPROVAL
-            if (existingOrder.status === RFQStatus.DRAFT || existingOrder.status === RFQStatus.PENDING_APPROVAL || existingOrder.status === RFQStatus.APPROVED) {
-                console.log(`[ClientRFQService] Hard deleting ${existingOrder.status} Client RFQ: ${existingOrder.clientRFQNumber}.`);
+            // if (existingOrder.status === RFQStatus.DRAFT || existingOrder.status === RFQStatus.PENDING_APPROVAL || existingOrder.status === RFQStatus.APPROVED) {
+            //     console.log(`[ClientRFQService] Hard deleting ${existingOrder.status} Client RFQ: ${existingOrder.clientRFQNumber}.`);
                 
-                // Erase record and cascade items completely
+            //     // Erase record and cascade items completely
+            //     await clientRfqRepo.remove(existingOrder);
+            //     actionResult = 'DELETED';
+            // } else {
+            //     console.log(`[ClientRFQService] Cancelling active Client RFQ: ${existingOrder.clientRFQNumber}`);
+                
+            //     // Mutate status to CANCELLED enum value
+            //     existingOrder.status = RFQStatus.CANCELLED;
+            //     await clientRfqRepo.save(existingOrder);
+            //     actionResult = 'CANCELLED';
+            // }
+
+            const workflowType =
+                await this.workflow.resolveWorkflowType(tenantId);
+
+            if (
+                this.workflow.canDelete(
+                    workflowType,
+                    existingOrder.status
+                )
+            ) {
+
                 await clientRfqRepo.remove(existingOrder);
+
                 actionResult = 'DELETED';
+
             } else {
-                console.log(`[ClientRFQService] Cancelling active Client RFQ: ${existingOrder.clientRFQNumber}`);
-                
-                // Mutate status to CANCELLED enum value
-                existingOrder.status = RFQStatus.CANCELLED;
+
+                this.workflow.ensureCanCancel(
+                    workflowType,
+                    existingOrder.status
+                );
+
+                existingOrder.status =
+                    RFQStatus.CANCELLED;
+
                 await clientRfqRepo.save(existingOrder);
+
                 actionResult = 'CANCELLED';
             }
-
             if (!isExternalTransaction && queryRunner) {
                 await queryRunner.commitTransaction();
             }
@@ -398,13 +526,28 @@ async updateClientRFQOrder(
         const variantRepo = activeManager.getRepository(ProductVariant);
 
         // 🔒 Multi-Tenant Boundary Check
-        const existingRFQ = await cpoRepo.findOne({ where: { id, tenantId } });
-        if (!existingRFQ) throw new Error("Client RFQ Order record not found or unauthorized.");
+        
+        // // 🛠️ State Machine Guardrail
+        // if (existingRFQ.status !== RFQStatus.DRAFT) {
+        //     throw new Error(`Cannot modify a Client RFQ Order with status: ${existingRFQ.status}`);
+        // }
+            const existingRFQ = await cpoRepo.findOne({
+                where: { id, tenantId }
+            });
 
-        // 🛠️ State Machine Guardrail
-        if (existingRFQ.status !== RFQStatus.DRAFT) {
-            throw new Error(`Cannot modify a Client RFQ Order with status: ${existingRFQ.status}`);
-        }
+            if (!existingRFQ) {
+                throw new Error(
+                    "Client RFQ Order record not found or unauthorized."
+                );
+            }
+
+            const workflowType =
+                await this.workflow.resolveWorkflowType(tenantId); 
+
+            this.workflow.ensureCanEdit(
+                workflowType,
+                existingRFQ.status
+            );
 
         // 📑 Handle incoming items if updating contents during Draft phase
         if (updateDto.items && updateDto.items.length > 0) {
@@ -473,14 +616,45 @@ async updateClientRFQOrder(
         }
 
         // If supervisor requested submission, switch status now
-        if (updateDto.status === RFQStatus.PENDING_APPROVAL) {
-            // Validation step: Prevent submitting an empty PO for approval
-            const finalItemCount = await cpoiRepo.count({ where: { clientRFQOrderId: existingRFQ.id } });
-            if (finalItemCount === 0 && (!existingRFQ.items || existingRFQ.items.length === 0)) {
-                throw new Error("Cannot submit an empty RFQ Order for approval.");
+        // if (updateDto.status === RFQStatus.PENDING_APPROVAL) {
+        //     // Validation step: Prevent submitting an empty PO for approval
+        //     const finalItemCount = await cpoiRepo.count({ where: { clientRFQOrderId: existingRFQ.id } });
+        //     if (finalItemCount === 0 && (!existingRFQ.items || existingRFQ.items.length === 0)) {
+        //         throw new Error("Cannot submit an empty RFQ Order for approval.");
+        //     }
+        //     existingRFQ.status = RFQStatus.PENDING_APPROVAL;
+        //     existingRFQ.internalNotes += ` | Submitted for approval on ${new Date().toISOString()}`;
+        // }
+
+      if (updateDto.status === RFQStatus.SUBMITTED) {
+
+            this.workflow.ensureCanSubmit(
+                workflowType,
+                existingRFQ.status
+            );
+
+            const finalItemCount =
+                await cpoiRepo.count({
+                    where: {
+                        clientRFQOrderId: existingRFQ.id
+                    }
+                });
+
+            if (
+                finalItemCount === 0 &&
+                (!existingRFQ.items ||
+                existingRFQ.items.length === 0)
+            ) {
+                throw new Error(
+                    "Cannot submit an empty RFQ."
+                );
             }
-            existingRFQ.status = RFQStatus.PENDING_APPROVAL;
-            existingRFQ.internalNotes += ` | Submitted for approval on ${new Date().toISOString()}`;
+
+            existingRFQ.status =
+                RFQStatus.SUBMITTED;
+
+            existingRFQ.internalNotes +=
+                ` | Submitted on ${new Date().toISOString()}`;
         }
 
         const targetOrder = await cpoRepo.save(existingRFQ);
@@ -506,200 +680,356 @@ async updateClientRFQOrder(
 }
 
 
-async processRFQApproval(
+
+async processRFQSubmission(
     id: number,
     tenantId: number,
-    action: 'APPROVE' | 'REJECT',
+    action: 'SUBMITTED',
     updatedItems?: any[]
 ): Promise<ClientRFQOrder> {
-    
+
     const queryRunner = AppDataSource.createQueryRunner();
+
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
     try {
-        const cpoRepo = queryRunner.manager.getRepository(ClientRFQOrder);
-        const cpoiRepo = queryRunner.manager.getRepository(ClientRFQOrderItem);
-        const productRepo = queryRunner.manager.getRepository(Product);
-        const variantRepo = queryRunner.manager.getRepository(ProductVariant);
 
-        // 🔒 1. Fetch record across Multi-Tenant Boundaries
-        const existingRFQ = await cpoRepo.findOne({ 
-            where: { id, tenantId },
-            relations: ['items'] 
-        });
-        if (!existingRFQ) throw new Error("Client RFQ Order record not found or unauthorized.");
+        const cpoRepo =
+            queryRunner.manager.getRepository(ClientRFQOrder);
 
-        // 🛠️ 2. State Machine Guardrail
-        // Blocks requests if the document is not explicitly locked under review
-        if (existingRFQ.status !== RFQStatus.PENDING_APPROVAL) {
-            throw new Error(`Approval processing denied. Order is currently in ${existingRFQ.status} status.`);
+        const cpoiRepo =
+            queryRunner.manager.getRepository(ClientRFQOrderItem);
+
+        const productRepo =
+            queryRunner.manager.getRepository(Product);
+
+        const variantRepo =
+            queryRunner.manager.getRepository(ProductVariant);
+
+
+        // --------------------------------------------------
+        // 1. Fetch RFQ
+        // --------------------------------------------------
+
+        const existingRFQ =
+            await cpoRepo.findOne({
+                where: {
+                    id,
+                    tenantId
+                },
+                relations: ['items']
+            });
+
+        if (!existingRFQ) {
+            throw new Error(
+                'Client RFQ Order record not found or unauthorized.'
+            );
         }
 
-        // 📑 3. Mutate lines if the approver submitted altered item quantities
-        if (action === 'APPROVE' && updatedItems && updatedItems.length > 0) {
-            // Delete original line records cleanly
-            await cpoiRepo.delete({ clientRFQOrderId: existingRFQ.id });
+
+        // --------------------------------------------------
+        // 2. Validate requested action
+        // --------------------------------------------------
+
+        if (action !== 'SUBMITTED') {
+            throw new Error(
+                `Invalid RFQ submission action '${action}'.`
+            );
+        }
+
+
+        // --------------------------------------------------
+        // 3. Workflow validation
+        // --------------------------------------------------
+
+        /*
+         * DRAFT -> SUBMITTED
+         *
+         * The workflow service should be the authority
+         * for whether this transition is allowed.
+         */
+
+      //  const workflow =            this.clientRFQWorkflowService;
+
+        const workflowType =
+            await this.workflow.resolveWorkflowType(tenantId);
+
+       this.workflow.ensureCanSubmit(
+            workflowType,
+            existingRFQ.status
+        );
+
+
+        // --------------------------------------------------
+        // 4. Update line items if supplied
+        // --------------------------------------------------
+
+        if (updatedItems && updatedItems.length > 0) {
+
+            await cpoiRepo.delete({
+                clientRFQOrderId: existingRFQ.id
+            });
 
             const enrichedItems: ClientRFQOrderItem[] = [];
+
             for (const itemInput of updatedItems) {
-                const lineItem = cpoiRepo.create();
-                lineItem.clientRFQOrderId = existingRFQ.id;
-              //  lineItem.clientRFQOrder = existingRFQ; // making cirular reference so remove it
-                lineItem.quantity = Number(itemInput.quantity || 1);
-                
-               
 
-                if (itemInput.productId && !itemInput.productVariantId) {
-                    const product = await productRepo.findOne({ where: { id: itemInput.productId, tenantId } });
-                    if (!product) throw new Error(`Material Product ID ${itemInput.productId} not found.`);
-                   
-                    
-                    lineItem.productId = product.id;
-                    lineItem.productVariantId = null;
-                    lineItem.prodName = product.prodName;
-                    lineItem.sku = product.sku;
-                   
+                const lineItem =
+                    cpoiRepo.create();
 
-                } else if (itemInput.productVariantId && !itemInput.productId) {
-                    const variant = await variantRepo.findOne({ where: { id: itemInput.productVariantId }, relations: ['productTemplate'] });
-                    if (!variant || variant.productTemplate.tenantId !== tenantId) throw new Error(`Material Variant ID ${itemInput.productVariantId} not found.`);
-                   
+                lineItem.clientRFQOrderId =
+                    existingRFQ.id;
 
-                    const sizeStr = variant.size ? ` (${variant.size})` : '';
-                    const finishStr = variant.finish ? ` - ${variant.finish}` : '';
+                lineItem.quantity =
+                    Number(itemInput.quantity || 1);
 
-                    lineItem.productId = null;
-                    lineItem.productVariantId = variant.id;
-                    lineItem.prodName = `${variant.productTemplate.prodName}${sizeStr}${finishStr}`;
-                    lineItem.sku = variant.sku;
-                    
+
+                // ------------------------------------------
+                // Flat Product
+                // ------------------------------------------
+
+                if (
+                    itemInput.productId &&
+                    !itemInput.productVariantId
+                ) {
+
+                    const product =
+                        await productRepo.findOne({
+                            where: {
+                                id: itemInput.productId,
+                                tenantId
+                            }
+                        });
+
+                    if (!product) {
+                        throw new Error(
+                            `Material Product ID ${itemInput.productId} not found.`
+                        );
+                    }
+
+                    lineItem.productId =
+                        product.id;
+
+                    lineItem.productVariantId =
+                        null;
+
+                    lineItem.prodName =
+                        product.prodName;
+
+                    lineItem.sku =
+                        product.sku;
+
                 }
+
+                // ------------------------------------------
+                // Product Variant
+                // ------------------------------------------
+
+                else if (
+                    itemInput.productVariantId &&
+                    !itemInput.productId
+                ) {
+
+                    const variant =
+                        await variantRepo.findOne({
+                            where: {
+                                id: itemInput.productVariantId
+                            },
+                            relations: [
+                                'productTemplate'
+                            ]
+                        });
+
+                    if (
+                        !variant ||
+                        variant.productTemplate.tenantId !== tenantId
+                    ) {
+                        throw new Error(
+                            `Material Variant ID ${itemInput.productVariantId} not found.`
+                        );
+                    }
+
+                    const sizeStr =
+                        variant.size
+                            ? ` (${variant.size})`
+                            : '';
+
+                    const finishStr =
+                        variant.finish
+                            ? ` - ${variant.finish}`
+                            : '';
+
+                    lineItem.productId =
+                        null;
+
+                    lineItem.productVariantId =
+                        variant.id;
+
+                    lineItem.prodName =
+                        `${variant.productTemplate.prodName}${sizeStr}${finishStr}`;
+
+                    lineItem.sku =
+                        variant.sku;
+
+                }
+
+                // ------------------------------------------
+                // Invalid item
+                // ------------------------------------------
+
+                else {
+
+                    throw new Error(
+                        'Each line item must contain exactly one: productId OR productVariantId.'
+                    );
+
+                }
+
                 enrichedItems.push(lineItem);
             }
-            
+
             await cpoiRepo.save(enrichedItems);
-            existingRFQ.items = enrichedItems;
+
+            existingRFQ.items =
+                enrichedItems;
         }
 
-        // 🚦 4. Resolve Final Enum State Transitions
-        if (action === 'APPROVE') {
-            existingRFQ.status = RFQStatus.APPROVED;
-            
-            // 💡 System Design Hook: Your Sales Order automation should run right here:
-            // await this.createSalesOrderFromApprovedPo(existingRFQ, queryRunner.manager);
-            
-        } else if (action === 'REJECT') {
-            // Using CANCELLED as your closest matching enum fallback for structural workflow rejections
-            existingRFQ.status = RFQStatus.CANCELLED; 
-        }
 
-        // 💾 5. Save header details and execute transaction database flush
-        const savedRFQ = await cpoRepo.save(existingRFQ);
+        // --------------------------------------------------
+        // 5. DRAFT -> SUBMITTED
+        // --------------------------------------------------
+
+        existingRFQ.status =
+            RFQStatus.SUBMITTED;
+
+
+        // --------------------------------------------------
+        // 6. Save
+        // --------------------------------------------------
+
+        const savedRFQ =
+            await cpoRepo.save(existingRFQ);
+
+
+        // --------------------------------------------------
+        // 7. Vendor notification
+        // --------------------------------------------------
+
+        /*
+         * This is the correct place for the vendor
+         * notification/event later.
+         *
+         * Example:
+         *
+         * await this.dispatchRfqNotificationToVendors(
+         *     savedRFQ,
+         *     queryRunner.manager
+         * );
+         */
+
+
         await queryRunner.commitTransaction();
-        
+
         return savedRFQ;
 
     } catch (error: any) {
+
         await queryRunner.rollbackTransaction();
-        console.error('[CPO Service Workflow Rollback Failure]:', error.message || error);
+
+        console.error(
+            '[CRFQ Submission Rollback Failure]:',
+            error.message || error
+        );
+
         throw error;
+
     } finally {
+
         await queryRunner.release();
+
     }
 }
 
-async processRFQDispatch(
-id: number,
-tenantId: number,
-action: 'SENT',
-updatedItems?: any[]
-): Promise<ClientRFQOrder>{
+async processRFQApproval(
+    rfqId: number,
+    tenantId: number,
+    manager?: EntityManager
+): Promise<ClientRFQOrder> {
 
-const queryRunner = AppDataSource.createQueryRunner();
-await queryRunner.connect();
-await queryRunner.startTransaction();
+    const activeManager =
+        manager ?? AppDataSource.manager;
 
-try {
-const cpoRepo = queryRunner.manager.getRepository(ClientRFQOrder);
-const cpoiRepo = queryRunner.manager.getRepository(ClientRFQOrderItem);
-const productRepo = queryRunner.manager.getRepository(Product);
-const variantRepo = queryRunner.manager.getRepository(ProductVariant);
-// 🔒 1. Fetch record across Multi-Tenant Boundaries
-const existingRFQ = await cpoRepo.findOne({ 
-    where: { id, tenantId },
-    relations: ['items'] 
-});
-if (!existingRFQ) throw new Error("Client RFQ Order record not found or unauthorized.");
+    const rfqRepository =
+        activeManager.getRepository(ClientRFQOrder);
 
-// 🛠️ 2. State Machine Guardrail
-// Blocks requests if the document is not explicitly in APPROVED status
-if (existingRFQ.status !== RFQStatus.APPROVED) {
-    throw new Error(`Dispatch processing denied. Order is currently in ${existingRFQ.status} status.`);
-}
+    // --------------------------------------------------
+    // 1. Load RFQ
+    // --------------------------------------------------
 
-// 📑 3. Mutate lines if the dispatcher submitted altered item quantities
-if (updatedItems && updatedItems.length > 0) {
-    // Delete original line records cleanly
-    await cpoiRepo.delete({ clientRFQOrderId: existingRFQ.id });
+    const rfq =
+        await rfqRepository.findOne({
+            where: {
+                id: rfqId,
+                tenantId
+            },
+            relations: ['items']
+        });
 
-    const enrichedItems: ClientRFQOrderItem[] = [];
-    for (const itemInput of updatedItems) {
-        const lineItem = cpoiRepo.create();
-        lineItem.clientRFQOrderId = existingRFQ.id;
-        lineItem.quantity = Number(itemInput.quantity || 1);
-        
-        if (itemInput.productId && !itemInput.productVariantId) {
-            const product = await productRepo.findOne({ where: { id: itemInput.productId, tenantId } });
-            if (!product) throw new Error(`Material Product ID ${itemInput.productId} not found.`);
-            
-            lineItem.productId = product.id;
-            lineItem.productVariantId = null;
-            lineItem.prodName = product.prodName;
-            lineItem.sku = product.sku;
-
-        } else if (itemInput.productVariantId && !itemInput.productId) {
-            const variant = await variantRepo.findOne({ where: { id: itemInput.productVariantId }, relations: ['productTemplate'] });
-            if (!variant || variant.productTemplate.tenantId !== tenantId) throw new Error(`Material Variant ID ${itemInput.productVariantId} not found.`);
-
-            const sizeStr = variant.size ? ` (${variant.size})` : '';
-            const finishStr = variant.finish ? ` - ${variant.finish}` : '';
-
-            lineItem.productId = null;
-            lineItem.productVariantId = variant.id;
-            lineItem.prodName = `${variant.productTemplate.prodName}${sizeStr}${finishStr}`;
-            lineItem.sku = variant.sku;
-        }
-        enrichedItems.push(lineItem);
+    if (!rfq) {
+        throw new Error(
+            `Client RFQ not found for ID: ${rfqId}`
+        );
     }
-    
-    await cpoiRepo.save(enrichedItems);
-    existingRFQ.items = enrichedItems;
+
+    // --------------------------------------------------
+    // 2. Resolve tenant-specific workflow
+    // --------------------------------------------------
+
+    const workflowType =
+        await this.workflow.resolveWorkflowType(
+            tenantId
+        );
+
+    // --------------------------------------------------
+    // 3. Determine the next status
+    // --------------------------------------------------
+
+    const nextStatus =
+        RFQStatus.QUOTED;
+
+    // --------------------------------------------------
+    // 4. Validate transition
+    // --------------------------------------------------
+
+    this.workflow.ensureCanTransition(
+        workflowType,
+        rfq.status,
+        nextStatus
+    );
+
+    // --------------------------------------------------
+    // 5. Change status
+    // --------------------------------------------------
+
+    console.log(
+        `[ClientRFQOrderService] ` +
+        `RFQ ${rfq.clientRFQNumber} ` +
+        `transitioning from ${rfq.status} ` +
+        `to ${nextStatus} ` +
+        `using workflow ${workflowType}`
+    );
+
+    rfq.status = nextStatus;
+
+    // --------------------------------------------------
+    // 6. Save
+    // --------------------------------------------------
+
+    return await rfqRepository.save(rfq);
 }
 
-// 🚦 4. Resolve Final Enum State Transitions
-if (action === 'SENT') {
-    existingRFQ.status = RFQStatus.SENT;
-    
-    // 💡 System Design Hook: Your Vendor notification email trigger should run right here:
-    // await this.dispatchRfqNotificationToVendors(existingRFQ, queryRunner.manager);
-}
 
-// 💾 5. Save header details and execute transaction database flush
-const savedRFQ = await cpoRepo.save(existingRFQ);
-await queryRunner.commitTransaction();
-
-return savedRFQ;
-
-} catch (error: any) {
-await queryRunner.rollbackTransaction();
-console.error('[CPO Service Dispatch Rollback Failure]:', error.message || error);
-throw error;
-} finally {
-await queryRunner.release();
-}
-
-}
 
 
     /**

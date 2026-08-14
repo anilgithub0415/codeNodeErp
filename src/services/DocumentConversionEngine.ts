@@ -12,48 +12,48 @@ class DocumentConversionEngine {
     //-----------------------------------------------------------------
     // Client RFQ -> Quotation
     //-----------------------------------------------------------------
+            async convertRFQToQuotation(
+                manager: EntityManager,
+                tenantId: number,
+                rfqId: number,
+                userId: number
+            ): Promise<Quotation> {
 
-    async convertRFQToQuotation(
-        manager: EntityManager,
-        tenantId: number,
-        rfqId: number,
-        userId: number
-    ): Promise<Quotation> {
+                const rfq =
+                    await this.loadRFQ(
+                        manager,
+                        tenantId,
+                        rfqId
+                    );
 
-        const rfq =
-            await this.loadRFQ(
-                manager,
-                tenantId,
-                rfqId
-            );
+                this.validateRFQ(rfq);
 
-        this.validateRFQ(rfq);
+                const quotation =
+                    await this.createQuotationHeader(
+                        manager,
+                        tenantId,
+                        rfq,
+                        userId
+                    );
 
-        const quotation =
-            await this.createQuotationHeader(
-                manager,
-                tenantId,
-                rfq,
-                userId
-            );
+                await this.copyRFQLines(
+                    manager,
+                    tenantId,
+                    rfq,
+                    quotation
+                );
 
-        await this.copyRFQLines(
-            manager,
-            tenantId,
-            rfq,
-            quotation
-        );
+                await this.markRFQConverted(
+                    manager,
+                    rfq,
+                    quotation
+                );
 
-        await this.markRFQConverted(
-            manager,
-            rfq
-        );
-
-        return await this.reloadQuotation(
-            manager,
-            quotation.id
-        );
-    }
+                return await this.reloadQuotation(
+                    manager,
+                    quotation.id
+                );
+            }
 
                             //-----------------------------------------------------------------
                             // Private methods
@@ -91,15 +91,31 @@ class DocumentConversionEngine {
                                 return rfq;
                             }
 
-                            private validateRFQ(
+                           private validateRFQ(
                                 rfq: ClientRFQOrder
                             ): void {
 
-                                if (rfq.status !== RFQStatus.SENT)
-                                    throw new Error(
-                                        "Only SENT RFQs can be converted."
-                                    );
+                                if (rfq.status !== RFQStatus.SUBMITTED) {
 
+                                    throw new Error(
+                                        "Only SUBMITTED RFQs can be converted."
+                                    );
+                                }
+
+                                if (rfq.isConvertedToQuotation) {
+
+                                    throw new Error(
+                                        `RFQ ${rfq.clientRFQNumber} has already been converted to Quotation ` +
+                                        `${rfq.convertedQuotationNumber || rfq.convertedQuotationId}.`
+                                    );
+                                }
+
+                                if (!rfq.items || rfq.items.length === 0) {
+
+                                    throw new Error(
+                                        "Cannot convert an RFQ without items."
+                                    );
+                                }
                             }
 
                             private async createQuotationHeader(
@@ -135,6 +151,8 @@ class DocumentConversionEngine {
                                                                     status: QuotationStatus.DRAFT,
 
                                                                     originatingClientRfqId: rfq.id,
+
+                                                                    originatingClientRfqNumber:rfq.clientRFQNumber,
 
                                                                     createdByUserId: userId
 
@@ -189,17 +207,23 @@ class DocumentConversionEngine {
 
                             }
 
-                            private async markRFQConverted(
+                         private async markRFQConverted(
                                 manager: EntityManager,
-                                rfq: ClientRFQOrder
+                                rfq: ClientRFQOrder,
+                                quotation: Quotation
                             ): Promise<void> {
 
-                                rfq.status = RFQStatus.QUOTED;
+                                rfq.isConvertedToQuotation = true;
+
+                                rfq.convertedQuotationId =
+                                    quotation.id;
+
+                                rfq.convertedQuotationNumber =
+                                    quotation.quoteNumber;
 
                                 await manager
                                     .getRepository(ClientRFQOrder)
                                     .save(rfq);
-
                             }
 
                             private async reloadQuotation(
@@ -272,232 +296,232 @@ class DocumentConversionEngine {
 
 }
 
-private async loadClientPO(
-    manager: EntityManager,
-    tenantId: number,
-    clientPOId: number
-): Promise<ClientPurchaseOrder> {
+                            private async loadClientPO(
+                                manager: EntityManager,
+                                tenantId: number,
+                                clientPOId: number
+                            ): Promise<ClientPurchaseOrder> {
 
-    const clientPO =
-        await manager
-            .getRepository(ClientPurchaseOrder)
-            .findOne({
+                                const clientPO =
+                                    await manager
+                                        .getRepository(ClientPurchaseOrder)
+                                        .findOne({
 
-                where: {
-                    id: clientPOId,
-                    tenantId
-                },
+                                            where: {
+                                                id: clientPOId,
+                                                tenantId
+                                            },
 
-                relations: [
-                    "items"
-                ]
+                                            relations: [
+                                                "items"
+                                            ]
 
-            });
+                                        });
 
-    if (!clientPO)
-        throw new Error("Client PO not found.");
+                                if (!clientPO)
+                                    throw new Error("Client PO not found.");
 
-    return clientPO;
+                                return clientPO;
 
-}
+                            }
 
-     private validateClientPO(
-    clientPO: ClientPurchaseOrder
-): void {
+                                private validateClientPO(
+                                clientPO: ClientPurchaseOrder
+                            ): void {
 
-    if (
-        clientPO.status !== Client_POStatus.APPROVED &&
-        clientPO.status !== Client_POStatus.SENT
-    ) {
-        throw new Error(
-            "Only Approved/Sent Client PO can be converted."
-        );
-    }
+                                if (
+                                    clientPO.status !== Client_POStatus.APPROVED &&
+                                    clientPO.status !== Client_POStatus.SENT
+                                ) {
+                                    throw new Error(
+                                        "Only Approved/Sent Client PO can be converted."
+                                    );
+                                }
 
-    if (clientPO.isConvertedToSales) {
+                                if (clientPO.isConvertedToSales) {
 
-        throw new Error(
+                                    throw new Error(
 
-            `Client PO ${clientPO.clientPoNumber} is already converted to Sales Order ${clientPO.convertedSalesOrderNumber}.`
+                                        `Client PO ${clientPO.clientPoNumber} is already converted to Sales Order ${clientPO.convertedSalesOrderNumber}.`
 
-        );
+                                    );
 
-    }
+                                }
 
-    if (
-        !clientPO.items ||
-        clientPO.items.length === 0
-    ) {
+                                if (
+                                    !clientPO.items ||
+                                    clientPO.items.length === 0
+                                ) {
 
-        throw new Error(
-            "Client PO has no items."
-        );
+                                    throw new Error(
+                                        "Client PO has no items."
+                                    );
 
-    }
+                                }
 
-}
+                            }
 
-    private async createSalesOrderHeader(
-    manager: EntityManager,
-    tenantId: number,
-    clientPO: ClientPurchaseOrder,
-    generatedSONumber: string,
-    userId: number
-): Promise<SalesOrder> {
+                                private async createSalesOrderHeader(
+                                manager: EntityManager,
+                                tenantId: number,
+                                clientPO: ClientPurchaseOrder,
+                                generatedSONumber: string,
+                                userId: number
+                            ): Promise<SalesOrder> {
 
-    const salesOrderRepo = manager.getRepository(SalesOrder);
-const test: SalesOrder = new SalesOrder();
-const salesOrder = salesOrderRepo.create({
+                                const salesOrderRepo = manager.getRepository(SalesOrder);
+                            const test: SalesOrder = new SalesOrder();
+                            const salesOrder = salesOrderRepo.create({
 
-                tenantId: clientPO.tenantId,
+                                            tenantId: clientPO.tenantId,
 
-                clientId: clientPO.clientId,
+                                            clientId: clientPO.clientId,
 
-                siteId: clientPO.siteId,
+                                            siteId: clientPO.siteId,
 
-                soNumber: generatedSONumber,
+                                            soNumber: generatedSONumber,
 
-                status: SOStatus.DRAFT,
+                                            status: SOStatus.DRAFT,
 
-                sourceType: OrderSourceType.CLIENT_PO,
+                                            sourceType: OrderSourceType.CLIENT_PO,
 
-                customerPoNumber:
-                    clientPO.clientPoNumber,
+                                            customerPoNumber:
+                                                clientPO.clientPoNumber,
 
-                customerPoDate:
-                    clientPO.poDate,
+                                            customerPoDate:
+                                                clientPO.poDate,
 
-                clientPurchaseOrderId:
-                    clientPO.id,
+                                            clientPurchaseOrderId:
+                                                clientPO.id,
 
-                clientPurchaseOrderNumber:
-                    clientPO.clientPoNumber,
+                                            clientPurchaseOrderNumber:
+                                                clientPO.clientPoNumber,
 
-                subTotal: 0,
+                                            subTotal: 0,
 
-                taxAmount: 0,
+                                            taxAmount: 0,
 
-                shippingAmount: 0,
+                                            shippingAmount: 0,
 
-                totalAmount: 0,
+                                            totalAmount: 0,
 
-                customAttributes: null,
+                                            customAttributes: null,
 
-                createdByUserId: userId
+                                            createdByUserId: userId
 
-            });
+                                        });
 
-    return await manager
-        .getRepository(SalesOrder)
-        .save(salesOrder);
+                                return await manager
+                                    .getRepository(SalesOrder)
+                                    .save(salesOrder);
 
-}
+                            }
 
 
-     private async copyClientPOItems(
-    manager: EntityManager,
-    tenantId: number,
-    clientPO: ClientPurchaseOrder,
-    salesOrder: SalesOrder
-): Promise<void> {
+                                private async copyClientPOItems(
+                                manager: EntityManager,
+                                tenantId: number,
+                                clientPO: ClientPurchaseOrder,
+                                salesOrder: SalesOrder
+                            ): Promise<void> {
 
-    const salesOrderItems: SalesOrderItem[] = [];
+                                const salesOrderItems: SalesOrderItem[] = [];
 
-    for (const poItem of clientPO.items) {
+                                for (const poItem of clientPO.items) {
 
-        salesOrderItems.push(
+                                    salesOrderItems.push(
 
-            manager
-                .getRepository(SalesOrderItem)
-                .create({
+                                        manager
+                                            .getRepository(SalesOrderItem)
+                                            .create({
 
-                   // tenantId,
+                                            // tenantId,
 
-                    salesOrderId:
-                        salesOrder.id,
+                                                salesOrderId:
+                                                    salesOrder.id,
 
-                    productId:
-                        poItem.productId,
+                                                productId:
+                                                    poItem.productId,
 
-                    productVariantId:
-                        poItem.productVariantId,
+                                                productVariantId:
+                                                    poItem.productVariantId,
 
-                    prodName:
-                        poItem.prodName,
+                                                prodName:
+                                                    poItem.prodName,
 
-                    sku:
-                        poItem.sku,
+                                                sku:
+                                                    poItem.sku,
 
-                    quantity:
-                        poItem.quantity,
+                                                quantity:
+                                                    poItem.quantity,
 
-                    salesUom:
-                        poItem.purchaseUom,
+                                                salesUom:
+                                                    poItem.purchaseUom,
 
-                    customPrice:
-                        poItem.finalPrice,
+                                                customPrice:
+                                                    poItem.finalPrice,
 
-                    customAttributes: null
+                                                customAttributes: null
 
-                })
+                                            })
 
-        );
+                                    );
 
-    }
+                                }
 
-    await manager
-        .getRepository(SalesOrderItem)
-        .save(salesOrderItems);
+                                await manager
+                                    .getRepository(SalesOrderItem)
+                                    .save(salesOrderItems);
 
-}
+                            }
 
 
-    private async markClientPOConverted(
-    manager: EntityManager,
-    clientPO: ClientPurchaseOrder,
-    salesOrder: SalesOrder
-): Promise<void> {
+                                private async markClientPOConverted(
+                                manager: EntityManager,
+                                clientPO: ClientPurchaseOrder,
+                                salesOrder: SalesOrder
+                            ): Promise<void> {
 
-    clientPO.internalNotes =
-        (clientPO.internalNotes || "") +
+                                clientPO.internalNotes =
+                                    (clientPO.internalNotes || "") +
 
-        ` | Converted to Sales Order ${salesOrder.soNumber} on ${new Date().toISOString()}`;
+                                    ` | Converted to Sales Order ${salesOrder.soNumber} on ${new Date().toISOString()}`;
 
-    clientPO.isConvertedToSales = true;
+                                clientPO.isConvertedToSales = true;
 
-    clientPO.convertedSalesOrderId =
-        salesOrder.id;
+                                clientPO.convertedSalesOrderId =
+                                    salesOrder.id;
 
-    clientPO.convertedSalesOrderNumber =
-        salesOrder.soNumber;
+                                clientPO.convertedSalesOrderNumber =
+                                    salesOrder.soNumber;
 
-    await manager
-        .getRepository(ClientPurchaseOrder)
-        .save(clientPO);
+                                await manager
+                                    .getRepository(ClientPurchaseOrder)
+                                    .save(clientPO);
 
-}
+                            }
 
 
-    private async reloadSalesOrder(
-    manager: EntityManager,
-    salesOrderId: number
-): Promise<SalesOrder> {
+                                private async reloadSalesOrder(
+                                manager: EntityManager,
+                                salesOrderId: number
+                            ): Promise<SalesOrder> {
 
-    return await manager
-        .getRepository(SalesOrder)
-        .findOneOrFail({
+                                return await manager
+                                    .getRepository(SalesOrder)
+                                    .findOneOrFail({
 
-            where: {
-                id: salesOrderId
-            },
+                                        where: {
+                                            id: salesOrderId
+                                        },
 
-            relations: [
-                "items"
-            ]
+                                        relations: [
+                                            "items"
+                                        ]
 
-        });
+                                    });
 
-}
+                            }
 
     //end clientPOtoSalesOrder                        
     //-----------------------------------------------------------------

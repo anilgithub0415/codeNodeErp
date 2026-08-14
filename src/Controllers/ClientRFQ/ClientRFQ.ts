@@ -2,11 +2,46 @@ import { Router, Request, Response } from 'express';
 import {  getClientRFQOrderRepository } from '../../dependencies'; // Replace with your standard DI lookup wrappers
 import { authorizeRoles } from '../Login/authorizeRoles';
 import { AppDataSource } from '../../../data-source';
-import { ClientRFQOrder } from '../../entity/ClientRFQOrder';
+import { ClientRFQOrder, RFQStatus } from '../../entity/ClientRFQOrder';
+import { IClientRFQActions } from '../../services/ClientRFQWorkflowService';
+
+
+
 
 const router = Router();
 
 
+router.get(
+    "/:id/workflow",
+    async(req,res,next)=>{
+
+
+        console.log('........hitting /:id/workflow');
+        
+
+        try{
+
+            const tenantId=req.user.tenantId;
+
+            const rfqId=Number(req.params.id);
+  const rfqService = getClientRFQOrderRepository(); 
+            const result=
+                await rfqService.getWorkflow(
+                    rfqId,
+                    tenantId
+                );
+
+            res.json(result);
+
+        }
+        catch(ex){
+
+            next(ex);
+
+        }
+
+    }
+);
 //
 //Pending: In all Endpoints, Better to use below type of Secure boundary identification locks: 
 // const loggedInTenantId = req.user.tenantId; // Secure boundary identification lock
@@ -283,7 +318,8 @@ router.route('/:id/approve').post(async (req: Request, res: Response) => {
         }
 
         // Pass payload downstream to the updated service method
-        const result = await clientPoService.processRFQApproval(poId, loggedInTenantId, action, sanitizedItems);
+       // const result = await clientPoService.processRFQApproval(poId, loggedInTenantId, action, sanitizedItems);
+        const result = await clientPoService.processRFQApproval(poId, loggedInTenantId);
         return res.status(200).json(result);
 
     } catch (error: any) {
@@ -294,14 +330,17 @@ router.route('/:id/approve').post(async (req: Request, res: Response) => {
 
 router.route('/:id/send').post(async (req: Request, res: Response) => {
 try {
+
+    console.log('........................running send RFQ.........');
+    
 const clientPoService = getClientRFQOrderRepository();
 const poId = Number(req.params.id);
 const loggedInTenantId = req.user.tenantId;
 const { action, items } = req.body; 
 
 // 🚦 Strict API Validation for the Action Header
-if (action !== 'SENT') {
-    return res.status(400).json({ message: 'Invalid action. Must be SENT.' });
+if (action !== 'SUBMITTED') {
+    return res.status(400).json({ message: 'Invalid action. Must be SUBMITTED.' });
 }
 
 // 📑 Sanitize items if modifications are bundled with the send request
@@ -328,7 +367,7 @@ if (items) {
 }
 
 // Pass payload downstream to the updated service method
-const result = await clientPoService.processRFQDispatch(poId, loggedInTenantId, action, sanitizedItems);
+const result = await clientPoService.processRFQSubmission(poId, loggedInTenantId, action, sanitizedItems);
 return res.status(200).json(result);
 
 } catch (error: any) {

@@ -1,5 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, Index } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, Index, Check } from 'typeorm';
 import { Tenant } from './Tenant';
+
+export enum Discount_Types{
+    PERCENTAGE ="PERCENTAGE",
+    FIXED_AMOUNT = "FIXED_AMOUNT",
+}
+//there is no @check constraint bcos typename may be custom name
 
 @Entity({ name: 'DiscountType' })
 @Index(['tenantId', 'typeName'], { unique: true })

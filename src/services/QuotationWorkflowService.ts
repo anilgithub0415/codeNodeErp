@@ -110,13 +110,6 @@ private workflows: Record<QuotationWorkflowType, QuotationWorkflowDefinition> = 
 
     
 
-    [QuotationStatus.UNDER_REVIEW]: {
-        editable: false,
-        deletable: false,
-        customerChange: false,
-        next: []
-    },
-
     [QuotationStatus.REJECTED]: {
         editable: false,
         deletable: false,
@@ -130,7 +123,7 @@ private workflows: Record<QuotationWorkflowType, QuotationWorkflowDefinition> = 
         customerChange: false,
         next: []
     }
-}
+} //end of STANDARD_APPROVAL
 
 };
 
@@ -243,6 +236,41 @@ public canDelete(
 
 
 
+public async resolveWorkflowType(
+    tenantId: number
+): Promise<QuotationWorkflowType> {
+
+    const tenantStrategyService =
+        getTenantStrategyServiceRepository();
+
+    const strategies =
+        await tenantStrategyService.getTenantStrategies(tenantId);
+
+    const workflowStrategy =
+        strategies.find(
+            s => s.tenantStrategyName === 'Quotation_Workflow'
+        );
+
+    if (!workflowStrategy) {
+        throw new Error(
+            `ClientRFQ workflow strategy is not configured for tenant ${tenantId}.`
+        );
+    }
+
+    const workflowType =
+        Object.values(QuotationWorkflowType)
+            .find(
+                value => value === workflowStrategy.tenantStrategy
+            );
+
+    if (!workflowType) {
+        throw new Error(
+            `Unsupported ClientRFQ workflow '${workflowStrategy.tenantStrategy}'.`
+        );
+    }
+
+    return workflowType;
+}
 
     private getWorkflow(
         workflowType: QuotationWorkflowType
@@ -348,6 +376,7 @@ public canDelete(
     }
 }
 
+
       public ensureCanSend (
     workflowType: QuotationWorkflowType,
     status: QuotationStatus
@@ -363,7 +392,7 @@ public canDelete(
     }
 }
 
-    public ensureCanRevisepublic(
+    public ensureCanRevise(
     workflowType: QuotationWorkflowType,
     status: QuotationStatus
 ): void {

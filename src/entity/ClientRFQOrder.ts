@@ -2,18 +2,20 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateCol
 import { ClientRFQOrderItem } from './ClientRFQOrderItem';
 
 export enum RFQStatus {
-    DRAFT = "DRAFT",
-    PENDING_APPROVAL = "PENDING_APPROVAL",
-    APPROVED = "APPROVED",
-    SENT = "SENT",
-    PARTIALLY_QUOTED = "PARTIALLY_QUOTED",
-    QUOTED='QUOTED',
-    CLOSED = "CLOSED",
-    CANCELLED = "CANCELLED"
+    DRAFT = "DRAFT",                     // Client is writing the request
+    SUBMITTED = "SUBMITTED",             // Client dispatched it to wholesalers (Replaces SENT)
+    
+    // --- Processing States ---
+    PARTIALLY_QUOTED = "PARTIALLY_QUOTED", // Some items linked to a SENT/APPROVED Quote
+    QUOTED = "QUOTED",                   // All items linked to a SENT/APPROVED Quote
+    IN_NEGOTIATION = "IN_NEGOTIATION",   // Linked Quote is currently COUNTER_OFFERED/REVISED
+    
+    // --- Terminal States ---
+    CLOSED = "CLOSED",                   // Successfully converted to an Order/Contract
+    CANCELLED = "CANCELLED"              // Client withdrew the request entirely
 }
-@Check(`status IN ('DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'SENT', 'PARTIALLY_QUOTED', 'QUOTED', 'PARTIALLY_RECEIVED', 'CLOSED', 'CANCELLED')`)
+@Check(`status IN ('DRAFT', 'SUBMITTED',  'PARTIALLY_QUOTED', 'QUOTED', 'IN_NEGOTIATION', 'CLOSED', 'CANCELLED')`)
 
-//few more statuses://'PENDING_REVIEW' | 'ACCEPTED' | 'REJECTED' | 'PARTIALLY_CONVERTED';
 
 @Entity("client_rfq_orders")
 @Index(['tenantId', 'clientRFQNumber'], { unique: true }) 
