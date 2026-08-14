@@ -5,9 +5,11 @@ import { QuotationItem } from '../entity/QuotationItem';
 import { Customer } from '../entity/Customer';
 import { Product } from '../entity/Product';
 import { LineDiscount } from '../entity/LineDiscount';
-import { IQuotationActions, QuotationWorkflowService } from './QuotationWorkflowService';
+import { IQuotationActions, QuotationWorkflowService, QuotationWorkflowType } from './QuotationWorkflowService';
 import { ClientRFQOrder, RFQStatus } from '../entity/ClientRFQOrder';
 import DocumentConversionEngine from './DocumentConversionEngine';
+import { getTenantStrategyServiceRepository } from '../dependencies';
+import { ClientRFQWorkflowService } from './ClientRFQWorkflowService';
 
  
 export interface ICreateQuotationItemInput {
@@ -19,7 +21,7 @@ export interface ICreateQuotationItemInput {
     unit: string;
     quantity: number;
     gstPercentage: number;
-    price: number;
+    customPrice: number;targetPrice:number;
     discount: number;
     customAttributes?: Record<string, any> | null;
 }
@@ -59,6 +61,8 @@ export class QuotationService {
     //Convert to Quotation new approach:tag:convertToQuoteNewIdea
     private workflowService = new QuotationWorkflowService();
         private workflow = new QuotationWorkflowService();
+        private workflow_client = new ClientRFQWorkflowService();
+        
 
     
     async init(repo: Repository<Quotation>): Promise<void> {
@@ -87,19 +91,62 @@ export class QuotationService {
 
         }
 
+
+         const tenantStrategyService =
+                getTenantStrategyServiceRepository();
+
+         const strategies =
+        await tenantStrategyService
+            .getTenantStrategies(tenantId);
+
+    const workflowStrategy =
+        strategies.find(
+            s =>
+                s.tenantStrategyName ===
+                "Quotation_Workflow"
+        );
+
+    if (!workflowStrategy) {
+        throw new Error(
+            "Quotation Workflow not configured."
+        );
+    }
+
+    const workflowName =
+        workflowStrategy.tenantStrategy;
+
+       const workflowType=this.toQuotationWorkflowType(workflowName) 
         return{
 
             quotationId:quotation.id,
 
             status:quotation.status,
 
-            actions:this.workflowService.getAllowedActions(
+            actions: await this.workflowService.getAllowedActions(workflowType,
                 quotation.status
             )
 
         };
 
     }
+
+    //helper function to map Quotation_Workflow strategy to enum
+     toQuotationWorkflowType(
+    value: string
+): QuotationWorkflowType {
+
+    if (
+        Object.values(QuotationWorkflowType)
+            .includes(value as QuotationWorkflowType)
+    ) {
+        return value as QuotationWorkflowType;
+    }
+
+    throw new Error(
+        `Unsupported Quotation Workflow strategy: ${value}`
+    );
+}
+
     async getQuotation(tenantId: number, id: number): Promise<Quotation> {
         const result = await this.quotationRepository.findOne({
             where: { id, tenantId },
@@ -117,8 +164,7 @@ export class QuotationService {
             isClientPortal: boolean = false
         ): Promise<Quotation[]> {
 
-            console.log('in getQuotations............isClientPortal:',isClientPortal);
-            
+                 
 
             const whereConditions: any = { tenantId };
             
@@ -143,7 +189,7 @@ export class QuotationService {
         createDto: CreateQuotationDto,
         manager?: EntityManager
     ): Promise<CreatedQuotationResponse> {
-        console.log('createDto for quotation initialized:', createDto);
+      
         
         const isExternalTransaction = !!manager;
         const txManager = isExternalTransaction ? manager! : AppDataSource.manager;
@@ -214,11 +260,11 @@ export class QuotationService {
                 // Metrics
                 itemNode.quantity = Number(itemInput.quantity || 0.00);
                 itemNode.gstPercentage = Number(itemInput.gstPercentage || 0.00);
-                itemNode.price = Number(itemInput.price || 0.00);
+                itemNode.customPrice = Number(itemInput.customPrice || 0.00);
                 itemNode.discount = Number(itemInput.discount || 0.00);
                 itemNode.customAttributes = itemInput.customAttributes ?? null;
                 
-                const baseAmount = itemNode.quantity * itemNode.price;
+                const baseAmount = itemNode.quantity * itemNode.customPrice;
                 const netAfterDiscount = baseAmount - itemNode.discount;
                 const taxAmount = netAfterDiscount * (itemNode.gstPercentage / 100);
                 
@@ -330,7 +376,7 @@ for (const incomingLine of (quotationData.items || [])) {
 
         if (activeDiscount) {
             item.appliedLineDiscountId = activeDiscount.id;
-            const itemSubtotalBase = Number(item.price) * Number(item.quantity);
+            const itemSubtotalBase = Number(item.customPrice) * Number(item.quantity);
             const strategyLabel = activeDiscount.discountType ? activeDiscount.discountType.typeName : 'PERCENTAGE';
 
             if (strategyLabel === 'PERCENTAGE') {
@@ -342,7 +388,7 @@ for (const incomingLine of (quotationData.items || [])) {
     }
 
     // Compute net totals using the individual 'item' variables context
-    const rawGrossTotal = (Number(item.price) * Number(item.quantity)) - Number(item.discount);
+    const rawGrossTotal = (Number(item.customPrice) * Number(item.quantity)) - Number(item.discount);
     const finalLineTotal = rawGrossTotal >= 0 ? rawGrossTotal : 0;
     
     const taxFactor = 1 + (Number(item.gstPercentage) / 100);
@@ -402,8 +448,35 @@ for (const incomingLine of (quotationData.items || [])) {
               where: { id: targetId, tenantId },
               relations: ['items']
           });
-        
-          this.workflow.ensureCanEdit(existingQuotation!.status);
+     
+
+        // --------------------------------------------------
+        // 1. Get tenant quotation workflow strategy
+        // --------------------------------------------------
+             const tenantStrategyService =
+            getTenantStrategyServiceRepository();
+
+        const strategies =
+            await tenantStrategyService.getTenantStrategies(tenantId);
+
+        const quotationWorkflowStrategy =
+            strategies.find(
+                s => s.tenantStrategyName === 'Quotation_Workflow'
+            );
+
+        if (!quotationWorkflowStrategy) {
+            throw new Error(
+                `Quotation Workflow strategy is not configured for tenant ${tenantId}.`
+            );
+        }
+
+        const workflowName =
+            quotationWorkflowStrategy.tenantStrategy as QuotationWorkflowType;
+
+            //---------------------------------------------------------------------------
+
+
+          this.workflow.ensureCanEdit(workflowName,existingQuotation!.status);
 
           if (!existingQuotation) {
               throw new Error(`Quotation with identification ID ${targetId} missing on tenant context.`);
@@ -420,6 +493,10 @@ const productRepo = transactionalEntityManager.getRepository(Product);
 
             const freshlyMappedItems = await Promise.all(
     updatableFields.items.map(async (itemInput) => {
+
+        //pending:remove cons log
+        console.log('..itemInput...',itemInput);
+        
         const itemNode = new QuotationItem();
         
         // Relational Links
@@ -445,11 +522,14 @@ const productRepo = transactionalEntityManager.getRepository(Product);
         // Metrics
         itemNode.quantity = Number(itemInput.quantity || 0.00);
         itemNode.gstPercentage = Number(itemInput.gstPercentage || 0.00);
-        itemNode.price = Number(itemInput.price || 0.00);
+        itemNode.customPrice = Number(itemInput.customPrice || 0.00);
+
+        itemNode.targetPrice = Number(itemInput.targetPrice || 0.00);
+
         itemNode.discount = Number(itemInput.discount || 0.00);
         itemNode.customAttributes = itemInput.customAttributes ?? null;
 
-        const baseAmount = itemNode.quantity * itemNode.price;
+        const baseAmount = itemNode.quantity * itemNode.customPrice;
         const netAfterDiscount = baseAmount - itemNode.discount;
         const taxAmount = netAfterDiscount * (itemNode.gstPercentage / 100);
         
@@ -471,7 +551,7 @@ const productRepo = transactionalEntityManager.getRepository(Product);
             updatableFields.clientId &&
             updatableFields.clientId !== existingQuotation.clientId
             ) {
-                this.workflow.ensureCanChangeCustomer(existingQuotation.status);
+                this.workflow.ensureCanChangeCustomer(workflowName,existingQuotation.status);
               }
 
           quotationRepo.merge(existingQuotation, pureFields);
@@ -484,36 +564,232 @@ const productRepo = transactionalEntityManager.getRepository(Product);
     // ==========================================
     // METHOD 1: UPDATE QUOTATION STATUS (SEND)
     // ==========================================
-    async updateQuotationStatus(
-        quoteId: number,
-        tenantId: number,
-        newStatus: QuotationStatus,
-        manager?: EntityManager
-    ): Promise<Quotation> {
-        const activeManager = manager ? manager : AppDataSource.manager;
-        const quoteRepo = activeManager.getRepository(Quotation);
+    // ==========================================
+// METHOD 1: UPDATE QUOTATION STATUS (SEND)
+// ==========================================
+// ==========================================
+// METHOD 1: UPDATE QUOTATION STATUS (SEND)
+// ==========================================
+async updateQuotationStatus(
+    quoteId: number,
+    tenantId: number,
+    newStatus: QuotationStatus,
+    manager?: EntityManager
+): Promise<Quotation> {
 
-        // 1. Fetch the target quotation
-        const targetQuote = await quoteRepo.findOne({
-            where: { id: quoteId, tenantId }
-        });
+    // If an outer transaction supplied a manager,
+    // participate in that transaction.
+    if (manager) {
 
-        if (!targetQuote) {
-            throw new Error(`[QuotationService] Quotation not found for ID: ${quoteId}`);
-        }
-
-        // 2. State Safety Guard
-        this.workflow.ensureCanSubmit(targetQuote.status);
-
-        console.log(`[QuotationService] Transitioning Quote ${targetQuote.quoteNumber} status from ${targetQuote.status} to ${newStatus}`);
-
-        // 3. Mutate status cleanly
-        targetQuote.status = newStatus;
-        
-        // 4. Save and return updated record
-        return await quoteRepo.save(targetQuote);
+        return await this.executeQuotationStatusUpdate(
+            manager,
+            quoteId,
+            tenantId,
+            newStatus
+        );
     }
 
+
+    // --------------------------------------------------
+    // Create our own transaction
+    // --------------------------------------------------
+
+    const queryRunner =
+        AppDataSource.createQueryRunner();
+
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+
+        const updatedQuotation =
+            await this.executeQuotationStatusUpdate(
+                queryRunner.manager,
+                quoteId,
+                tenantId,
+                newStatus
+            );
+
+        await queryRunner.commitTransaction();
+
+        return updatedQuotation;
+
+    } catch (error) {
+
+        await queryRunner.rollbackTransaction();
+
+        throw error;
+
+    } finally {
+
+        await queryRunner.release();
+    }
+}
+
+// ==========================================
+// EXECUTE QUOTATION STATUS UPDATE
+// ==========================================
+private async executeQuotationStatusUpdate(
+    manager: EntityManager,
+    quoteId: number,
+    tenantId: number,
+    newStatus: QuotationStatus
+): Promise<Quotation> {
+
+    const quotationRepo =
+        manager.getRepository(Quotation);
+
+    const rfqRepo =
+        manager.getRepository(ClientRFQOrder);
+
+    // --------------------------------------------------
+    // 1. Load quotation
+    // --------------------------------------------------
+
+    const quotation =
+        await quotationRepo.findOne({
+            where: {
+                id: quoteId,
+                tenantId
+            }
+        });
+
+    if (!quotation) {
+
+        throw new Error(
+            `[QuotationService] Quotation ${quoteId} not found.`
+        );
+    }
+
+    // --------------------------------------------------
+    // 2. Resolve quotation workflow
+    // --------------------------------------------------
+
+    const workflowType =
+        await this.workflow.resolveWorkflowType(
+            tenantId
+        );
+
+    // --------------------------------------------------
+    // 3. Validate requested quotation transition
+    // --------------------------------------------------
+
+    if (newStatus === QuotationStatus.SENT) {
+
+        this.workflow.ensureCanSend(
+            workflowType,
+            quotation.status
+        );
+    }
+
+    // --------------------------------------------------
+    // 4. Change quotation status
+    // --------------------------------------------------
+
+    console.log(
+        `[QuotationService] Transitioning quotation ` +
+        `${quotation.quoteNumber} ` +
+        `from ${quotation.status} ` +
+        `to ${newStatus}`
+    );
+
+    quotation.status =
+        newStatus;
+
+    // --------------------------------------------------
+    // 5. Save quotation
+    // --------------------------------------------------
+
+    const savedQuotation =
+        await quotationRepo.save(
+            quotation
+        );
+
+    // --------------------------------------------------
+    // 6. Synchronize originating RFQ
+    // --------------------------------------------------
+    //
+    // Only RFQ-originated quotations participate.
+    //
+    // Manual quotations have:
+    //
+    // originatingClientRfqId = NULL
+    //
+    // Therefore they skip this section.
+    // --------------------------------------------------
+
+    if (
+        newStatus === QuotationStatus.SENT &&
+        savedQuotation.originatingClientRfqId
+    ) {
+
+        const rfq =
+            await rfqRepo.findOne({
+                where: {
+                    id:
+                        savedQuotation
+                            .originatingClientRfqId,
+
+                    tenantId
+                }
+            });
+
+        if (!rfq) {
+
+            throw new Error(
+                `Originating Client RFQ ` +
+                `${savedQuotation.originatingClientRfqId} ` +
+                `was not found.`
+            );
+        }
+
+        // --------------------------------------------------
+        // RFQ should still be SUBMITTED here.
+        //
+        // It was converted earlier, but conversion itself
+        // did not change the RFQ status.
+        // --------------------------------------------------
+
+        if (
+            rfq.status !== RFQStatus.SUBMITTED
+        ) {
+
+            throw new Error(
+                `Client RFQ ${rfq.clientRFQNumber} ` +
+                `cannot be marked QUOTED because its ` +
+                `current status is '${rfq.status}'.`
+            );
+        }
+
+        // --------------------------------------------------
+        // The quotation is now actually sent to client.
+        // Therefore RFQ becomes QUOTED.
+        // --------------------------------------------------
+
+        rfq.status =
+            RFQStatus.QUOTED;
+
+        await rfqRepo.save(
+            rfq
+        );
+    }
+
+    // --------------------------------------------------
+    // 7. Return complete quotation
+    // --------------------------------------------------
+
+    return await quotationRepo.findOneOrFail({
+        where: {
+            id: savedQuotation.id,
+            tenantId
+        },
+        relations: [
+            "client",
+            "items",
+            "items.product"
+        ]
+    });
+}
     // ==========================================
     // METHOD 2: APPROVE QUOTATION (NO STOCK CHANGES)
     // ==========================================
@@ -546,8 +822,35 @@ const productRepo = transactionalEntityManager.getRepository(Product);
                 throw new Error(`[QuotationService] Quotation not found for ID: ${quoteId}`);
             }
 
+
+        // --------------------------------------------------
+        // 1. Get tenant quotation workflow strategy
+        // --------------------------------------------------
+             const tenantStrategyService =
+            getTenantStrategyServiceRepository();
+
+        const strategies =
+            await tenantStrategyService.getTenantStrategies(tenantId);
+
+        const quotationWorkflowStrategy =
+            strategies.find(
+                s => s.tenantStrategyName === 'Quotation_Workflow'
+            );
+
+        if (!quotationWorkflowStrategy) {
+            throw new Error(
+                `Quotation Workflow strategy is not configured for tenant ${tenantId}.`
+            );
+        }
+
+        const workflowName =
+            quotationWorkflowStrategy.tenantStrategy as QuotationWorkflowType;
+
+            //---------------------------------------------------------------------------
+
+            
             // 2. State Safety Guard
-          this.workflow.ensureCanApprove(targetQuote.status);
+          this.workflow.ensureCanApprove(workflowName,targetQuote.status);
 
             console.log(`[QuotationService] Approving Quote ${targetQuote.quoteNumber}...`);
 
@@ -578,98 +881,655 @@ const productRepo = transactionalEntityManager.getRepository(Product);
    * Clones the previous quotation structure, increments iteration attributes, 
    * applies the TARGET price parameters, and marks old iterations inactive.
    */
-      async processClientCounterOffer(originalQuoteId: number, tenantId: number, payload: any): Promise<any> {
-    // 1. Execute atomic transaction wrapper using your custom AppDataSource architecture reference
-    return await AppDataSource.manager.transaction(async (transactionalEntityManager) => {
-      
-      // 2. Fetch previous quotation instance with its linked material line items using transaction contexts
-      const existingQuote = await transactionalEntityManager.findOne(Quotation, {
-        where: { id: originalQuoteId, tenantId: tenantId },
-        relations: ['items'],
-      });
+     async processClientCounterOffer(
+    originalQuoteId: number,
+    tenantId: number,
+    payload: any
+): Promise<any> {
 
-      this.workflow.ensureCanCounterOffer(existingQuote!.status);
+    return await AppDataSource.manager.transaction(
+        async (transactionalEntityManager) => {
 
-      if (!existingQuote) {
-        throw new Error(`Quotation structure source context matching ID #${originalQuoteId} not found for tenant #${tenantId}.`);
-      }
+            // ============================================================
+            // 1. Load existing quotation
+            // ============================================================
 
-      // 3. Archive previous negotiation round iteration state safely
-      existingQuote.isActive = false;
-      await transactionalEntityManager.save(existingQuote);
+            const existingQuote =
+                await transactionalEntityManager.findOne(
+                    Quotation,
+                    {
+                        where: {
+                            id: originalQuoteId,
+                            tenantId
+                        },
+                        relations: ['items']
+                    }
+                );
 
-      // 4. Create a clean instance model clone representing the target iteration change
-      const newNegotiationRound = new Quotation();
-      newNegotiationRound.tenantId = existingQuote.tenantId;
-      newNegotiationRound.clientId = existingQuote.clientId;
-      newNegotiationRound.clientName = existingQuote.clientName;
-      newNegotiationRound.clientCategory = existingQuote.clientCategory;
-      newNegotiationRound.contactPerson = existingQuote.contactPerson;
-      newNegotiationRound.deliveryLocation = existingQuote.deliveryLocation;
-      newNegotiationRound.remarksNotes = payload.remarksNotes || existingQuote.remarksNotes;
-      
-      // Seed multi-round version data attributes securely
-      newNegotiationRound.quoteNumber = existingQuote.quoteNumber ? existingQuote.quoteNumber : `QT-${Date.now()}`;
-      newNegotiationRound.version = Number(existingQuote.version || 1) + 1;
-      newNegotiationRound.isActive = true;
-      newNegotiationRound.status = QuotationStatus.COUNTER_OFFERED; // Moves client card automatically into Negotiation Kanban column
-      newNegotiationRound.totalAmount = Number(payload.totalAmount || 0);
-
-      // Persist top-level parent wrapper data to claim fresh sequence record index ID mappings
-      const savedRoundHeader = await transactionalEntityManager.save(newNegotiationRound);
-
-      // 5. Map line items incorporating client's targeted wholesale counter prices
-      if (Array.isArray(payload.items)) {
-        const structuralItemRows = [];
-
-        for (const incomingLine of payload.items) {
-          const itemRow = new QuotationItem();
-          itemRow.quotation = savedRoundHeader;
-          
-          const resolvedProductId = incomingLine.productId ? Number(incomingLine.productId) : null;
-          itemRow.productId = resolvedProductId;
-          itemRow.productVariantId = incomingLine.productVariantId ? Number(incomingLine.productVariantId) : null;
-          
-          // 🌟 FIX: Fallback lookup directly against previous iteration lines if the frontend array dropped the parameter
-          let finalProdName = incomingLine.prodName;
-          let finalSku = incomingLine.sku;
-
-          if (!finalProdName && resolvedProductId && existingQuote.items) {
-            const historicalMatch = existingQuote.items.find(h => Number(h.productId) === resolvedProductId);
-            if (historicalMatch) {
-              finalProdName = historicalMatch.prodName;
-              finalSku = historicalMatch.sku;
+            if (!existingQuote) {
+                throw new Error(
+                    `Quotation structure source context matching ID #${originalQuoteId} not found for tenant #${tenantId}.`
+                );
             }
-          }
 
-          // 🌟 SECONDARY SAFETY NET: Fallback string value to guarantee compliance with database schema rules
-          itemRow.prodName = finalProdName || `Product #${resolvedProductId || 'Unknown'}`;
-          itemRow.sku = finalSku || '';
-          
-          itemRow.description = incomingLine.description;
-          itemRow.unit = incomingLine.unit || 'PCS';
-          itemRow.quantity = Number(incomingLine.quantity || 0);
-          
-          // Track both core wholesale value and newly requested target metrics
-          itemRow.price = Number(incomingLine.price || 0);
-         itemRow.targetPrice = incomingLine.targetPrice ? Number(incomingLine.targetPrice) : null;
-          
-          itemRow.discount = Number(incomingLine.discount || 0);
-          itemRow.appliedLineDiscountId = incomingLine.appliedLineDiscountId ? Number(incomingLine.appliedLineDiscountId) : null;
-          itemRow.gstPercentage = Number(incomingLine.gstPercentage || 0);
-          itemRow.totalItemAmount = Number(incomingLine.totalItemAmount || 0);
-          
-          structuralItemRows.push(itemRow);
+
+            // ============================================================
+            // 2. Resolve quotation workflow
+            // ============================================================
+
+            const quotationWorkflowType =
+                await this.workflow.resolveWorkflowType(
+                    tenantId
+                );
+
+
+            // ============================================================
+            // 3. Validate quotation can receive counter offer
+            // ============================================================
+
+            this.workflow.ensureCanCounterOffer(
+                quotationWorkflowType,
+                existingQuote.status
+            );
+
+
+            // ============================================================
+            // 4. If quotation originated from Client RFQ,
+            //    load originating RFQ
+            // ============================================================
+
+            let originatingRFQ: ClientRFQOrder | null = null;
+
+            if (existingQuote.originatingClientRfqId) {
+
+                originatingRFQ =
+                    await transactionalEntityManager.findOne(
+                        ClientRFQOrder,
+                        {
+                            where: {
+                                id: existingQuote.originatingClientRfqId,
+                                tenantId
+                            }
+                        }
+                    );
+
+                if (!originatingRFQ) {
+                    throw new Error(
+                        `Originating Client RFQ #${existingQuote.originatingClientRfqId} was not found for tenant #${tenantId}.`
+                    );
+                }
+
+
+                // ========================================================
+                // 5. Resolve Client RFQ workflow
+                // ========================================================
+
+                const clientRFQWorkflowType =
+                    await this.workflow_client.resolveWorkflowType(
+                        tenantId
+                    );
+
+
+                // ========================================================
+                // 6. Validate RFQ can move to IN_NEGOTIATION
+                // ========================================================
+
+                const canMoveToNegotiation =
+                    this.workflow_client.ensureCanMoveToNegotiation(
+                        clientRFQWorkflowType,
+                        originatingRFQ.status
+                    );
+
+                if (!canMoveToNegotiation) {
+
+                    throw new Error(
+                        `Client RFQ #${originatingRFQ.id} cannot transition from '${originatingRFQ.status}' to '${RFQStatus.IN_NEGOTIATION}' under workflow '${clientRFQWorkflowType}'.`
+                    );
+                }
+            }
+
+
+            // ============================================================
+            // 7. Archive previous quotation round
+            // ============================================================
+
+            existingQuote.isActive = false;
+
+            await transactionalEntityManager.save(
+                existingQuote
+            );
+
+
+            // ============================================================
+            // 8. Create new negotiation quotation
+            // ============================================================
+
+            const newNegotiationRound =
+                new Quotation();
+
+            newNegotiationRound.tenantId =
+                existingQuote.tenantId;
+
+            newNegotiationRound.clientId =
+                existingQuote.clientId;
+
+            newNegotiationRound.clientName =
+                existingQuote.clientName;
+
+            newNegotiationRound.clientCategory =
+                existingQuote.clientCategory;
+
+            newNegotiationRound.contactPerson =
+                existingQuote.contactPerson;
+
+            newNegotiationRound.deliveryLocation =
+                existingQuote.deliveryLocation;
+
+            newNegotiationRound.remarksNotes =
+                payload.remarksNotes ||
+                existingQuote.remarksNotes;
+
+
+            // ============================================================
+            // Preserve originating RFQ relationship
+            // ============================================================
+
+            newNegotiationRound.originatingClientRfqId =
+                existingQuote.originatingClientRfqId;
+
+            newNegotiationRound.originatingClientRfqNumber =
+                existingQuote.originatingClientRfqNumber;
+
+
+            // ============================================================
+            // Negotiation version
+            // ============================================================
+
+            newNegotiationRound.quoteNumber =
+                existingQuote.quoteNumber
+                    ? existingQuote.quoteNumber
+                    : `QT-${Date.now()}`;
+
+            newNegotiationRound.version =
+                Number(existingQuote.version || 1) + 1;
+
+            newNegotiationRound.isActive = true;
+
+            newNegotiationRound.status =
+                QuotationStatus.COUNTER_OFFERED;
+
+            newNegotiationRound.totalAmount =
+                Number(payload.totalAmount || 0);
+
+
+            // ============================================================
+            // 9. Save new quotation
+            // ============================================================
+
+            const savedRoundHeader =
+                await transactionalEntityManager.save(
+                    newNegotiationRound
+                );
+
+
+            // ============================================================
+            // 10. Copy counter-offer items
+            // ============================================================
+
+            if (Array.isArray(payload.items)) {
+
+                const structuralItemRows: QuotationItem[] = [];
+
+                for (const incomingLine of payload.items) {
+
+                    const itemRow =
+                        new QuotationItem();
+
+                    itemRow.quotation =
+                        savedRoundHeader;
+
+
+                    const resolvedProductId =
+                        incomingLine.productId
+                            ? Number(incomingLine.productId)
+                            : null;
+
+                    itemRow.productId =
+                        resolvedProductId;
+
+                    itemRow.productVariantId =
+                        incomingLine.productVariantId
+                            ? Number(
+                                incomingLine.productVariantId
+                            )
+                            : null;
+
+
+                    // ====================================================
+                    // Product information fallback
+                    // ====================================================
+
+                    let finalProdName =
+                        incomingLine.prodName;
+
+                    let finalSku =
+                        incomingLine.sku;
+
+
+                    if (
+                        !finalProdName &&
+                        resolvedProductId &&
+                        existingQuote.items
+                    ) {
+
+                        const historicalMatch =
+                            existingQuote.items.find(
+                                h =>
+                                    Number(h.productId) ===
+                                    resolvedProductId
+                            );
+
+                        if (historicalMatch) {
+
+                            finalProdName =
+                                historicalMatch.prodName;
+
+                            finalSku =
+                                historicalMatch.sku;
+                        }
+                    }
+
+
+                    itemRow.prodName =
+                        finalProdName ||
+                        `Product #${resolvedProductId || 'Unknown'}`;
+
+                    itemRow.sku =
+                        finalSku || '';
+
+                    itemRow.description =
+                        incomingLine.description;
+
+                    itemRow.unit =
+                        incomingLine.unit || 'PCS';
+
+                    itemRow.quantity =
+                        Number(
+                            incomingLine.quantity || 0
+                        );
+
+                    itemRow.customPrice =
+                        Number(
+                            incomingLine.price || 0
+                        );
+
+                    itemRow.targetPrice =
+                        incomingLine.targetPrice
+                            ? Number(
+                                incomingLine.targetPrice
+                            )
+                            : null;
+
+                    itemRow.discount =
+                        Number(
+                            incomingLine.discount || 0
+                        );
+
+                    itemRow.appliedLineDiscountId =
+                        incomingLine.appliedLineDiscountId
+                            ? Number(
+                                incomingLine.appliedLineDiscountId
+                            )
+                            : null;
+
+                    itemRow.gstPercentage =
+                        Number(
+                            incomingLine.gstPercentage || 0
+                        );
+
+                    itemRow.totalItemAmount =
+                        Number(
+                            incomingLine.totalItemAmount || 0
+                        );
+
+
+                    structuralItemRows.push(
+                        itemRow
+                    );
+                }
+
+
+                await transactionalEntityManager.save(
+                    QuotationItem,
+                    structuralItemRows
+                );
+            }
+
+
+            // ============================================================
+            // 11. Move originating RFQ into negotiation
+            // ============================================================
+
+            if (originatingRFQ) {
+
+                originatingRFQ.status =
+                    RFQStatus.IN_NEGOTIATION;
+
+                await transactionalEntityManager.save(
+                    ClientRFQOrder,
+                    originatingRFQ
+                );
+            }
+
+
+            // ============================================================
+            // 12. Return newly created quotation
+            // ============================================================
+
+            return savedRoundHeader;
         }
+    );
+}
 
-        // Batch persist the item lines within the transactional scope
-        await transactionalEntityManager.save(QuotationItem, structuralItemRows);
-      }
+async processQuotationRevision(
+    originalQuoteId: number,
+    tenantId: number,
+    payload: any
+): Promise<Quotation> {
 
-      // Return the newly created revision record, committing the transaction automatically
-      return savedRoundHeader;
-    });
-  }
+    return await AppDataSource.manager.transaction(
+        async (transactionalEntityManager) => {
+
+            // =========================================================
+            // 1. Load existing quotation
+            // =========================================================
+
+            const quotationRepo =
+                transactionalEntityManager.getRepository(Quotation);
+
+            const quotationItemRepo =
+                transactionalEntityManager.getRepository(QuotationItem);
+
+            const rfqRepo =
+                transactionalEntityManager.getRepository(ClientRFQOrder);
+
+            const existingQuote =
+                await quotationRepo.findOne({
+                    where: {
+                        id: originalQuoteId,
+                        tenantId
+                    },
+                    relations: ['items']
+                });
+
+            if (!existingQuote) {
+                throw new Error(
+                    `Quotation #${originalQuoteId} not found for tenant #${tenantId}.`
+                );
+            }
+
+
+            // =========================================================
+            // 2. Resolve tenant quotation workflow
+            // =========================================================
+
+            const workflowType =
+                await this.workflow.resolveWorkflowType(
+                    tenantId
+                );
+
+
+            // =========================================================
+            // 3. Workflow guardrail
+            //
+            // COUNTER_OFFERED → REVISED
+            // =========================================================
+
+            this.workflow.ensureCanRevise(
+                workflowType,
+                existingQuote.status
+            );
+
+
+            // =========================================================
+            // 4. Archive previous quotation revision
+            // =========================================================
+
+            existingQuote.isActive = false;
+
+            await transactionalEntityManager.save(
+                Quotation,
+                existingQuote
+            );
+
+
+            // =========================================================
+            // 5. Create new quotation revision
+            // =========================================================
+
+            const revisedQuotation =
+                quotationRepo.create({
+
+                    tenantId:
+                        existingQuote.tenantId,
+
+                    clientId:
+                        existingQuote.clientId,
+
+                    clientName:
+                        existingQuote.clientName,
+
+                    clientCategory:
+                        existingQuote.clientCategory,
+
+                    contactPerson:
+                        existingQuote.contactPerson,
+
+                    deliveryLocation:
+                        existingQuote.deliveryLocation,
+
+                    remarksNotes:
+                        payload.remarksNotes ??
+                        existingQuote.remarksNotes,
+
+                    quoteNumber:
+                        existingQuote.quoteNumber,
+
+                    version:
+                        Number(existingQuote.version || 1) + 1,
+
+                    isActive:
+                        true,
+
+                    status:
+                        QuotationStatus.REVISED,
+
+                    quotationDate:
+                        new Date(),
+
+                    originatingClientRfqId:
+                        existingQuote.originatingClientRfqId,
+
+                    originatingClientRfqNumber:
+                        existingQuote.originatingClientRfqNumber,
+
+                    totalAmount:
+                        Number(
+                            payload.totalAmount ??
+                            existingQuote.totalAmount ??
+                            0
+                        )
+                });
+
+
+            const savedRevision =
+                await quotationRepo.save(
+                    revisedQuotation
+                );
+
+
+            // =========================================================
+            // 6. Create revised quotation items
+            // =========================================================
+
+            const sourceItems =
+                Array.isArray(payload.items) &&
+                payload.items.length > 0
+
+                    ? payload.items
+
+                    : existingQuote.items;
+
+
+            const revisedItems: QuotationItem[] = [];
+
+
+            for (const sourceItem of sourceItems) {
+
+                const item =
+                    quotationItemRepo.create({
+
+                        quotationId:
+                            savedRevision.id,
+
+                        productId:
+                            sourceItem.productId
+                                ? Number(sourceItem.productId)
+                                : null,
+
+                        productVariantId:
+                            sourceItem.productVariantId
+                                ? Number(sourceItem.productVariantId)
+                                : null,
+
+                        prodName:
+                            sourceItem.prodName ||
+                            `Product #${
+                                sourceItem.productId ||
+                                sourceItem.productVariantId ||
+                                'Unknown'
+                            }`,
+
+                        sku:
+                            sourceItem.sku || '',
+
+                        description:
+                            sourceItem.description || null,
+
+                        unit:
+                            sourceItem.unit || 'PCS',
+
+                        quantity:
+                            Number(
+                                sourceItem.quantity || 0
+                            ),
+
+                        customPrice:
+                            Number(
+                                sourceItem.customPrice ??
+                                sourceItem.price ??
+                                0
+                            ),
+
+                        targetPrice:
+                            sourceItem.targetPrice != null
+                                ? Number(sourceItem.targetPrice)
+                                : null,
+
+                        discount:
+                            Number(
+                                sourceItem.discount || 0
+                            ),
+
+                        appliedLineDiscountId:
+                            sourceItem.appliedLineDiscountId
+                                ? Number(
+                                    sourceItem.appliedLineDiscountId
+                                )
+                                : null,
+
+                        gstPercentage:
+                            Number(
+                                sourceItem.gstPercentage || 0
+                            ),
+
+                        totalItemAmount:
+                            Number(
+                                sourceItem.totalItemAmount || 0
+                            )
+                    });
+
+
+                revisedItems.push(item);
+            }
+
+
+            await quotationItemRepo.save(
+                revisedItems
+            );
+
+
+            // =========================================================
+            // 7. Synchronize originating Client RFQ
+            //
+            // COUNTER_OFFERED / REVISED means negotiation is active.
+            // =========================================================
+
+            if (existingQuote.originatingClientRfqId) {
+
+                const rfq =
+                    await rfqRepo.findOne({
+                        where: {
+                            id:
+                                existingQuote.originatingClientRfqId,
+
+                            tenantId
+                        }
+                    });
+
+
+                if (!rfq) {
+
+                    throw new Error(
+                        `Originating Client RFQ #${
+                            existingQuote.originatingClientRfqId
+                        } not found.`
+                    );
+                }
+
+
+                rfq.status =
+                    RFQStatus.IN_NEGOTIATION;
+
+
+                await rfqRepo.save(
+                    rfq
+                );
+            }
+
+
+            // =========================================================
+            // 8. Reload complete revised quotation
+            // =========================================================
+
+            return await quotationRepo.findOneOrFail({
+
+                where: {
+                    id: savedRevision.id,
+                    tenantId
+                },
+
+                relations: [
+                    'client',
+                    'items',
+                    'items.product'
+                ]
+
+            });
+
+        }
+    );
+}
 // RFQ -> Quotation
 async convertRFQToQuotation(
     tenantId: number,

@@ -44,12 +44,23 @@ export class SalesOrderItem {
     @Column({ type: 'decimal', precision: 10, scale: 2, default: 1.00 })
     quantity!: number;
 
-    // UNIFIED: Renamed database column metadata target from 'finalPrice' to 'finalPrice' to match Purchase convention precisely
-    @Column({ name: 'finalPrice', type: 'decimal', precision: 10, scale: 2, default: 0.00, transformer: {
+
+    @Column({ name: 'gst_percentage', type: 'decimal', precision: 5, scale: 2, default: 0.00 })
+    gstPercentage!: number;
+    
+    // UNIFIED: Renamed database column metadata target from 'customPrice' to 'customPrice' to match Purchase convention precisely
+    @Column({ name: 'customPrice', type: 'decimal', precision: 10, scale: 2, default: 0.00, transformer: {
     to: (value: number) => value,
     from: (value: string) => parseFloat(value)
   } })
-    finalPrice!: number; 
+    customPrice!: number; 
+
+    @Column({ name: "target_price", type: "decimal", precision: 12, scale: 2, nullable: true })
+    targetPrice!: number | null;
+
+
+    @Column({ name: 'discount', type: 'decimal', precision: 12, scale: 2, default: 0.00 })
+    discount!: number; // Store total calculated currency reduction amount here
 
     // UNIFIED: Shifted property parameters from 'saleUom nvarchar' over to 'sales_uom varchar' matching purchase_uom
     @Column({ name: 'sales_uom', type: 'varchar', length: 20, nullable: true })

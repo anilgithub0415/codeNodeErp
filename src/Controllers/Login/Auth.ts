@@ -31,7 +31,7 @@ export const auth = (req: Request, res: Response, next: NextFunction) => {
       // to allow with invalid pasword inside userservice : if (!!isPasswordValid) { retrun null } return user
       
       // if u will forgive here by request for contains '/api', u will not get req.user while saving
-    // (req.originalUrl.includes('/api/') )||
+// (req.originalUrl.includes('/api/') )||  
         (req.originalUrl === '/api/login' && req.method === 'POST') ||
         (req.originalUrl.includes('/api/token') && req.method === 'POST') ||
         (req.originalUrl === '/api/signup' && req.method === 'POST') ||

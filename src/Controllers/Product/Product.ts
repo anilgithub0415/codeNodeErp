@@ -46,8 +46,7 @@ router.route('')
                 createdByUserId: loggedInUserId    
             };
 
-            console.log('Sanitised Payload Context Body:', secureProductPayload);
-
+            
             const product = await productService.createProduct(secureProductPayload);
             return res.status(201).json(product);
         } catch (error: any) {
@@ -69,8 +68,7 @@ router.route('')
                 tenantId: loggedInTenantId
             };
 
-            console.log('Sanitised PUT Payload Body:', secureProductPayload);
-
+        
             const updatedProduct = await productService.updateProduct(secureProductPayload);
             return res.status(200).json(updatedProduct);
         } catch (error: any) {
@@ -88,7 +86,6 @@ router.route('/withvariant')
                console.log('Basic validation fail like product name, base_price missing');
             }
 
-            console.log('posting withvariant body:', req.body);
             const product = await productTempService.createProductTemplate(req.body);
             return res.status(201).json(product);
         } catch (error: any) {
@@ -142,26 +139,78 @@ router.route('/withvariant/:tenantId')
             return res.status(500).json({ "message": "Failed to retrieve products: " + error.message });
         }
     });
-
 // --- Route: /product/finalPrice/:id/:tenantId/:custId
 router.route('/finalPrice/:id/:tenantId/:custId')
     .post(async (req: Request, res: Response) => {
+
         try {
+
             const p = req.body;
-            console.log('i got p:', p);
-            
-            const prodId = parseInt(req.params.id);
+        
+
+            const productId = parseInt(req.params.id);
             const tenantId = parseInt(req.params.tenantId);
-            const custId = parseInt(req.params.custId);
+            const customerId = parseInt(req.params.custId);
 
-            const priceCalcService = new PriceCalculationService(); 
-            const finalPrice = (await priceCalcService.calculateLinePrice(tenantId,  custId, p)).sellingPrice
+            if (isNaN(productId)) {
+                return res.status(400).json({
+                    message: 'Invalid product ID.'
+                });
+            }
 
-            return res.status(200).json(finalPrice);
-        } catch (error: any) {
-            console.error('Failed to calculatefinalprice of product:', error.message || error);
-            return res.status(500).json({ "message": "Failed to calculatefinalprice of product: " + error.message });
+            if (isNaN(tenantId)) {
+                return res.status(400).json({
+                    message: 'Invalid tenant ID.'
+                });
+            }
+
+            if (isNaN(customerId)) {
+                return res.status(400).json({
+                    message: 'Invalid customer ID.'
+                });
+            }
+
+            const priceCalcService =
+                new PriceCalculationService();
+
+            const pricingRequest = {
+
+                ...p,
+
+                // The selected sellable item.
+                // Its interpretation is determined by
+                // Product_FlatOrvariant tenant strategy.
+                productId
+
+            };
+
+            const pricingResult =
+                await priceCalcService.calculateLinePrice(
+                    tenantId,
+                    customerId,
+                    pricingRequest
+                );
+
+            return res.status(200).json(
+                pricingResult.sellingPrice
+            );
+
         }
+        catch (error: any) {
+
+            console.error(
+                'Failed to calculate final price:',
+                error.message || error
+            );
+
+            return res.status(500).json({
+                message:
+                    'Failed to calculate final price: ' +
+                    (error.message || error)
+            });
+
+        }
+
     });
 
 // --- Route: /product/:tenantId  <--- THIS MUST SIT ABOVE /:tenantId/:id
@@ -196,7 +245,7 @@ router.route('/:tenantId/:id')
             }
 
             const productService = getProductRepository(); 
-            console.log('hitting get product with id:', prodId);
+        
         
             const aProduct = await productService.getProduct(tenantId, prodId);
             return res.status(200).json(aProduct);

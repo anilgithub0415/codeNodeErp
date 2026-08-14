@@ -39,7 +39,7 @@ console.log('found customerCategory :',customerCategory,' of custid:',customerId
          //hook for single product pricing
          var hookName='A_Product_Pricing_Rule'
          const processedProduct=await this.hookBroker.executeHook(hookName,tenantId,p);        
-         console.log('finalprice:',processedProduct.finalPrice);
+      
          
          return processedProduct.finalPrice; 
 

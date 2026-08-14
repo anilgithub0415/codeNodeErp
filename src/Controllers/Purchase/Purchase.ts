@@ -78,7 +78,7 @@ router.use((req, res, next) => {
         var productVariantId=parseInt(req.params.productVariantId);
 
             const rulesMatrix = await purchaseService.fetchTenantRulesMatrix(tenantId,productId,productVariantId);
-            //console.log('rulesMatrix:',rulesMatrix);
+          
             
              res.status(200).json(rulesMatrix);
         } catch (error: any) {

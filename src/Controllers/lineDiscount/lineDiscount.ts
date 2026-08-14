@@ -65,7 +65,7 @@ router.route('/:tenantId').get(async (req: Request, res: Response) => {
 
 router.route('').post(async (req: Request<{}, {}, CreateDiscountRequestBody>, res: Response) => {
     try {
-        console.log('....................posting new disount:',req.body);
+       
         
         const discountService = getLineDiscountRepository();
 

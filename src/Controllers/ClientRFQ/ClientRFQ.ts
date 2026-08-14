@@ -2,11 +2,46 @@ import { Router, Request, Response } from 'express';
 import {  getClientRFQOrderRepository } from '../../dependencies'; // Replace with your standard DI lookup wrappers
 import { authorizeRoles } from '../Login/authorizeRoles';
 import { AppDataSource } from '../../../data-source';
-import { ClientRFQOrder } from '../../entity/ClientRFQOrder';
+import { ClientRFQOrder, RFQStatus } from '../../entity/ClientRFQOrder';
+import { IClientRFQActions } from '../../services/ClientRFQWorkflowService';
+
+
+
 
 const router = Router();
 
 
+router.get(
+    "/:id/workflow",
+    async(req,res,next)=>{
+
+
+        console.log('........hitting /:id/workflow');
+        
+
+        try{
+
+            const tenantId=req.user.tenantId;
+
+            const rfqId=Number(req.params.id);
+  const rfqService = getClientRFQOrderRepository(); 
+            const result=
+                await rfqService.getWorkflow(
+                    rfqId,
+                    tenantId
+                );
+
+            res.json(result);
+
+        }
+        catch(ex){
+
+            next(ex);
+
+        }
+
+    }
+);
 //
 //Pending: In all Endpoints, Better to use below type of Secure boundary identification locks: 
 // const loggedInTenantId = req.user.tenantId; // Secure boundary identification lock
@@ -19,8 +54,7 @@ const router = Router();
 // =====================================================================
 router.route('').get(async (req: Request, res: Response) => {
     try {
-        console.log('.....only get is working..........................................................................');
-        
+              
         const clientPoService = getClientRFQOrderRepository();
 
         // 1. Extract values safely from request query parameters
@@ -44,11 +78,11 @@ router.route('').get(async (req: Request, res: Response) => {
             return res.status(400).json({ message: 'Invalid tenant identification parameters supplied.' });
         }
 
-        console.log(`Extracting registers for Tenant: ${tenantId}, Site: ${siteId}, Client: ${clientId}, Statuses: ${statuses}`);
+       
 
         // 2. Fetch the dynamic dataset array updated with the statuses parameter
         const resultList = await clientPoService.getClientRFQsFiltered(tenantId, siteId, clientId, statuses);
-        console.log(resultList);
+       
 
         return res.status(200).json(resultList);
     } catch (error: any) {
@@ -63,7 +97,7 @@ router.route('').get(async (req: Request, res: Response) => {
 // =====================================================================
 router.route('').get(authorizeRoles('Site_Supervisor', 'Client'),async (req: Request, res: Response) => {
     try {
-        console.log('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+     
         const clientPoService = getClientRFQOrderRepository();
         const loggedInTenantId = req.user.tenantId; // Secure boundary identification lock
 
@@ -122,7 +156,7 @@ router.route('/:id').delete(async (req: Request, res: Response) => {
 // ==========================================
 router.route('').post(async (req: Request, res: Response) => {
     try {
-        console.log('..........................posting client PO.................', req.body);
+        
         
         const clientPoService = getClientRFQOrderRepository();
 
@@ -136,8 +170,7 @@ router.route('').post(async (req: Request, res: Response) => {
   
         const loggedInTenantId = req.user.tenantId;
 
-        console.log('middle step......................................');
-        
+              
         // Process line items carefully
         let sanitizedItems;
         try {
@@ -163,8 +196,7 @@ router.route('').post(async (req: Request, res: Response) => {
             return res.status(400).json({ message: validationErr.message });
         }
 
-        console.log('second middle step......................................');
-               console.log('second middle step......................................');
+      
         const securePayload = {
             tenantId: loggedInTenantId,
             clientId: Number(req.body.clientId),
@@ -177,7 +209,6 @@ router.route('').post(async (req: Request, res: Response) => {
         };
 
 
-        console.log('..........................posting client PO.................', securePayload);
 
         // Add type assertion at the method call boundary
         const result = await clientPoService.createClientRFQOrder(securePayload as any);
@@ -287,7 +318,8 @@ router.route('/:id/approve').post(async (req: Request, res: Response) => {
         }
 
         // Pass payload downstream to the updated service method
-        const result = await clientPoService.processRFQApproval(poId, loggedInTenantId, action, sanitizedItems);
+       // const result = await clientPoService.processRFQApproval(poId, loggedInTenantId, action, sanitizedItems);
+        const result = await clientPoService.processRFQApproval(poId, loggedInTenantId);
         return res.status(200).json(result);
 
     } catch (error: any) {
@@ -298,14 +330,17 @@ router.route('/:id/approve').post(async (req: Request, res: Response) => {
 
 router.route('/:id/send').post(async (req: Request, res: Response) => {
 try {
+
+    console.log('........................running send RFQ.........');
+    
 const clientPoService = getClientRFQOrderRepository();
 const poId = Number(req.params.id);
 const loggedInTenantId = req.user.tenantId;
 const { action, items } = req.body; 
 
 // 🚦 Strict API Validation for the Action Header
-if (action !== 'SENT') {
-    return res.status(400).json({ message: 'Invalid action. Must be SENT.' });
+if (action !== 'SUBMITTED') {
+    return res.status(400).json({ message: 'Invalid action. Must be SUBMITTED.' });
 }
 
 // 📑 Sanitize items if modifications are bundled with the send request
@@ -332,7 +367,7 @@ if (items) {
 }
 
 // Pass payload downstream to the updated service method
-const result = await clientPoService.processRFQDispatch(poId, loggedInTenantId, action, sanitizedItems);
+const result = await clientPoService.processRFQSubmission(poId, loggedInTenantId, action, sanitizedItems);
 return res.status(200).json(result);
 
 } catch (error: any) {

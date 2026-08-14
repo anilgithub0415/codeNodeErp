@@ -141,7 +141,7 @@ import { LineDiscount } from './LineDiscount'; // 🌟 Import line discount enti
   (("product_id" IS NOT NULL AND "product_variant_id" IS NULL) OR ("product_id" IS NULL AND "product_variant_id" IS NOT NULL))
   AND "quantity" >= 0 
   AND "gst_percentage" >= 0 
-  AND "price" >= 0 
+  AND "customPrice" >= 0 
   AND "discount" >= 0 
   AND "total_item_amount" >= 0
 `)
@@ -197,8 +197,8 @@ export class QuotationItem {
     @Column({ name: 'gst_percentage', type: 'decimal', precision: 5, scale: 2, default: 0.00 })
     gstPercentage!: number;
 
-    @Column({ name: 'price', type: 'decimal', precision: 12, scale: 2, default: 0.00 })
-    price!: number;
+    @Column({ name: 'customPrice', type: 'decimal', precision: 12, scale: 2, default: 0.00 })
+    customPrice!: number;
 
     @Column({ name: "target_price", type: "decimal", precision: 12, scale: 2, nullable: true })
     targetPrice!: number | null;

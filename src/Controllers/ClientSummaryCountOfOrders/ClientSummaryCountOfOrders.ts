@@ -51,12 +51,12 @@ router.route('/summary').get(async (req: Request, res: Response) => {
             },
             clientRFQs: {
                 DRAFT: rfqCounts[RFQStatus.DRAFT] || 0,
-                PENDING_APPROVAL: rfqCounts[RFQStatus.PENDING_APPROVAL] || 0,
-                APPROVED: rfqCounts[RFQStatus.APPROVED] || 0,
-                SENT: rfqCounts[RFQStatus.SENT] || 0,
-                PARTIALLY_RECEIVED: rfqCounts[RFQStatus.PARTIALLY_QUOTED] || 0,
-                CLOSED: rfqCounts[RFQStatus.CLOSED] || 0,
-                CANCELLED: rfqCounts[RFQStatus.CANCELLED] || 0
+               //ENDING_APPROVAL: rfqCounts[RFQStatus.PENDING_APPROVAL] || 0,
+                APPROVED: rfqCounts[RFQStatus.QUOTED] || 0,
+                SENT: rfqCounts[RFQStatus.SUBMITTED] || 0,
+                //RTIALLY_RECEIVED: rfqCounts[RFQStatus.PARTIALLY_QUOTED] || 0,
+                //OSED: rfqCounts[RFQStatus.CLOSED] || 0,
+               //ANCELLED: rfqCounts[RFQStatus.CANCELLED] || 0
             },
              sales: {
                 DRAFT: salesCounts[Client_POStatus.DRAFT] || 0,

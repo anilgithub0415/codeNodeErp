@@ -55,8 +55,7 @@ router.route('')
                return res.status(400).json({ message: 'tenantId and leadSource are required fields.' });
             }
 
-            console.log('.........................................................leadsource body:', req.body);
-
+         
             const result = await leadsourceService.createLeadsource(req.body);
             res.status(201).json(result);
         } catch (error: any) {

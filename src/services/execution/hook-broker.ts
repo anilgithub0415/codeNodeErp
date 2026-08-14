@@ -13,9 +13,11 @@ export class HookBroker{
     }
 
     public async executeHook(scriptName:string, tenantId:number,context:any):Promise<any>{
+
         var customScript =await this.getTenantSript(tenantId, scriptName);
-       
-        console.log('context:',context);
+  
+        
+        
         
  //customScript="item=context; const category = context.customerCategory;  if(category== 'B2C' && item.customAttributes?.tier_prices?.B2C_price){     item.finalPrice = item.customAttributes?.tier_prices.B2C_price;     }     else if (category== 'B2B'  && item.customAttributes?.tier_prices?.B2B_price){      item.finalPrice = item.customAttributes?.tier_prices.B2B_price;  }      else if (category== 'B2BC'  && item.customAttributes?.tier_prices?.B2BC_price){      item.finalPrice = item.customAttributes?.tier_prices.B2BC_price;  }      else {   item.finalPrice=item.basePrice;   }         item;"
  //customScript='const item = context.product; const category = context.customerCategory; if (category === "B2C" && item.customAttributes?.tier_prices?.B2C_price) {    item.finalPrice = item.customAttributes.tier_prices.B2C_price;}else if (    category === "B2B" &&   item.customAttributes?.tier_prices?.B2B_price) {    item.finalPrice = item.customAttributes.tier_prices.B2B_price;}else if (    category === "B2BC" &&    item.customAttributes?.tier_prices?.B2BC_price) {    item.finalPrice = item.customAttributes.tier_prices.B2BC_price;} else {    item.finalPrice = item.basePrice;}return 0;'
@@ -23,9 +25,9 @@ export class HookBroker{
 //{ sellingPrice: 222}
 
 //Pending: Just change script named: A_Product_Pricing_Rule replace item = context with item = context.product 
-customScript='item = context.product;  const category = context.customerCategory;  if(category== "B2C" && item.customAttributes?.tier_prices?.B2C_price){     item.finalPrice = item.customAttributes?.tier_prices.B2C_price;     }   else if (category== "B2B"  && item.customAttributes?.tier_prices?.B2B_price){      item.finalPrice = item.customAttributes?.tier_prices.B2B_price;  }     else if (category== "B2BC"  && item.customAttributes?.tier_prices?.B2BC_price){      item.finalPrice = item.customAttributes?.tier_prices.B2BC_price;  }     else {   item.finalPrice = item.basePrice   } '
-
- console.log(customScript);
+//customScript='item = context.product;  const category = context.customerCategory;  if(category== "B2C" && item.customAttributes?.tier_prices?.B2C_price){     item.finalPrice = item.customAttributes?.tier_prices.B2C_price;     }   else if (category== "B2B"  && item.customAttributes?.tier_prices?.B2B_price){      item.finalPrice = item.customAttributes?.tier_prices.B2B_price;  }     else if (category== "B2BC"  && item.customAttributes?.tier_prices?.B2BC_price){      item.finalPrice = item.customAttributes?.tier_prices.B2BC_price;  }     else {   item.finalPrice = item.basePrice   } '
+//customScript='item = context.product;  const category = context.customerCategory;  if(category== "B2C" && item.customAttributes?.tier_prices?.B2C_price){     item.customPrice = item.customAttributes?.tier_prices.B2C_price;     }   else if (category== "B2B"  && item.customAttributes?.tier_prices?.B2B_price){      item.customPrice = item.customAttributes?.tier_prices.B2B_price;  }     else if (category== "B2BC"  && item.customAttributes?.tier_prices?.B2BC_price){      item.customPrice = item.customAttributes?.tier_prices.B2BC_price;  }     else {   item.customPrice = item.basePrice   } '
+// console.log(customScript);
  
          if (!customScript) { console.log('Invalid script is here.................................');
          
