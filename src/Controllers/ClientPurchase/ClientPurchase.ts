@@ -8,6 +8,34 @@ const router = Router();
 
 
 
+
+router.route('/:id').get(async (req: Request, res: Response) => {
+    try {
+        
+        
+        const clientPoService = getClientPurchaseOrderRepository();
+
+        // 1. Extract values safely from request query parameters
+        const tenantId = req.query.activeTenantId ? parseInt(req.query.activeTenantId as string, 10) : 1; 
+
+        const id =parseInt( req.params.id);
+      
+
+      
+
+        if (isNaN(tenantId)) {
+            return res.status(400).json({ message: 'Invalid tenant identification parameters supplied.' });
+        }
+
+        const result = await clientPoService.getClientPO(tenantId,  id);
+
+        return res.status(200).json(result);
+    } catch (error: any) {
+        console.error('[CPO Listing Fetch Error]:', error.message);
+        return res.status(400).json({ message: 'Failed to read document registries: ' + error.message });
+    }
+});
+
 // =====================================================================
 // GET: EXTRACT LIST REGISTERS BY TENANT, SITE, CLIENT, AND STATUS FILTER
 // =====================================================================

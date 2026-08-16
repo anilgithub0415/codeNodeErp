@@ -1,5 +1,6 @@
 
 import { getTenantStrategyServiceRepository } from "../dependencies";
+import { Client_POStatus } from "../entity/ClientPurchaseOrder";
 import { RFQStatus } from "../entity/ClientRFQOrder";
 
 export enum ClientRFQWorkflowType {
@@ -15,6 +16,11 @@ interface WorkflowNode {
 
     next: RFQStatus[];
 }
+
+
+
+
+
 export interface IClientRFQActions {
     canEdit: boolean;
     canDelete: boolean;
