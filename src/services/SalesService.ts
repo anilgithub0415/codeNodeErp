@@ -1,6 +1,6 @@
 import { EntityManager, Not, Repository } from 'typeorm';
 import { AppDataSource } from '../../data-source'; 
-import { SalesOrder } from '../entity/SalesOrder';
+import { SalesOrder, SOStatus } from '../entity/SalesOrder';
 import { SalesOrderItem } from '../entity/SalesOrderItem';
 import { Product } from '../entity/Product';
 import { DocumentSequence } from '../entity/DocumentSequence';
@@ -10,7 +10,9 @@ import { CustomerCategory } from '../entity/CustomerCategory';
 import { CustomerCategoryMapping } from '../entity/CustomerCategoryMapping';
 import { ProductVariant } from '../entity/productVariant';
 import { ProductUomConversion } from '../entity/ProductUomConversion';
-import { getProductRepository, getProductUomConversionRepository, getProductVariantRepository } from '../dependencies';
+import { getProductRepository, getProductUomConversionRepository, getProductVariantRepository, getTenantStrategyServiceRepository } from '../dependencies';
+import { ISalesActions, SalesWorkflowService, SalesWorkflowType } from './SalesWorkflowService';
+import { Client_POStatus, ClientPurchaseOrder } from '../entity/ClientPurchaseOrder';
 
 export interface ICreateSalesItemInput {
     productId?: number | null;
@@ -40,13 +42,100 @@ export interface CreatedSalesOrderResponse {
     salesOrder: SalesOrder;
 }
 
+export interface SalesWorkflowDto{
+
+    salesId:number;
+
+    status:SOStatus;
+
+    actions:ISalesActions;
+
+}
 export class SalesService {
     private salesRepository!: Repository<SalesOrder>;
+    private workflowService = new SalesWorkflowService();
 
     async init(salesRepo: Repository<SalesOrder>): Promise<void> {
         this.salesRepository = salesRepo;
         console.log("SalesService repository initialized.");       
     }
+      public async getWorkflow(
+        quotationId:number,
+        tenantId:number
+        ):Promise<SalesWorkflowDto>{
+    
+            const salesorder = await this.salesRepository.findOne({
+    
+                where:{
+                    id:quotationId,
+                    tenantId
+                }
+    
+            });
+    
+            if(!salesorder){
+    
+                throw new Error("Salesorder not found.");
+    
+            }
+    
+    
+             const tenantStrategyService =
+                    getTenantStrategyServiceRepository();
+    
+             const strategies =
+            await tenantStrategyService
+                .getTenantStrategies(tenantId);
+    
+        const workflowStrategy =
+            strategies.find(
+                s =>
+                    s.tenantStrategyName ===
+                    "Sales_Workflow"
+            );
+    
+        if (!workflowStrategy) {
+            throw new Error(
+                "Sales Workflow not configured."
+            );
+        }
+    
+        const workflowName =
+            workflowStrategy.tenantStrategy;
+    
+           const workflowType=this.toSalesWorkflowType(workflowName) 
+            return{
+    
+                salesId:salesorder.id,
+    
+                status:salesorder.status,
+    
+                actions: await this.workflowService.getAllowedActions(workflowType,
+                    salesorder.status
+                )
+    
+            };
+    
+        }
+
+
+            //helper function to map Quotation_Workflow strategy to enum
+             toSalesWorkflowType(
+            value: string
+        ): SalesWorkflowType {
+        
+            if (
+                Object.values(SalesWorkflowType)
+                    .includes(value as SalesWorkflowType)
+            ) {
+                return value as SalesWorkflowType;
+            }
+        
+            throw new Error(
+                `Unsupported Quotation Workflow strategy: ${value}`
+            );
+        }
+
     async createSalesOrder(
         createDto: CreateSalesOrderDto,
         manager?: EntityManager
@@ -264,6 +353,224 @@ console.log('yes existing sales......enrichedItems:',enrichedItems);
             if (!isExternalTransaction && queryRunner) await queryRunner.release();
         }
     }
+
+    public async sendSalesOrder(
+    salesOrderId: number,
+    tenantId: number
+): Promise<SalesOrder> {
+
+    const queryRunner =
+        AppDataSource.createQueryRunner();
+
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+
+        const manager =
+            queryRunner.manager;
+
+
+        // =====================================================
+        // 1. Repositories
+        // =====================================================
+
+        const salesOrderRepo =
+            manager.getRepository(
+                SalesOrder
+            );
+
+        const clientPORepo =
+            manager.getRepository(
+                ClientPurchaseOrder
+            );
+
+
+        // =====================================================
+        // 2. Fetch Sales Order
+        // =====================================================
+
+        const salesOrder =
+            await salesOrderRepo.findOne({
+
+                where: {
+                    id: salesOrderId,
+                    tenantId
+                },
+
+                relations: [
+                    'items'
+                ]
+
+            });
+
+
+        if (!salesOrder) {
+
+            throw new Error(
+                'Sales Order not found or unauthorized.'
+            );
+
+        }
+
+
+        // =====================================================
+        // 3. Resolve Sales workflow
+        // =====================================================
+
+        const workflowService =
+            new SalesWorkflowService();
+
+        const workflowType =
+            await workflowService.resolveWorkflowType(
+                tenantId
+            );
+
+
+        // =====================================================
+        // 4. Validate SEND transition
+        // =====================================================
+
+        workflowService.ensureCanSend(
+            workflowType,
+            salesOrder.status
+        );
+
+
+        // =====================================================
+        // 5. Sales Order → SENT
+        // =====================================================
+
+        salesOrder.status =
+            SOStatus.SENT;
+
+        await salesOrderRepo.save(
+            salesOrder
+        );
+
+
+        // =====================================================
+        // 6. Close originating Client PO
+        //
+        // Only Sales Orders created from a Client PO
+        // have clientPurchaseOrderId.
+        //
+        // Manual Sales Orders have:
+        //
+        //     clientPurchaseOrderId = null
+        //
+        // Therefore manual Sales Orders do not trigger
+        // any Client PO update.
+        // =====================================================
+
+        if (salesOrder.clientPurchaseOrderId) {
+
+            const clientPO =
+                await clientPORepo.findOne({
+
+                    where: {
+                        id:
+                            salesOrder.clientPurchaseOrderId,
+
+                        tenantId
+                    }
+
+                });
+
+
+            if (!clientPO) {
+
+                throw new Error(
+                    'Originating Client Purchase Order not found.'
+                );
+
+            }
+
+
+            // =================================================
+            // Validate Client PO conversion
+            // =================================================
+
+            if (!clientPO.isConvertedToSales) {
+
+                throw new Error(
+                    'Client Purchase Order has not been marked as converted to Sales Order.'
+                );
+
+            }
+
+
+            // =================================================
+            // Client PO → CLOSED
+            // =================================================
+
+            clientPO.status =
+                Client_POStatus.CLOSED;
+
+            await clientPORepo.save(
+                clientPO
+            );
+
+        }
+
+
+        // =====================================================
+        // 7. Reload clean Sales Order
+        // =====================================================
+
+        const cleanSalesOrder =
+            await salesOrderRepo.findOne({
+
+                where: {
+                    id: salesOrder.id,
+                    tenantId
+                },
+
+                relations: [
+                    'items'
+                ]
+
+            });
+
+
+        if (!cleanSalesOrder) {
+
+            throw new Error(
+                'Failed to reload processed Sales Order.'
+            );
+
+        }
+
+
+        // =====================================================
+        // 8. Commit transaction
+        // =====================================================
+
+        await queryRunner.commitTransaction();
+
+
+        return cleanSalesOrder;
+
+    }
+    catch (error: any) {
+
+        await queryRunner.rollbackTransaction();
+
+        console.error(
+            '[SalesOrder Send Transaction Rollback]:',
+            error.message || error
+        );
+
+        throw error;
+
+    }
+    finally {
+
+        await queryRunner.release();
+
+    }
+
+}
     /**
      * Strict DELETE/CANCEL Action: Asserts lifecycle conditions using the immutable soNumber. 
      * Hard deletes the entry if in 'DRAFT' status (skipping stock adjustments as drafts do not touch inventory); 
@@ -649,9 +956,11 @@ console.log('yes existing sales......enrichedItems:',enrichedItems);
 async updateSalesOrderStatus(
     soId: number,
     tenantId: number,
-    newStatus: string, // Passes "PENDING_APPROVAL"
+    newStatus: SOStatus, // Passes "PENDING_APPROVAL"
     manager?: EntityManager
 ): Promise<SalesOrder> {
+
+     console.log('......hitting sales service update...................');
     const activeManager = manager ? manager : AppDataSource.manager;
     const salesRepo = activeManager.getRepository(SalesOrder);
 
@@ -664,9 +973,7 @@ async updateSalesOrderStatus(
         throw new Error(`[SalesService] Sales Order not found for ID: ${soId}`);
     }
 
-    if (targetSO.status !== 'DRAFT') {
-        throw new Error(`[SalesService] Only DRAFT sales orders can be submitted for approval.`);
-    }
+    
 
     targetSO.status = newStatus;
     return await salesRepo.save(targetSO);
@@ -704,10 +1011,7 @@ async approvePendingSalesOrder(
             throw new Error(`[SalesService] Sales Order not found for ID: ${soId}`);
         }
 
-        // State Change Check: Make sure it's coming from PENDING_APPROVAL now
-        if (targetSO.status !== 'PENDING_APPROVAL') {
-            throw new Error(`[SalesService] Sales Order cannot be approved. Current status is '${targetSO.status}', expected 'PENDING_APPROVAL'.`);
-        }
+        
 
         console.log(`[SalesService] Approving Sales Order: ${targetSO.soNumber}`);
 
@@ -715,7 +1019,7 @@ async approvePendingSalesOrder(
         const finalizedSO = await salesRepo.save(targetSO);
 
         // 🔥 Deduct Stock: Runs your deep conversion factor and safety validation checks
-        await this.decrementProductStock(activeManager, tenantId, finalizedSO.items);
+       // await this.decrementProductStock(activeManager, tenantId, finalizedSO.items);
 
         if (!isExternalTransaction && queryRunner) {
             await queryRunner.commitTransaction();

@@ -10,7 +10,8 @@ export enum SOStatus {
     PENDING_APPROVAL = "PENDING_APPROVAL",
     APPROVED = "APPROVED",
     SENT = "SENT",
-    PARTIALLY_RECEIVED = "PARTIALLY_RECEIVED",
+    PARTIALLY_DELIVERED = "PARTIALLY_DELIVERED",
+    DELIVERED="DELIVERED",
     CLOSED = "CLOSED",
     CANCELLED = "CANCELLED"
 }
@@ -94,8 +95,12 @@ export class SalesOrder{
     @JoinColumn({ name: 'siteId' })
     site!: Site;
 
-    @Column({ default: 'draft' })
-    status!: string;
+       @Column({
+            type: "varchar",
+            length: 25,
+            default: SOStatus.DRAFT
+        })
+        status!: SOStatus;
 
     @Column({ name: "sub_total", type: "decimal", precision: 10, scale: 2, default: 0 })
     subTotal!: number;

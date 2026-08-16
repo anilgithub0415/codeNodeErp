@@ -8,10 +8,10 @@ export enum Client_POStatus {
     SENT = "SENT",
     PARTIALLY_FULFILLED = "PARTIALLY_FULFILLED",
     FULFILLED ='FULFILLED',
-    CLOSED = "CLOSED",
+    CLOSED = "CLOSED", 
     CANCELLED = "CANCELLED"
 }
-@Check(`status IN ('DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'SENT', 'PARTIALLY_FULFILLED', 'FULFILLED', 'CLOSED', 'CANCELLED')`)
+@Check(`status IN ('DRAFT', 'SUBMITTED', 'PENDING_APPROVAL', 'APPROVED', 'SENT', 'PARTIALLY_FULFILLED', 'FULFILLED', 'CLOSED', 'CANCELLED')`)
 
 //few more statuses://'PENDING_REVIEW' | 'ACCEPTED' | 'REJECTED' | 'PARTIALLY_CONVERTED';
 
@@ -44,8 +44,8 @@ siteId!: number | null; // 👈 Make sure this camelCase variable exists!
     @Column({ name: 'po_date', type: 'date' })
     poDate!: Date | null; 
 
-    @Column({ name: 'requested_delivery_date', type: 'date', nullable: true })
-    requestedDeliveryDate!: Date;
+    @Column({ name: 'requested_delivery_date', type: 'datetime', nullable: true })
+    requestedDeliveryDate!: Date | null;
 
    
 
