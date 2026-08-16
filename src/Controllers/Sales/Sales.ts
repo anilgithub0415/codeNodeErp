@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
-import { getSalesOrderRepository} from '../../dependencies'
+import {  getClientPurchaseOrderRepository, getSalesOrderRepository} from '../../dependencies'
 import { AppDataSource } from '../../../data-source';
-import { SalesOrder } from '../../entity/SalesOrder';
+import { SalesOrder, SOStatus } from '../../entity/SalesOrder';
 
 const router = Router();
 // Middleware to ensure settingsService is available (optional, but good for clarity)
@@ -17,6 +17,35 @@ router.use((req, res, next) => {
         res.status(500).json({ message: 'Server initialization error. Sales service not ready.' });
     }
 }); 
+
+
+router.get(
+    "/:id/workflow",
+    async(req,res,next)=>{
+
+        try{
+
+            const tenantId=req.user.tenantId;
+
+            const quotationId=Number(req.params.id);
+            const salesService = getSalesOrderRepository(); 
+            const result=
+                await salesService.getWorkflow(
+                    quotationId,
+                    tenantId
+                );
+
+            res.json(result);
+
+        }
+        catch(ex){
+
+            next(ex);
+
+        }
+
+    }
+);
 
 router.route('/:tenantId/:id')
     .get(async (req: Request, res: Response) => {
@@ -94,7 +123,7 @@ router.route('/SOautonumering')
         const newOrder = new SalesOrder();
         newOrder.soNumber = generatedSoNumber;
         newOrder.siteId = customerId;
-        newOrder.status = "DRAFT"; // Set standard initial status
+        newOrder.status = SOStatus.DRAFT; // Set standard initial status
 
         // Persist the order 
         const savedOrder = await queryRunner.manager.save(SalesOrder, newOrder);
@@ -293,11 +322,45 @@ router.route('/:id/finalize').patch(async (req: Request, res: Response) => {
         const result = await salesService.updateSalesOrderStatus(
             targetSoId,
             loggedInTenantId,
-            "PENDING_APPROVAL"
+            SOStatus.PENDING_APPROVAL
         );
         return res.status(200).json(result);
     } catch (error: any) {
         return res.status(400).json({ message: 'Submission failed: ' + error.message });
+    }
+});
+
+
+router.route('/:id/send').patch(async (req: Request, res: Response) => {
+    try {
+       
+        
+        const salesService = getSalesOrderRepository(); 
+        const targetQuoteId = parseInt(req.params.id, 10);
+
+        if (isNaN(targetQuoteId)) {
+            return res.status(400).json({ message: 'Invalid identity tracking index.' });
+        }
+
+        const loggedInTenantId = parseInt(req.user.tenantId, 10);
+
+        // Transition the sales cleanly to SENT status
+        const updatedSales = await salesService.sendSalesOrder(
+            targetQuoteId,
+            loggedInTenantId
+          
+        );
+
+        //------------------Close mark ClientPO here-------------
+
+        //------------------
+
+        return res.status(200).json({
+            message: `Sales has been successfully sent to the client.`,
+            sales: updatedSales
+        });
+    } catch (error: any) {
+        return res.status(400).json({ message: 'Failed to send sales: ' + error.message });
     }
 });
 
@@ -314,6 +377,8 @@ router.route('/:id/approve').patch(async (req: Request, res: Response) => {
             targetSoId,
             loggedInTenantId
         );
+        console.log('........after Approving coming back..............');
+        
         return res.status(200).json(result);
     } catch (error: any) {
         return res.status(400).json({ message: 'Approval failed: ' + error.message });

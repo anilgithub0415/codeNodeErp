@@ -8,6 +8,37 @@ const router = Router();
 
 
 
+router.get(
+    "/:id/workflow",
+    async(req,res,next)=>{
+
+
+        console.log('........hitting /:id/workflow');
+        
+
+        try{
+
+            const tenantId=req.user.tenantId;
+
+            const rfqId=Number(req.params.id);
+  const clPOService = getClientPurchaseOrderRepository(); 
+            const result=
+                await clPOService.getWorkflow(
+                    rfqId,
+                    tenantId
+                );
+
+            res.json(result);
+
+        }
+        catch(ex){
+
+            next(ex);
+
+        }
+
+    }
+);
 
 router.route('/:id').get(async (req: Request, res: Response) => {
     try {
