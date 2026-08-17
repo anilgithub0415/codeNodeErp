@@ -92,6 +92,9 @@ export enum PricingStrategies {
   (tenant_strategy_name = 'Sales_Workflow' AND tenant_strategy IN ('STANDARD_APPROVAL', 'AUTO_DISPATCH'))
   OR
   (tenant_strategy_name = 'ClientPO_Workflow' AND tenant_strategy IN ('STANDARD'))
+  
+  OR
+  (tenant_strategy_name = 'Purchase_Workflow' AND tenant_strategy IN ('STANDARD_APPROVAL', 'AUTO_DISPATCH'))
 `)
 @Entity({ name: 'TenantStrategy' }) 
 @Unique(['tenantStrategyName'])
