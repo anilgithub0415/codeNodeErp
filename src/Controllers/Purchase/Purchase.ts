@@ -18,6 +18,38 @@ router.use((req, res, next) => {
         res.status(500).json({ message: 'Server initialization error. Purchase service not ready.' });
     }
 }); 
+
+
+router.get(
+    "/:id/workflow",
+    async(req,res,next)=>{
+
+        try{
+
+console.log('......here is tenantid in purchase/123/workflow url:');
+            const tenantId=req.user.tenantId;
+
+            const purchaseId=Number(req.params.id);
+            const purchaseService = getPurchaseOrderRepository(); 
+
+            const result=
+                await purchaseService.getWorkflow(
+                    purchaseId,
+                    tenantId
+                );
+
+            res.json(result);
+
+        }
+        catch(ex){
+
+            next(ex);
+
+        }
+
+    }
+);
+
 //getPO single
 
     router.route('/:tenantId/:poId')
@@ -169,6 +201,42 @@ router.route('/:id/finalize').patch(async (req: Request, res: Response) => {
         return res.status(400).json({ message: 'Failed to submit for approval: ' + error.message });
     }
 });
+
+
+
+// ==========================================
+// PATCH: SEND DRAFT/REVISED QUOTATION TO CLIENT
+// ==========================================
+router.route('/:id/send').patch(async (req: Request, res: Response) => {
+    try {
+
+     
+        const purchaseService = getPurchaseOrderRepository(); 
+        const targetPurchaseId = parseInt(req.params.id, 10);
+
+        if (isNaN(targetPurchaseId)) {
+            return res.status(400).json({ message: 'Invalid identity tracking index.' });
+        }
+   console.log('.....hitting send.......');
+        
+        const loggedInTenantId = parseInt(req.user.tenantId, 10);
+
+        // Transition the purchase cleanly to SENT status
+        const updatedPurchase = await purchaseService.updatePurchaseOrderStatus(
+            targetPurchaseId,
+            loggedInTenantId,
+            POStatus.SENT
+        );
+
+        return res.status(200).json({
+            message: `Purchase has been successfully sent to the client.`,
+            purchase: updatedPurchase
+        });
+    } catch (error: any) {
+        return res.status(400).json({ message: 'Failed to send purchase: ' + error.message });
+    }
+});
+
 
 // ==========================================
 // PATCH: APPROVE A PENDING PURCHASE ORDER (AFFECTS STOCK)

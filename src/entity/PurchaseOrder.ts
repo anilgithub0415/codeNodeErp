@@ -9,9 +9,11 @@ export enum POStatus {
     APPROVED = "APPROVED",
     SENT = "SENT",
     PARTIALLY_RECEIVED = "PARTIALLY_RECEIVED",
+    RECEIVED="RECEIVED",
     CLOSED = "CLOSED",
     CANCELLED = "CANCELLED"
 }
+
 @Check(`status IN ('DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'SENT', 'PARTIALLY_RECEIVED', 'CLOSED', 'CANCELLED')`)
 
 @Entity("purchase_orders")

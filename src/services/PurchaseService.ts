@@ -7,7 +7,8 @@ import { Product } from '../entity/Product';
 import { DocumentSequence } from '../entity/DocumentSequence';
 import { ProductVariant } from '../entity/productVariant';
 import { ProductUomConversion } from '../entity/ProductUomConversion';
-import { getProductRepository, getProductUomConversionRepository, getProductVariantRepository } from '../dependencies';
+import { getProductRepository, getProductUomConversionRepository, getProductVariantRepository, getTenantStrategyServiceRepository } from '../dependencies';
+import { IPurchaseActions, PurchaseWorkflowService, PurchaseWorkflowType } from './PurchaseWorkflowService';
 
 export interface ICreatePurchaseOrderItemInput {
     productId?: number;
@@ -29,8 +30,20 @@ export interface CreatedPurchaseOrderResponse {
     purchaseOrder: PurchaseOrder;
 }
 
+
+export interface PurchaseWorkflowDto{
+
+    purchaseId:number;
+
+    status:POStatus;
+
+    actions:IPurchaseActions;
+
+}
+
 export class PurchaseService {
     private purchaseRepository!: Repository<PurchaseOrder>;
+        private workflowService = new PurchaseWorkflowService();
 
     //============================================================================================================================================
     /**
@@ -42,6 +55,84 @@ export class PurchaseService {
         this.purchaseRepository = purchaseRepo;
         console.log("PurchaseService repository initialized.");       
     }
+
+
+    public async getWorkflow(
+    purchaseId:number,
+    tenantId:number
+    ):Promise<PurchaseWorkflowDto>{
+
+        const purchase = await this.purchaseRepository.findOne({
+
+            where:{
+                id:purchaseId,
+                tenantId
+            }
+
+        });
+
+        if(!purchase){
+
+            throw new Error("Purchase not found.");
+
+        }
+
+
+         const tenantStrategyService =
+                getTenantStrategyServiceRepository();
+
+         const strategies =
+        await tenantStrategyService
+            .getTenantStrategies(tenantId);
+
+    const workflowStrategy =
+        strategies.find(
+            s =>
+                s.tenantStrategyName ===
+                "Purchase_Workflow"
+        );
+
+    if (!workflowStrategy) {
+        throw new Error(
+            "Purchase Workflow not configured."
+        );
+    }
+
+    const workflowName =
+        workflowStrategy.tenantStrategy;
+
+       const workflowType=this.toPurchaseWorkflowType(workflowName) 
+        return{
+
+            purchaseId:purchase.id,
+
+            status:purchase.status,
+
+            actions: await this.workflowService.getAllowedActions(workflowType,
+                purchase.status
+            )
+
+        };
+
+    }
+
+
+     toPurchaseWorkflowType(
+    value: string
+): PurchaseWorkflowType {
+
+    if (
+        Object.values(PurchaseWorkflowType)
+            .includes(value as PurchaseWorkflowType)
+    ) {
+        return value as PurchaseWorkflowType;
+    }
+
+    throw new Error(
+        `Unsupported Purchase Workflow strategy: ${value}`
+    );
+}
+
     //============================================================================================================================================
     //============================================================================================================================================
     async createPurchaseOrder(
@@ -719,6 +810,9 @@ export class PurchaseService {
     newStatus: POStatus, // Use the strict enum type here
     manager?: EntityManager
 ): Promise<PurchaseOrder> {
+    
+    console.log('.......................updatestatus PO.....................');
+    
     const activeManager = manager ? manager : AppDataSource.manager;
     const poRepo = activeManager.getRepository(PurchaseOrder);
 
@@ -731,10 +825,6 @@ export class PurchaseService {
         throw new Error(`[PurchaseService] Purchase Order not found for ID: ${poId}`);
     }
 
-    // 2. State Safety Guard using strict enum validation
-    if (targetPO.status !== POStatus.DRAFT) {
-        throw new Error(`[PurchaseService] Only ${POStatus.DRAFT} purchase orders can be submitted for approval. Current status is '${targetPO.status}'.`);
-    }
 
     console.log(`[PurchaseService] Transitioning PO ${targetPO.poNumber} status from ${POStatus.DRAFT} to ${newStatus}`);
 

@@ -28,7 +28,7 @@ const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI!; // This must be th
 
 // Define the structure for a single available context
 interface AvailableContext {
-    userId?:any;
+    userId?:any;displayName:string;
     tenantId: number;
     tenantName: string; // Include tenant name for display
     roleName: string;
@@ -70,7 +70,7 @@ interface LoginResponse {
     availableContexts: AvailableContext[];
     expires_in: number; //earlier was AccessToken_expiresIn
     tenantId:number;
-    tenantType:string;
+    tenantType:string;userName?:string;
     roleName:string;
     permissions:any[]
 }
@@ -266,7 +266,7 @@ const generateAuthTokens = async (newUser: any, deviceInfo: string = '', manager
 
         // 2. Map UserTenantContexts to AvailableContext DTOs
         var availableContexts: AvailableContext[] = userContexts.map(context => ({
-            tenantId: context.tenantId,
+            tenantId: context.tenantId,displayName:'userABC', //Pending:displayName is asigned statically  userABC
             tenantName: context.user.tenant!.tenantName, // Assuming tenant name is available on the loaded tenant object
             tenantType:context.user.tenant!.tenantType,
             roleName: context.roleName,
@@ -718,7 +718,7 @@ const Login = async (credentials: { userName: string; password: string; }, devic
                     userId: verifiedUserId,
                     tenantId: 0,
                     tenantName: 'Global System (All Tenants)',
-                    roleName: 'SuperAdmin',
+                    roleName: 'SuperAdmin', displayName:'userEFG',//Pending:displayName is asigned statically  userEFG
                     permissions: ['ALL_PRIVILEGES']
                 }
             ];
@@ -728,7 +728,7 @@ const Login = async (credentials: { userName: string; password: string; }, devic
                 availableContexts.push({
                     userId: verifiedUserId,
                     tenantId: tenantId,
-                    tenantName: data.tenantName,
+                    tenantName: data.tenantName, displayName:'userpqr', //Pending:displayName is asigned statically  userpqr
                     roleName: 'Admin', // Default target role to assume when spoofing
                     permissions: data.permissions // FIXED: Now passing the extracted permissions array
                 });
@@ -751,7 +751,7 @@ const Login = async (credentials: { userName: string; password: string; }, devic
             // 4. Map entities to AvailableContext DTOs safely
             availableContexts = userContexts.map(context => ({
                 userId: context.userId,
-                tenantId: context.tenantId,
+                tenantId: context.tenantId, displayName:context.user?.userName,
                 tenantName: context.user?.tenant?.tenantName || 'Unknown Tenant',
                 roleName: context.role?.rolename || 'No Role Assigned', // Corrected property case from rolename to roleName
                 permissions: context.role?.rolePermissions ? context.role.rolePermissions.map(p => p.permissionName) : []
