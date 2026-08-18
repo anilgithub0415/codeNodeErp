@@ -208,6 +208,9 @@ app.use('/api/migrate-database', migrateC);
 //===================================================
 
 
+//test
+import testPriceCalculationC from './src/Controllers/testPriceCalculation/testPriceCalculation';
+app.use('/api/testPriceCalculation', testPriceCalculationC);
 
 
 // ==========================================

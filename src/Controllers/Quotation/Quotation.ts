@@ -164,6 +164,56 @@ router.route('/:id/counter-offer').post(async (req: Request, res: Response) => {
 });
 
 
+router.route('/:id/client-approve').post(async (req: Request, res: Response) => {
+
+    try {
+
+        const quotationService =
+            getQuotationRepository();
+
+        const quotationId =
+            Number(req.params.id);
+
+        const tenantId =
+            req.user.tenantId;
+
+        if (!quotationId || isNaN(quotationId)) {
+
+            return res.status(400).json({
+                message: 'Invalid quotation ID.'
+            });
+
+        }
+
+        const result =
+            await quotationService.clientApproveQuotation(
+                quotationId,
+                tenantId
+            );
+
+        return res.status(200).json({
+            message: 'Quotation accepted successfully.',
+            quotation: result
+        });
+
+    }
+    catch (error: any) {
+
+        console.error(
+            '[Client Quotation Approve Error]:',
+            error.message || error
+        );
+
+        return res.status(400).json({
+            message:
+                'Failed to accept quotation: ' +
+                error.message
+        });
+
+    }
+
+});
+
 // ==========================================
 // PUT: MODIFY AN UNFINISHED CLIENT QUOTATION
 // ==========================================

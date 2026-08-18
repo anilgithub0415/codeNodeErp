@@ -3,22 +3,22 @@ import { QuotationItem } from './QuotationItem';
 import { Customer } from './Customer';
 
 // 1. Define the negotiation status enum
-export enum QuotationStatus {
-    DRAFT = "DRAFT",                                     // Wholesaler creating the quote
-    PENDING_APPROVAL="PENDING_APPROVAL",                        
-    APPROVED = "APPROVED",      
-    SENT = "SENT",                                       // Sent to client, visible in ClientPortal
-    COUNTER_OFFERED = "COUNTER_OFFERED",                 // Client changed prices and sent back
-    REVISED = "REVISED",                                 // Wholesaler adjusted prices based on counter-offer
-    REJECTED = "REJECTED",                               // Client or Wholesaler cancelled negotiation
-    EXPIRED = "EXPIRED",
-  
-    CANCELLED="CANCELLED"                                  // Validity date passed
-}
 
+export enum QuotationStatus {
+    DRAFT = "DRAFT",
+    PENDING_APPROVAL = "PENDING_APPROVAL",
+    APPROVED = "APPROVED",
+    SENT = "SENT",
+    CLIENT_APPROVED = "CLIENT_APPROVED",
+    COUNTER_OFFERED = "COUNTER_OFFERED",
+    REVISED = "REVISED",
+    REJECTED = "REJECTED",
+    EXPIRED = "EXPIRED",
+    CANCELLED = "CANCELLED"
+}
 // 2. Add SQL Check constraint covering all enum values
 @Check(`"total_amount" >= 0`)
-@Check(`status IN ('DRAFT', 'PENDING_APPROVAL','APPROVED', 'SENT', 'COUNTER_OFFERED', 'REVISED', 'REJECTED', 'EXPIRED','CANCELLED')`)
+@Check(`status IN ('DRAFT', 'PENDING_APPROVAL','APPROVED', 'SENT','CLIENT_APPROVED', 'COUNTER_OFFERED', 'REVISED', 'REJECTED', 'EXPIRED','CANCELLED')`)
 @Entity("quotations")
 export class Quotation {
 

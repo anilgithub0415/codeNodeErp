@@ -16,6 +16,7 @@ export interface IQuotationActions {
     canApprove: boolean;
     canSend:boolean;
     canCounterOffer: boolean;
+    canClientApprove: boolean;
     canRevise: boolean;
     canChangeCustomer: boolean;
 }
@@ -48,83 +49,124 @@ type QuotationWorkflowDefinition =
  
 export class QuotationWorkflowService {
 
-    
-private workflows: Record<QuotationWorkflowType, QuotationWorkflowDefinition> = {
+    private workflows:
+    Record<
+        QuotationWorkflowType,
+        QuotationWorkflowDefinition
+    > = {
 
-  [QuotationWorkflowType.STANDARD_APPROVAL]: {
-    [QuotationStatus.DRAFT]: {
-        editable: true,
-        deletable: true,
-        customerChange: true,
-        next: [
-            QuotationStatus.PENDING_APPROVAL
-        ]
-    },
+    [QuotationWorkflowType.STANDARD_APPROVAL]: {
 
-    [QuotationStatus.PENDING_APPROVAL]: {
-    editable: false,
-    deletable: false,
-    customerChange: false,
-    next: [
-        QuotationStatus.APPROVED,
-        QuotationStatus.REJECTED
-    ]
-    },
+        [QuotationStatus.DRAFT]: {
 
-    [QuotationStatus.APPROVED]: {
-        editable: false,
-        deletable: false,
-        customerChange: false,
-        next: [
-            QuotationStatus.SENT
-        ]
-    },
+            editable: true,
+            deletable: true,
+            customerChange: true,
 
-    [QuotationStatus.SENT]: {
-        editable: false,
-        deletable: false,
-        customerChange: false,
-        next: [
-            QuotationStatus.COUNTER_OFFERED,
-            QuotationStatus.APPROVED
-        ]
-    },
+            next: [
+                QuotationStatus.PENDING_APPROVAL
+            ]
+        },
 
-    [QuotationStatus.COUNTER_OFFERED]: {
-        editable: false,
-        deletable: false,
-        customerChange: false,
-        next: [
-            QuotationStatus.REVISED
-        ]
-    },
 
-    [QuotationStatus.REVISED]: {
-        editable: true,
-        deletable: false,
-        customerChange: false,
-        next: [
-            QuotationStatus.PENDING_APPROVAL
-        ]
-    },
+        // Wholesaler internal approval
+        [QuotationStatus.PENDING_APPROVAL]: {
 
-    
+            editable: false,
+            deletable: false,
+            customerChange: false,
 
-    [QuotationStatus.REJECTED]: {
-        editable: false,
-        deletable: false,
-        customerChange: false,
-        next: []
-    },
+            next: [
+                QuotationStatus.APPROVED,
+                QuotationStatus.REJECTED
+            ]
+        },
 
-    [QuotationStatus.CANCELLED]: {
-        editable: false,
-        deletable: false,
-        customerChange: false,
-        next: []
+
+        // Wholesaler approved quotation
+        [QuotationStatus.APPROVED]: {
+
+            editable: false,
+            deletable: false,
+            customerChange: false,
+
+            next: [
+                QuotationStatus.SENT
+            ]
+        },
+
+
+        // Sent to client
+        [QuotationStatus.SENT]: {
+
+            editable: false,
+            deletable: false,
+            customerChange: false,
+
+            next: [
+                QuotationStatus.CLIENT_APPROVED,
+                QuotationStatus.COUNTER_OFFERED
+            ]
+        },
+
+
+        // Client accepted quotation
+        [QuotationStatus.CLIENT_APPROVED]: {
+
+            editable: false,
+            deletable: false,
+            customerChange: false,
+
+            next: []
+        },
+
+
+        // Client proposed changes
+        [QuotationStatus.COUNTER_OFFERED]: {
+
+            editable: false,
+            deletable: false,
+            customerChange: false,
+
+            next: [
+                QuotationStatus.REVISED
+            ]
+        },
+
+
+        // Wholesaler prepares revised quotation
+        [QuotationStatus.REVISED]: {
+
+            editable: true,
+            deletable: false,
+            customerChange: false,
+
+            next: [
+                QuotationStatus.PENDING_APPROVAL
+            ]
+        },
+
+
+        [QuotationStatus.REJECTED]: {
+
+            editable: false,
+            deletable: false,
+            customerChange: false,
+
+            next: []
+        },
+
+
+        [QuotationStatus.CANCELLED]: {
+
+            editable: false,
+            deletable: false,
+            customerChange: false,
+
+            next: []
+        }
+
     }
-} //end of STANDARD_APPROVAL
-
 };
 
       
@@ -211,6 +253,17 @@ public canDelete(
         );
     }
 
+     public canClientApprove(  
+        workflowType: QuotationWorkflowType,
+        status: QuotationStatus
+    ): boolean {
+
+        return this.canTransition(
+            workflowType,
+            status,
+            QuotationStatus.CLIENT_APPROVED
+        );
+    }
 
     public canRevise(  
         workflowType: QuotationWorkflowType,
@@ -307,6 +360,8 @@ public async resolveWorkflowType(
         canSend: this.canSend(workflowType,status),
 
         canCounterOffer: this.canCounterOffer(workflowType,status),
+        
+        canClientApprove: this.canClientApprove(workflowType,status),
 
         canRevise: this.canRevise(workflowType,status),
 
@@ -415,6 +470,21 @@ public async resolveWorkflowType(
 
         throw new Error(
             `Quotation cannot receive a counter offer when status is '${status}'.` +
+            `under workflow '${workflowType}'.`
+        );
+
+    }
+}
+
+public ensureCanClientApprove(
+    workflowType: QuotationWorkflowType,
+    status: QuotationStatus
+): void {
+
+    if (!this.canClientApprove(workflowType, status)) {
+
+        throw new Error(
+            `Quotation cannot clientapproved when status is '${status}'.` +
             `under workflow '${workflowType}'.`
         );
 

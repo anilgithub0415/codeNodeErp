@@ -1231,6 +1231,221 @@ private async executeQuotationStatusUpdate(
     );
 }
 
+public async clientApproveQuotation(
+    quotationId: number,
+    tenantId: number
+): Promise<Quotation> {
+
+    const queryRunner =
+        AppDataSource.createQueryRunner();
+
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+
+        const manager =
+            queryRunner.manager;
+
+
+        // =====================================================
+        // 1. Repositories
+        // =====================================================
+
+        const quotationRepo =
+            manager.getRepository(
+                Quotation
+            );
+
+        const rfqRepo =
+            manager.getRepository(
+                ClientRFQOrder
+            );
+
+
+        // =====================================================
+        // 2. Fetch quotation
+        // =====================================================
+
+        const quotation =
+            await quotationRepo.findOne({
+
+                where: {
+                    id: quotationId,
+                    tenantId
+                },
+
+                relations: [
+                    'items'
+                ]
+
+            });
+
+
+        if (!quotation) {
+
+            throw new Error(
+                'Quotation not found or unauthorized.'
+            );
+
+        }
+
+
+        // =====================================================
+        // 3. Validate quotation status
+        //
+        // Client can accept only a quotation that has
+        // already been sent by the wholesaler.
+        // =====================================================
+
+        if (
+            quotation.status !==
+            QuotationStatus.SENT
+        ) {
+
+            throw new Error(
+                `Quotation cannot be accepted by client when status is '${quotation.status}'.`
+            );
+
+        }
+
+
+        // =====================================================
+        // 4. Resolve quotation workflow
+        // =====================================================
+
+        const workflowService =
+            new QuotationWorkflowService();
+
+        const workflowType =
+            await workflowService.resolveWorkflowType(
+                tenantId
+            );
+
+
+        // =====================================================
+        // 5. Validate CLIENT_APPROVE transition
+        // =====================================================
+
+        workflowService.ensureCanClientApprove(
+            workflowType,
+            quotation.status
+        );
+
+
+        // =====================================================
+        // 6. Update quotation
+        //
+        // SENT → CLIENT_APPROVED
+        // =====================================================
+
+        quotation.status =
+            QuotationStatus.CLIENT_APPROVED;
+
+
+        // =====================================================
+        // 7. Find originating Client RFQ
+        // =====================================================
+
+        if (
+            !quotation.originatingClientRfqId
+        ) {
+
+            throw new Error(
+                'Quotation is not linked to an originating Client RFQ.'
+            );
+
+        }
+
+
+        const rfq =
+            await rfqRepo.findOne({
+
+                where: {
+                    id:
+                        quotation.originatingClientRfqId,
+
+                    tenantId
+                }
+
+            });
+
+
+        if (!rfq) {
+
+            throw new Error(
+                'Originating Client RFQ not found.'
+            );
+
+        }
+
+
+      
+
+
+        // =====================================================
+        // 9. Close originating RFQ
+        //
+        // IN_NEGOTIATION → CLOSED
+        // =====================================================
+
+        rfq.status =
+            RFQStatus.CLOSED;
+
+
+        // =====================================================
+        // 10. Save RFQ
+        // =====================================================
+
+        await rfqRepo.save(
+            rfq
+        );
+
+
+        // =====================================================
+        // 11. Save quotation
+        //
+        // SENT → CLIENT_APPROVED
+        // =====================================================
+
+        const savedQuotation =
+            await quotationRepo.save(
+                quotation
+            );
+
+
+        // =====================================================
+        // 12. Commit transaction
+        //
+        // Both changes succeed together.
+        // =====================================================
+
+        await queryRunner.commitTransaction();
+
+
+        return savedQuotation;
+
+    }
+    catch (error: any) {
+
+        await queryRunner.rollbackTransaction();
+
+        console.error(
+            '[Client Quotation Approval Rollback]:',
+            error.message || error
+        );
+
+        throw error;
+
+    }
+    finally {
+
+        await queryRunner.release();
+
+    }
+
+}
+
 async processQuotationRevision(
     originalQuoteId: number,
     tenantId: number,
