@@ -76,6 +76,9 @@ import { DiscountType } from './src/entity/DiscountType';
 import { Interaction } from './src/entity/Interaction';
 import { ClientRFQOrder } from './src/entity/ClientRFQOrder';
 import { ClientRFQOrderItem } from './src/entity/ClientRFQOrderItem';
+import { Promotion } from './src/entity/Promotion';
+import { PromotionAction } from './src/entity/PromotionAction';
+import { PromotionCondition } from './src/entity/PromotionCondition';
 
 
 
@@ -124,7 +127,7 @@ export const AppDataSource = new DataSource({
     ,DeliveryChallan,DeliveryChallanItem
     ,Leadsource,ClientStatus,Site
 
-    ,LineDiscount,DiscountType
+    ,LineDiscount,DiscountType, Promotion, PromotionAction, PromotionCondition
     ,Interaction
 ,AutocodeCounter ,DocumentSequence, CustomerCategoryMapping
 ,UserPreferences], 

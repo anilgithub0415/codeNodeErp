@@ -159,7 +159,7 @@ class PriceResolverEngine {
             if (!customer) {
 
                 throw new Error(
-                    "Customer not found."
+                    "Customer not found. with customerId:"
                 );
 
             }

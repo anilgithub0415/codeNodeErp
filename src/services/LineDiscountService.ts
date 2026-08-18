@@ -45,22 +45,45 @@ export class LineDiscountService {
 
     //Pending:Need to consider discount for customerId 
     //Pending: Need to consider discount for Quantity
+async findBestDiscount(
+    tenantId: number,
+    productId: number,
+    productVariantId: number | null,
+    customerId: number,
+    quantity: number,
+    sellingPrice: number,
+    manager?: EntityManager
+): Promise<LineDiscount | null> {
 
-    async findBestDiscount(
-        tenantId:number,    productId:number,    productVariantId:number|null,
-        customerId:number,  quantity:number,   sellingPrice:number, manager?: EntityManager
-    ): Promise<LineDiscount> {
-        if (!this.discountRepository) {
-            throw new Error("LineDiscountService repository not initialized.");
-        }
-        const discountRepo = manager ? manager.getRepository(LineDiscount) : this.discountRepository;
-        const result = await discountRepo.findOne({ 
-            where: { tenantId: tenantId , productId:productId  },
-            relations: ['product'] 
-        }); 
-        return result!; 
-
+    if (!this.discountRepository) {
+        throw new Error(
+            "LineDiscountService repository not initialized."
+        );
     }
+
+    const discountRepo =
+        manager
+            ? manager.getRepository(LineDiscount)
+            : this.discountRepository;
+
+    const result =
+        await discountRepo.findOne({
+
+            where: {
+                tenantId,
+                productId,
+                isActive: true
+            },
+
+            relations: [
+                'product',
+                'discountType'
+            ]
+
+        });
+
+    return result;
+}
    async getDiscounts(ptenantId: number, manager?: EntityManager): Promise<LineDiscount[]> {
     if (!this.discountRepository) {
         throw new Error("LineDiscountService repository not initialized.");
